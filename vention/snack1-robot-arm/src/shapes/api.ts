@@ -7,6 +7,7 @@ import type { NewShape, Shape, ShapePatch } from "./types";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../conveyors/types";
 import type { NewSplitter, Splitter, SplitterPatch } from "../splitters/types";
 import type { Part } from "../splitters/rules";
+import type { Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner } from "../line/types";
 
 /** Override with VITE_INVENTORY_API, e.g. http://localhost:8080 for the API without Docker. */
 export const API_BASE: string = (import.meta.env.VITE_INVENTORY_API as string | undefined) ?? "http://localhost:8081";
@@ -58,4 +59,20 @@ export const splittersApi = {
   remove: (id: string) => call<{ deleted: string }>("DELETE", `/splitters/${id}`),
   /** Parts with every field the rules can test (location, stock, low). */
   parts: () => call<Part[]>("GET", "/parts"),
+};
+
+export const lineApi = {
+  connectors: () => call<{ defaultPoints: ConnectionPoint[]; connectors: Connectors[] }>("GET", "/connectors"),
+  setPoints: (owner: Owner, points: ConnectionPoint[]) => call<Connectors>("PUT", `/connectors/${owner}`, { points }),
+  resetPoints: (owner: Owner) => call<{ deleted: string }>("DELETE", `/connectors/${owner}`),
+  mergers: () => call<Merger[]>("GET", "/mergers"),
+  createMerger: (m: NewMerger) => call<Merger>("POST", "/mergers", m),
+  updateMerger: (id: string, patch: MergerPatch) => call<Merger>("PATCH", `/mergers/${id}`, patch),
+  removeMerger: (id: string) => call<{ deleted: string }>("DELETE", `/mergers/${id}`),
+  machines: () => call<Machine[]>("GET", "/machines"),
+  createMachine: (m: NewMachine) => call<Machine>("POST", "/machines", m),
+  updateMachine: (id: string, patch: MachinePatch) => call<Machine>("PATCH", `/machines/${id}`, patch),
+  removeMachine: (id: string) => call<{ deleted: string }>("DELETE", `/machines/${id}`),
+  assemble: (a: NewAssembly) => call<Assembly>("POST", "/assemblies", a),
+  assemblies: () => call<Assembly[]>("GET", "/assemblies?limit=20"),
 };

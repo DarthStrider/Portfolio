@@ -22,6 +22,8 @@ repository interface and pass the same contract tests.
 - [x] Concurrency-safe on both databases: stock never goes negative and is never promised twice
 - [x] Shapes for the robot arm's scene (Snack 1): boxes, cylinders, spheres and cones with size, color, position and rotation, stored with the inventory
 - [x] Splitters on those belts: ordered sorting rules (on the shape, or on the inventory part it stands for) stored as data, editable from the arm app, the API or the database
+- [x] Mergers and joining machines for those belts, and connection points per kind of object (part or shape kind)
+- [x] Assemblies: joining two shapes uses up their parts from stock, all or nothing, with a ledger entry; safe when two joins race for the same shape
 - [x] Edit a part's name, category, location or reorder level (stock only changes through receive and consume, so the ledger stays complete)
 - [x] Conveyor belts for the same scene: size, speed (forward or reversed), position and angle, so a line layout is saved with the parts it uses
 - [x] Switchable storage: `DB=postgres`, `DB=mongo`, or `DB=memory` (no database at all)
@@ -152,6 +154,15 @@ replica set, the same steps could run inside a multi-document transaction instea
 | POST | `/api/splitters` | `{ "name": "Sort gate", "conveyorId": "…", "along": 1.2, "rules": [{ "conditions": [{ "field": "part.category", "op": "eq", "value": "plate" }], "exit": "left" }], "otherwise": "straight" }` | 201 + splitter (`along` in meters from the belt's start, at most its length) |
 | PATCH | `/api/splitters/{id}` | `name`, `along`, `rules` (the whole list, in order) or `otherwise` | Updated splitter |
 | DELETE | `/api/splitters/{id}` | | `{ "deleted": id }`, or 404. Deleting a belt deletes its splitters |
+| GET | `/api/connectors` | | `{ defaultPoints, connectors }`: stored connection points per kind of object |
+| PUT | `/api/connectors/{owner}` | `{ "points": [{ "name": "hole", "x": -0.25, "y": 0.5, "z": 0 }] }` | Replaces the points for `part:<SKU>` or `kind:<box\|cylinder\|sphere\|cone>`. Positions are fractions of the size, −0.5 to 0.5 |
+| DELETE | `/api/connectors/{owner}` | | Back to the defaults (top and bottom) |
+| GET / POST | `/api/mergers` | `{ "name", "kind": "side"\|"y", "conveyorId", "along", "feederIds": [...], "priority": "main"\|"feeders"\|"alternate", "gap" }` | List, or 201 + merger. Side: one feeder; Y: two, and `along` is 0 |
+| PATCH / DELETE | `/api/mergers/{id}` | `name`, `along`, `priority` or `gap` | Updated merger / `{ "deleted": id }`. Deleting any belt it uses deletes it |
+| GET / POST | `/api/machines` | `{ "name", "conveyorId", "along", "base": { "owner": "part:PL-200", "point": "hole" }, "attach": { "owner": "kind:cylinder", "point": "bottom" }, "cycleSeconds": 1.5 }` | List, or 201 + machine |
+| PATCH / DELETE | `/api/machines/{id}` | `name`, `along`, `base`, `attach` or `cycleSeconds` | Updated machine / `{ "deleted": id }` |
+| GET | `/api/assemblies?limit=50` | | Assemblies, newest first, with the parts each used |
+| POST | `/api/assemblies` | `{ "name", "baseShapeId", "attachedShapeId", "basePoint", "attachedPoint", "attachment": { "x", "y", "z", "rotationY" } }` | 201 + assembly. 409 if the shape is already joined, the join would loop, or stock is short (with `shortages`); 404 if a shape is missing |
 | PATCH | `/api/parts/{sku}` | `name`, `category`, `location` or `reorderLevel` | Updated part. Stock fields are refused: use receive/consume |
 
 Rule fields: `kind`, `color`, `name`, `sku`, `width`, `height`, `depth` (meters), `isPart`, `part.category`, `part.location`,
@@ -165,7 +176,7 @@ arm's dev server uses it. Set `CORS_ORIGINS` to a comma-separated list to allow 
 
 ## Testing
 
-- **Contract tests** (`tests/contract.ts`, 23 tests) run against every implementation: filtering, the
+- **Contract tests** (`tests/contract.ts`, 26 tests) run against every implementation: filtering, the
   ledger, all-or-nothing reservations, consuming around reservations, closing exactly once, and
   concurrency (8 simultaneous reservations for 3 actuators: exactly 3 succeed).
   The in-memory run is part of `npm test`; Postgres and MongoDB run with `--profile test`.

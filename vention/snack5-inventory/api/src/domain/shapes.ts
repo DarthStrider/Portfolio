@@ -7,6 +7,7 @@
  */
 import { isSku } from "./design.ts";
 import { ValidationError } from "./errors.ts";
+import type { Attachment } from "./assembly.ts";
 
 export type ShapeKind = "box" | "cylinder" | "sphere" | "cone";
 export const SHAPE_KINDS: readonly ShapeKind[] = ["box", "cylinder", "sphere", "cone"];
@@ -35,11 +36,16 @@ export interface Shape {
   rotationY: number;
   /** The inventory part this shape stands for, or null for a plain shape. */
   sku: string | null;
+  /** Set once the shape has been joined onto another (an assembly): it then moves with that shape. */
+  attachedTo: string | null;
+  /** Where it sits on that shape, in that shape's frame. Null unless attached. */
+  attach: Attachment | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export type NewShape = Omit<Shape, "id" | "createdAt" | "updatedAt">;
+/** New shapes stand alone; only an assembly attaches one shape to another. */
+export type NewShape = Omit<Shape, "id" | "createdAt" | "updatedAt" | "attachedTo" | "attach">;
 /** What can change after a shape is placed: move it, turn it, rename or recolor it. */
 export type ShapePatch = Partial<Pick<Shape, "name" | "color" | "position" | "rotationY">>;
 

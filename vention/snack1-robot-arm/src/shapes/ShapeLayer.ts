@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { DEG } from "../arm/kinematics";
 import type { Shape, ShapeKind, Size } from "./types";
+import { poses, type Pose } from "../line/joints";
 
 /**
  * Draws the stored shapes in the scene, plus a see-through "ghost" that follows the mouse
@@ -74,8 +75,12 @@ export class ShapeLayer {
       mesh.name = s.name;
       mesh.material.color.set(s.color);
       mesh.userData.halfHeight = s.size.y / 2;
-      place(mesh, s.size, s.position.x, s.position.z, s.rotationY, this.supportAt(s.position.x, s.position.z));
     }
+    // Shapes on their own stand on the floor or a belt; joined shapes ride on their base.
+    const where = poses(shapes, (s) => ({
+      x: s.position.x, y: this.supportAt(s.position.x, s.position.z) + s.size.y / 2, z: s.position.z, rotationY: s.rotationY,
+    }));
+    for (const [id, p] of where) this.poseCenter(id, p);
     this.select(this.selectedId && keep.has(this.selectedId) ? this.selectedId : null);
   }
 
@@ -86,6 +91,19 @@ export class ShapeLayer {
   pose(id: string, x: number, y: number, z: number): void {
     const mesh = this.meshes.get(id);
     if (mesh) mesh.position.set(x, y + (mesh.userData.halfHeight as number), z);
+  }
+
+  /** Places a shape's center exactly: used for shapes riding on others. */
+  poseCenter(id: string, p: Pose): void {
+    const mesh = this.meshes.get(id);
+    if (!mesh) return;
+    mesh.position.set(p.x, p.y, p.z);
+    mesh.rotation.y = p.rotationY * DEG;
+  }
+
+  /** The mesh drawing a shape, so connection point markers can be added to it. */
+  meshOf(id: string): THREE.Mesh | undefined {
+    return this.meshes.get(id);
   }
 
   /** Highlights one shape (or none) by making it glow slightly. */

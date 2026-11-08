@@ -250,10 +250,13 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
     render();
   }
 
+  const selectListeners: ((id: string | null) => void)[] = [];
+
   function setSelected(id: string | null) {
     selected = id;
     layer.select(id);
     render();
+    for (const fn of selectListeners) fn(id);
   }
 
   function remove(id: string) {
@@ -303,6 +306,7 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
       <h2>In the scene <span class="count"></span></h2>
       <ul class="shape-list"></ul>
     </section>
+    <section class="points-host" hidden></section>
     <p class="shapes-status" role="status" hidden></p>
   `;
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector(sel) as T;
@@ -424,14 +428,18 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
             ? `<small class="${placed > part.onHand ? "over" : ""}">${s.sku} · ${placed} in scene, ${part.onHand} on hand</small>`
             : s.sku ? `<small class="over">${s.sku} · no longer in the inventory</small>` : "";
           const moving = mode.kind === "moving" && mode.id === s.id;
+          const base = s.attachedTo ? shapes.find((x) => x.id === s.attachedTo) : undefined;
+          const joined = base ? `<small class="joined">joined onto ${escapeHtml(base.name)}</small>` : "";
+          // A joined shape moves with its base, so it has no Move of its own.
+          const moveBtn = base ? "" : `<button type="button" data-id="${s.id}" data-do="move" aria-pressed="${moving}" ${running ? "disabled" : ""} title="Click the floor to move it">${moving ? "Cancel" : "Move"}</button>`;
           return `<li class="${s.id === selected ? "selected" : ""}">
             <button type="button" class="pick" data-id="${s.id}" aria-pressed="${s.id === selected}">
               <span class="swatch" style="background:${s.color}"></span>
-              <span class="label"><strong>${escapeHtml(s.name)}</strong><small>${s.kind} · ${sizeText(s)}</small>${stockNote}
+              <span class="label"><strong>${escapeHtml(s.name)}</strong><small>${s.kind} · ${sizeText(s)}</small>${stockNote}${joined}
                 <span class="pill ${where}">${REACH_LABEL[where]}</span></span>
             </button>
             <span class="row-actions">
-              <button type="button" data-id="${s.id}" data-do="move" aria-pressed="${moving}" ${running ? "disabled" : ""} title="Click the floor to move it">${moving ? "Cancel" : "Move"}</button>
+              ${moveBtn}
               <button type="button" data-id="${s.id}" data-do="delete" ${running ? "disabled" : ""} title="Delete (or press Delete)">✕</button>
             </span>
           </li>`;
@@ -498,15 +506,25 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
       return m ? { ...s, position: { x: m.x, z: m.z } } : s;
     });
     refresh();
-    if (moves.length === 0) return;
-    void act(async () => {
+    if (moves.length === 0) return Promise.resolve();
+    return act(async () => {
       // One request per shape; a few dozen at most, so a bulk endpoint isn't worth it.
       for (const m of moves) await shapesApi.update(m.id, { position: { x: m.x, z: m.z } });
     }, `Saved where ${moves.length} shape${moves.length === 1 ? "" : "s"} ended up.`);
   }
 
   return {
-    layer, handleClick, handleHover, handleKey, setSurface, setRunning, saveMoves, refresh,
+    layer, handleClick, handleHover, handleKey, setSurface, setRunning, saveMoves, refresh, act,
+    /** Reload from the API now (after a change made elsewhere, such as an assembly). */
+    reload: load,
+    /** Where the connection point editor goes. */
+    pointsHost: $("section.points-host"),
+    get selectedId(): string | null {
+      return selected;
+    },
+    onSelect(fn: (id: string | null) => void) {
+      selectListeners.push(fn);
+    },
     /** The shapes as last loaded (or saved). */
     get shapes(): readonly Shape[] {
       return shapes;

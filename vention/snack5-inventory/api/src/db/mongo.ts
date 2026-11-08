@@ -28,6 +28,10 @@ import type { NewShape, Shape, ShapePatch } from "../domain/shapes.ts";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
 import type { NewSplitter, Splitter, SplitterPatch } from "../domain/splitters.ts";
 import type { PartPatch } from "../domain/newPart.ts";
+import type {
+  AssembleResult, Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner,
+} from "../domain/assembly.ts";
+import { consumption } from "./memory.ts";
 
 interface PartDoc {
   _id: string; // the SKU
@@ -45,6 +49,10 @@ interface ShapeDoc extends Omit<Shape, "id" | "createdAt" | "updatedAt"> { _id: 
 interface ConveyorDoc extends Omit<Conveyor, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 /** A splitter's rules are nested lists of objects: a document holds them as they are. */
 interface SplitterDoc extends Omit<Splitter, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
+interface ConnectorsDoc { _id: Owner; points: ConnectionPoint[]; updatedAt: Date }
+interface MergerDoc extends Omit<Merger, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
+interface MachineDoc extends Omit<Machine, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
+interface AssemblyDoc extends Omit<Assembly, "id" | "createdAt"> { _id: string; createdAt: Date }
 
 /** `onHand - reserved >= qty`, as a query filter. */
 const atLeastAvailable = (qty: number) => ({ $expr: { $gte: [{ $subtract: ["$onHand", "$reserved"] }, qty] } });
@@ -60,6 +68,10 @@ export class MongoRepo implements InventoryRepo {
   private readonly shapes: Collection<ShapeDoc>;
   private readonly conveyors: Collection<ConveyorDoc>;
   private readonly splitters: Collection<SplitterDoc>;
+  private readonly connectors: Collection<ConnectorsDoc>;
+  private readonly mergers: Collection<MergerDoc>;
+  private readonly machines: Collection<MachineDoc>;
+  private readonly assemblies: Collection<AssemblyDoc>;
 
   constructor(url: string, dbName = "inventory") {
     this.client = new MongoClient(url, { serverSelectionTimeoutMS: 5000 });
@@ -71,6 +83,10 @@ export class MongoRepo implements InventoryRepo {
     this.shapes = this.db.collection<ShapeDoc>("shapes");
     this.conveyors = this.db.collection<ConveyorDoc>("conveyors");
     this.splitters = this.db.collection<SplitterDoc>("splitters");
+    this.connectors = this.db.collection<ConnectorsDoc>("connectors");
+    this.mergers = this.db.collection<MergerDoc>("mergers");
+    this.machines = this.db.collection<MachineDoc>("machines");
+    this.assemblies = this.db.collection<AssemblyDoc>("assemblies");
   }
 
   async init(): Promise<void> {
@@ -221,7 +237,7 @@ export class MongoRepo implements InventoryRepo {
 
   async createShape(s: NewShape): Promise<Shape> {
     const now = new Date();
-    const doc: ShapeDoc = { ...s, _id: randomUUID(), createdAt: now, updatedAt: now };
+    const doc: ShapeDoc = { ...s, attachedTo: null, attach: null, _id: randomUUID(), createdAt: now, updatedAt: now };
     await this.shapes.insertOne(doc);
     return toShape(doc);
   }
@@ -239,6 +255,8 @@ export class MongoRepo implements InventoryRepo {
   async deleteShape(id: string): Promise<void> {
     const r = await this.shapes.deleteOne({ _id: id });
     if (r.deletedCount !== 1) throw new NotFoundError(`No shape ${id}`);
+    // No ON DELETE CASCADE here: delete what was joined onto it, and so on down.
+    for (const child of await this.shapes.find({ attachedTo: id }).toArray()) await this.deleteShape(child._id).catch(() => {});
   }
 
   async listConveyors(): Promise<Conveyor[]> {
@@ -265,6 +283,119 @@ export class MongoRepo implements InventoryRepo {
     // belt in the instant between the two deletes would be left pointing at nothing; the arm
     // app ignores splitters whose belt is gone, and Postgres's foreign key rules it out.
     await this.splitters.deleteMany({ conveyorId: id });
+    await this.machines.deleteMany({ conveyorId: id });
+    await this.mergers.deleteMany({ $or: [{ conveyorId: id }, { feederIds: id }] });
+  }
+
+  async listConnectors(): Promise<Connectors[]> {
+    return (await this.connectors.find({}).sort({ _id: 1 }).toArray()).map((d) => ({ owner: d._id, points: d.points, updatedAt: d.updatedAt.toISOString() }));
+  }
+
+  async setConnectors(owner: Owner, points: ConnectionPoint[]): Promise<Connectors> {
+    const doc: ConnectorsDoc = { _id: owner, points, updatedAt: new Date() };
+    await this.connectors.replaceOne({ _id: owner }, doc, { upsert: true });
+    return { owner, points, updatedAt: doc.updatedAt.toISOString() };
+  }
+
+  async deleteConnectors(owner: Owner): Promise<void> {
+    const r = await this.connectors.deleteOne({ _id: owner });
+    if (r.deletedCount !== 1) throw new NotFoundError(`No connection points stored for ${owner}`);
+  }
+
+  async listMergers(): Promise<Merger[]> {
+    return (await this.mergers.find({}).sort({ createdAt: 1, _id: 1 }).toArray()).map((d) => fromDoc<Merger>(d));
+  }
+
+  async createMerger(m: NewMerger): Promise<Merger> {
+    const now = new Date();
+    const doc: MergerDoc = { ...m, _id: randomUUID(), createdAt: now, updatedAt: now };
+    await this.mergers.insertOne(doc);
+    return fromDoc<Merger>(doc);
+  }
+
+  async updateMerger(id: string, patch: MergerPatch): Promise<Merger> {
+    const doc = await this.mergers.findOneAndUpdate({ _id: id }, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
+    if (!doc) throw new NotFoundError(`No merger ${id}`);
+    return fromDoc<Merger>(doc);
+  }
+
+  async deleteMerger(id: string): Promise<void> {
+    if ((await this.mergers.deleteOne({ _id: id })).deletedCount !== 1) throw new NotFoundError(`No merger ${id}`);
+  }
+
+  async listMachines(): Promise<Machine[]> {
+    return (await this.machines.find({}).sort({ createdAt: 1, _id: 1 }).toArray()).map((d) => fromDoc<Machine>(d));
+  }
+
+  async createMachine(m: NewMachine): Promise<Machine> {
+    const now = new Date();
+    const doc: MachineDoc = { ...m, _id: randomUUID(), createdAt: now, updatedAt: now };
+    await this.machines.insertOne(doc);
+    return fromDoc<Machine>(doc);
+  }
+
+  async updateMachine(id: string, patch: MachinePatch): Promise<Machine> {
+    const doc = await this.machines.findOneAndUpdate({ _id: id }, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
+    if (!doc) throw new NotFoundError(`No machine ${id}`);
+    return fromDoc<Machine>(doc);
+  }
+
+  async deleteMachine(id: string): Promise<void> {
+    if ((await this.machines.deleteOne({ _id: id })).deletedCount !== 1) throw new NotFoundError(`No machine ${id}`);
+  }
+
+  /**
+   * MongoDB has no multi-document transaction without a replica set, so this is a saga like
+   * reserve(): claim the attached shape with a conditional update (so two joins can't both take
+   * it), then use up each part with a conditional update; if any part is short, give back what
+   * was taken and release the claim.
+   */
+  async assemble(a: NewAssembly): Promise<AssembleResult> {
+    const [base, attached] = await Promise.all([this.shapes.findOne({ _id: a.baseShapeId }), this.shapes.findOne({ _id: a.attachedShapeId })]);
+    if (!base || !attached) return { ok: false, reason: "not_found" };
+    for (let s: ShapeDoc | null = base, depth = 0; s && depth < 50; depth++) {
+      if (s._id === attached._id) return { ok: false, reason: "cycle" };
+      s = s.attachedTo ? await this.shapes.findOne({ _id: s.attachedTo }) : null;
+    }
+    const joined = new Set((await this.assemblies.find({ $or: [
+      { baseShapeId: { $in: [base._id, attached._id] } }, { attachedShapeId: { $in: [base._id, attached._id] } },
+    ] }).toArray()).flatMap((x) => [x.baseShapeId, x.attachedShapeId]));
+    const need = consumption([toShape(base), toShape(attached)], (id) => joined.has(id));
+
+    const claim = await this.shapes.updateOne(
+      { _id: attached._id, attachedTo: null }, // matches null or missing (shapes saved before assemblies)
+      { $set: { attachedTo: base._id, attach: a.attachment, updatedAt: new Date() } },
+    );
+    if (claim.modifiedCount !== 1) return { ok: false, reason: "already_attached" };
+
+    const taken: { sku: string; qty: number }[] = [];
+    for (const n of need) {
+      const r = await this.parts.updateOne({ _id: n.sku, ...atLeastAvailable(n.qty) }, { $inc: { onHand: -n.qty }, $set: { updatedAt: new Date() } });
+      if (r.modifiedCount === 1) {
+        taken.push(n);
+        continue;
+      }
+      // Undo: give back what was taken, release the claim, and report what's short.
+      for (const t of taken) await this.parts.updateOne({ _id: t.sku }, { $inc: { onHand: t.qty } });
+      await this.shapes.updateOne({ _id: attached._id }, { $set: { attachedTo: null, attach: null } });
+      const parts = await this.getParts(need.map((x) => x.sku));
+      const shortages = need.flatMap((x) => {
+        const available = parts.find((p) => p.sku === x.sku)?.available ?? 0;
+        return available < x.qty ? [{ sku: x.sku, need: x.qty, available }] : [];
+      });
+      return { ok: false, reason: "short", shortages };
+    }
+    const doc: AssemblyDoc = {
+      _id: randomUUID(), name: a.name, baseShapeId: base._id, attachedShapeId: attached._id,
+      basePoint: a.basePoint, attachedPoint: a.attachedPoint, consumed: need, createdAt: new Date(),
+    };
+    await this.assemblies.insertOne(doc);
+    if (need.length) await this.log(need.map(({ sku, qty }) => ({ sku, kind: "consume" as const, qty, note: `Assembly ${a.name} (${doc._id})`, reservationId: null })));
+    return { ok: true, assembly: fromDoc<Assembly>(doc) };
+  }
+
+  async listAssemblies(limit: number): Promise<Assembly[]> {
+    return (await this.assemblies.find({}).sort({ createdAt: -1, _id: 1 }).limit(limit).toArray()).map((d) => fromDoc<Assembly>(d));
   }
 
   async listSplitters(): Promise<Splitter[]> {
@@ -290,7 +421,7 @@ export class MongoRepo implements InventoryRepo {
   }
 
   async reset(): Promise<void> {
-    await Promise.all([this.splitters.deleteMany({}), this.conveyors.deleteMany({}), this.shapes.deleteMany({}), this.parts.deleteMany({}), this.moves.deleteMany({}), this.res.deleteMany({}), this.counters.deleteMany({})]);
+    await Promise.all([this.assemblies.deleteMany({}), this.machines.deleteMany({}), this.mergers.deleteMany({}), this.connectors.deleteMany({}), this.splitters.deleteMany({}), this.conveyors.deleteMany({}), this.shapes.deleteMany({}), this.parts.deleteMany({}), this.moves.deleteMany({}), this.res.deleteMany({}), this.counters.deleteMany({})]);
   }
 
   /**
@@ -363,6 +494,7 @@ function toShape(d: ShapeDoc): Shape {
   return {
     id: d._id, name: d.name, kind: d.kind, size: d.size, color: d.color, position: d.position, rotationY: d.rotationY,
     sku: d.sku ?? null, // shapes saved before parts could be placed have no sku field
+    attachedTo: d.attachedTo ?? null, attach: d.attach ?? null, // nor did shapes saved before assemblies
     createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
   };
 }
@@ -380,4 +512,10 @@ function toSplitter(d: SplitterDoc): Splitter {
     id: d._id, name: d.name, conveyorId: d.conveyorId, along: d.along, rules: d.rules, otherwise: d.otherwise,
     createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
   };
+}
+
+/** Documents whose fields are already the API's: rename _id and turn dates into ISO strings. */
+function fromDoc<R>(d: { _id: string; createdAt: Date; updatedAt?: Date }): R {
+  const { _id, createdAt, updatedAt, ...rest } = d;
+  return { ...rest, id: _id, createdAt: createdAt.toISOString(), ...(updatedAt ? { updatedAt: updatedAt.toISOString() } : {}) } as R;
 }

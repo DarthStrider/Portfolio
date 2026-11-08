@@ -11,6 +11,9 @@ import { conveyorsApi, ShapesApiError } from "../shapes/api";
 import type { createShapes } from "../shapes/controller";
 import { ConveyorLayer } from "./ConveyorLayer";
 import { step, supportHeight, type Body, type Exit, type Gate } from "./transport";
+import { poses } from "../line/joints";
+import type { Join, Stations } from "../line/stations";
+import type { Attachment } from "../line/types";
 import type { Conveyor, NewConveyor } from "./types";
 
 type Shapes = ReturnType<typeof createShapes>;
@@ -26,6 +29,15 @@ export interface Gates {
   list(): readonly Gate[];
   /** Asked once when a shape reaches a gate. */
   route(shapeId: string, gate: Gate): Exit;
+}
+
+/** What the mergers and machines plug in: their stations, and how to save a run's joins. */
+export interface Line {
+  stations: Stations;
+  /** Called on Stop, after positions are saved, with the joins machines made during the run. */
+  saveJoins(joins: readonly Join[]): Promise<void>;
+  /** Called every frame while running, after the step, to update the stations' 3D models. */
+  frame(dt: number): void;
 }
 
 interface Draft {
@@ -60,6 +72,10 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
   let bodies: Map<string, Body> | null = null;
   let started: Map<string, { x: number; z: number }> = new Map();
   let gates: Gates = { list: () => [], route: () => "straight" };
+  let line: Line | null = null;
+  /** Joins made during this run: which shape now rides on which. */
+  let links = new Map<string, { parentId: string; attach: Attachment }>();
+  let joins: Join[] = [];
   const listeners: ((belts: readonly Conveyor[]) => void)[] = [];
 
   // Shapes stand on whichever belt is under them, and can be placed onto one.
@@ -132,8 +148,16 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     setMode({ kind: "idle" });
     bodies = new Map();
     started = new Map();
+    links = new Map();
+    joins = [];
+    line?.stations.reset();
+    // Shapes joined onto another ride on it: only the ones standing on their own get a body.
     for (const s of shapes.shapes) {
-      bodies.set(s.id, { id: s.id, x: s.position.x, z: s.position.z, y: supportHeight(belts, s.position.x, s.position.z), vx: 0, vy: 0, vz: 0 });
+      if (s.attachedTo) continue;
+      bodies.set(s.id, {
+        id: s.id, x: s.position.x, z: s.position.z, y: supportHeight(belts, s.position.x, s.position.z),
+        vx: 0, vy: 0, vz: 0, size: Math.max(s.size.x, s.size.z),
+      });
       started.set(s.id, { ...s.position });
     }
     shapes.setRunning(true);
@@ -141,33 +165,70 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     render();
   }
 
-  function stop() {
+  async function stop() {
     if (!bodies) return;
     const moves: { id: string; x: number; z: number }[] = [];
-    for (const [id, b] of bodies) {
-      const from = started.get(id)!;
+    // Shapes joined during the run are saved where they ended up too, so if the assembly is
+    // refused (not enough stock), they're left at the machine rather than back at the start.
+    const where = currentPoses();
+    for (const [id, from] of started) {
+      const p = where.get(id);
+      if (!p) continue;
       // Millimeters are plenty, and the API keeps whatever we send.
-      const x = Math.round(b.x * 1000) / 1000;
-      const z = Math.round(b.z * 1000) / 1000;
+      const x = Math.round(p.x * 1000) / 1000;
+      const z = Math.round(p.z * 1000) / 1000;
       if (Math.hypot(x - from.x, z - from.z) >= 0.001) moves.push({ id, x, z });
     }
+    const made = joins;
     bodies = null;
+    joins = [];
+    line?.stations.reset();
+    line?.frame(0); // lights back to idle
     shapes.setRunning(false);
-    shapes.saveMoves(moves);
-    if (moves.length === 0) message = { text: "Nothing moved. Shapes ride a belt when placed on top of it.", error: false };
+    if (moves.length === 0 && made.length === 0) message = { text: "Nothing moved. Shapes ride a belt when placed on top of it.", error: false };
     render();
+    await shapes.saveMoves(moves);
+    if (made.length && line) {
+      await line.saveJoins(made);
+      await shapes.reload();
+    }
+  }
+
+  /** Where every shape is now: bodies for the free ones, and joined ones riding on them. */
+  function currentPoses() {
+    return poses(shapes.shapes, (s) => {
+      const b = bodies?.get(s.id);
+      return b
+        ? { x: b.x, y: b.y + s.size.y / 2, z: b.z, rotationY: s.rotationY }
+        : { x: s.position.x, y: supportHeight(belts, s.position.x, s.position.z) + s.size.y / 2, z: s.position.z, rotationY: s.rotationY };
+    }, links);
   }
 
   /** Called every frame by main.ts. */
   function update(dt: number) {
     if (!bodies) return;
     layer.animate(dt);
-    const options = { gates: gates.list(), route: (b: Body, g: Gate) => gates.route(b.id!, g) };
-    for (let left = dt; left > 1e-9; left -= MAX_STEP) step(bodies.values(), belts, Math.min(MAX_STEP, left), options);
-    for (const [id, b] of bodies) shapes.layer.pose(id, b.x, b.y, b.z);
+    const st = line?.stations;
+    const options = {
+      gates: gates.list(), route: (b: Body, g: Gate) => gates.route(b.id!, g),
+      stops: st?.stops() ?? [], hold: st?.hold,
+    };
+    for (let left = dt; left > 1e-9; left -= MAX_STEP) {
+      const h = Math.min(MAX_STEP, left);
+      st?.prepare(bodies);
+      step(bodies.values(), belts, h, options);
+      for (const j of st?.afterStep(h) ?? []) {
+        // The attached shape stops being a free body: from now on it rides on the base.
+        bodies.delete(j.attachedId);
+        links.set(j.attachedId, { parentId: j.baseId, attach: j.attach });
+        joins.push(j);
+      }
+    }
+    for (const [id, p] of currentPoses()) shapes.layer.poseCenter(id, p);
+    line?.frame(dt);
   }
 
-  runButton.addEventListener("click", () => (bodies ? stop() : start()));
+  runButton.addEventListener("click", () => (bodies ? void stop() : start()));
 
   // ---- Pointer ----
 
@@ -416,6 +477,12 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     /** Called with the new list whenever the belts are (re)loaded. */
     onBeltsChange(fn: (belts: readonly Conveyor[]) => void) {
       listeners.push(fn);
+    },
+    /** Re-read the belts now (after something else moved them, such as snapping feeders into place). */
+    reload: load,
+    /** The mergers and machines plug in here. */
+    setLine(next: Line) {
+      line = next;
     },
     /** The splitters plug in here. */
     setGates(next: Gates) {

@@ -1,0 +1,82 @@
+/** Line equipment as the inventory API stores it (snack5-inventory/api/src/domain/assembly.ts). */
+import type { ShapeKind } from "../shapes/types";
+
+/** A kind of object: an inventory part, or plain shapes of one kind. */
+export type Owner = `part:${string}` | `kind:${ShapeKind}`;
+
+/** A named spot on an object, as fractions of its size from its center (-0.5..0.5; y = 0.5 is the top). */
+export interface ConnectionPoint {
+  name: string;
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface Connectors {
+  owner: Owner;
+  points: ConnectionPoint[];
+  updatedAt: string;
+}
+
+export type MergerKind = "side" | "y";
+export type Priority = "main" | "feeders" | "alternate";
+
+export interface Merger {
+  id: string;
+  name: string;
+  kind: MergerKind;
+  /** The main belt ("side") or the output belt ("y"). */
+  conveyorId: string;
+  /** Meters from that belt's start; 0 for "y". */
+  along: number;
+  feederIds: string[];
+  priority: Priority;
+  /** Clear space needed at the merge point, meters. */
+  gap: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export type NewMerger = Omit<Merger, "id" | "createdAt" | "updatedAt">;
+export type MergerPatch = Partial<Pick<Merger, "name" | "along" | "priority" | "gap">>;
+
+export interface Slot {
+  owner: Owner;
+  point: string;
+}
+
+export interface Machine {
+  id: string;
+  name: string;
+  conveyorId: string;
+  along: number;
+  /** Stays on the belt; the attach item is joined onto it. */
+  base: Slot;
+  attach: Slot;
+  cycleSeconds: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export type NewMachine = Omit<Machine, "id" | "createdAt" | "updatedAt">;
+export type MachinePatch = Partial<Pick<Machine, "name" | "along" | "base" | "attach" | "cycleSeconds">>;
+
+export interface Attachment {
+  x: number;
+  y: number;
+  z: number;
+  rotationY: number;
+}
+
+export interface NewAssembly {
+  name: string;
+  baseShapeId: string;
+  attachedShapeId: string;
+  basePoint: string;
+  attachedPoint: string;
+  attachment: Attachment;
+}
+
+export interface Assembly extends Omit<NewAssembly, "attachment"> {
+  id: string;
+  consumed: { sku: string; qty: number }[];
+  createdAt: string;
+}

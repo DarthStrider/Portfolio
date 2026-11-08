@@ -17,6 +17,9 @@ checked against each other every frame.
 - [x] Shapes: create boxes, cylinders, spheres and cones, place and move them on the floor with the mouse, and see which ones the arm can reach. They're saved in the inventory database (Snack 5), PostgreSQL or MongoDB
 - [x] Conveyor belts: build your own (length, width, height, speed, angle), place them with the mouse, then **Run** them: shapes on a belt ride along, fall off the end, and can land on another belt. Stop saves where everything ended up
 - [x] Splitters: diverter gates on a belt that send each item left, right or straight on by rules you write (shape kind, color, size, name, SKU, or the inventory part's category, location and stock). Rules are stored in the database, and inventory changes apply to the next item through the gate
+- [x] Mergers: a feeder belt joining a main belt at a point, or a Y where two belts become one. Feeder items queue and wait for a gap; choose main belt first, feeders first, or take turns
+- [x] Joining machines: a station on a belt holds one item of each of two kinds and joins them at their connection points; the joined object carries on down the line. Each join is saved as an assembly that uses up the parts from stock
+- [x] Connection points per kind of object (inventory part or plain shape kind), edited by typing positions or clicking on the object
 
 ## How to run
 
@@ -75,6 +78,30 @@ The **Splitters** tab puts diverter gates on belts and decides what each one sep
 
 Rules live in the database, so you can change them from the API (`PATCH /api/splitters/{id}`) or straight in PostgreSQL/MongoDB. Part fields are read live: change a part's category (`PATCH /api/parts/{sku}`) or its stock, and the next item of that part through a gate follows the new value. The tab re-reads splitters and parts every 3 s, even while the line runs.
 
+### Connection points (Shapes tab)
+
+Select a shape and the **Connection points** section appears under the list. Points belong to the shape's *kind*: every
+PL-200 plate shares them, as does every plain cylinder. Until you change them, every kind has **top** and **bottom**.
+
+- Positions are percentages of the object's size from its center: x and z sideways, y = 50 is the top, −50 the bottom. So one set of points fits every size.
+- **+ Add point** and type the position, or **Click on object** and click anywhere on a shape of that kind to put a point there.
+- Points show as dots on every object of that kind (orange is the highlighted one). **Save points** stores them; **Back to defaults** removes yours.
+
+### Mergers and joining machines (Machines tab)
+
+**Mergers**
+- **Side**: a feeder belt joins a main belt at a point (cm along it). **Y**: two feeder belts come together into the start of an output belt.
+- Tick **Move the feeder belts into place** and the feeders are turned and moved to meet the main belt (side) or angled in at ±35° (Y).
+- Feeder items stop at the end of the feeder and queue behind each other until the merge point is clear: nothing within **gap** cm of it on the main belt. Then they slide onto the main belt's centerline.
+- **Priority**: *Main belt first* (the main belt never stops), *Feeders first* (main-belt items stop a gap short while a feeder item waits), *Take turns*. A Y's two feeders always take turns.
+- The post's light is green when the merge point is clear, red while it's holding something; the amber patch on the belt is the gap it keeps clear.
+
+**Joining machines**
+- Pick the belt and where on it, the **base** object and its point (it stays on the belt) and the object **joined onto it** and its point, plus how long a join takes.
+- While running, the machine holds the first base and the first attach item to arrive; items it doesn't need, or doesn't need yet, pass under it. With both, the press comes down, the attach item is joined so its point meets the base's point, and the base carries it on.
+- On **Stop**, each join is saved as an **assembly**: the joined shape is attached to its base in the database (it moves with it from then on), and each part is used up from stock once, with a ledger entry. If a part is short, that join is refused and nothing changes for it.
+- Recent assemblies are listed at the bottom of the tab.
+
 ### Controls
 
 | Input | Action |
@@ -109,15 +136,23 @@ src/
 │   ├── transport.ts     what a belt does to a shape: ride, fall, land (pure math, unit-tested)
 │   ├── ConveyorLayer.ts belt models, the scrolling chevron texture, the placement preview
 │   └── controller.ts    the Conveyors tab, Run / Stop, saving positions after a run
-└── splitters/
-    ├── types.ts         a splitter and its rules, as the API stores them
-    ├── rules.ts         which exit a rule list picks for a shape and its part (pure, unit-tested)
-    ├── SplitterLayer.ts the gate model: gantry and swinging flaps
-    └── controller.ts    the Splitters tab: placing gates, the rule editor, the live preview
+├── splitters/
+│   ├── types.ts         a splitter and its rules, as the API stores them
+│   ├── rules.ts         which exit a rule list picks for a shape and its part (pure, unit-tested)
+│   ├── SplitterLayer.ts the gate model: gantry and swinging flaps
+│   └── controller.ts    the Splitters tab: placing gates, the rule editor, the live preview
+└── line/
+    ├── types.ts         connection points, mergers, machines, assemblies, as the API stores them
+    ├── joints.ts        where points are, where to put a joined object, poses through joins (pure)
+    ├── stations.ts      what mergers and machines do each step: hold, release, queue, join (pure)
+    ├── LineLayer.ts     merger posts and machine portals, with their lights and press
+    ├── PointEditor.ts   the connection point editor and its markers
+    └── controller.ts    the Machines tab, and saving assemblies after a run
 tests/kinematics.test.ts FK tests (node:test)
 tests/reach.test.ts      reach tests
 tests/transport.test.ts  belt tests: riding, falling off, hand-over between belts, gravity timing
 tests/splitters.test.ts  rule matching, and gates sending items left, right or straight
+tests/stations.test.ts   mergers (gaps, queues, priorities, a Y taking turns), joining geometry, machines
 scripts/build-gripper.ts writes the gripper .glb with no dependencies
 ```
 

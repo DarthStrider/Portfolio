@@ -95,6 +95,125 @@ CREATE TABLE IF NOT EXISTS splitters (
 );
 CREATE INDEX IF NOT EXISTS splitters_conveyor ON splitters (conveyor_id);
 
+-- A shape joined onto another moves with it. Deleting the base deletes what's joined to it,
+-- since together they're one object now.
+ALTER TABLE shapes ADD COLUMN IF NOT EXISTS attached_to uuid REFERENCES shapes (id) ON DELETE CASCADE;
+ALTER TABLE shapes ADD COLUMN IF NOT EXISTS attach jsonb;
+
+-- Connection points for a kind of object: an inventory part ('part:PL-200') or a plain shape
+-- kind ('kind:box'). Positions are fractions of the object's size, so they fit every size.
+CREATE TABLE IF NOT EXISTS connectors (
+  owner       text PRIMARY KEY CHECK (owner ~ '^(part:[A-Z0-9][A-Z0-9-]{1,31}|kind:(box|cylinder|sphere|cone))$'),
+  points      jsonb NOT NULL CHECK (jsonb_typeof(points) = 'array' AND jsonb_array_length(points) <= 12),
+  updated_at  timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+
+-- Where belts come together. Feeders are an array: a foreign key can't point into one, so the
+-- repository deletes a merger when one of its feeders is deleted.
+CREATE TABLE IF NOT EXISTS mergers (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         text NOT NULL CHECK (length(name) BETWEEN 1 AND 40),
+  kind         text NOT NULL CHECK (kind IN ('side', 'y')),
+  conveyor_id  uuid NOT NULL REFERENCES conveyors (id) ON DELETE CASCADE,
+  along        double precision NOT NULL CHECK (along BETWEEN 0 AND 4),
+  feeder_ids   uuid[] NOT NULL CHECK (cardinality(feeder_ids) BETWEEN 1 AND 2),
+  priority     text NOT NULL CHECK (priority IN ('main', 'feeders', 'alternate')),
+  gap          double precision NOT NULL CHECK (gap BETWEEN 0.05 AND 1),
+  created_at   timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at   timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+
+-- Joining stations on a belt: take one item of each kind and join them at their connection points.
+CREATE TABLE IF NOT EXISTS machines (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name           text NOT NULL CHECK (length(name) BETWEEN 1 AND 40),
+  conveyor_id    uuid NOT NULL REFERENCES conveyors (id) ON DELETE CASCADE,
+  along          double precision NOT NULL CHECK (along BETWEEN 0 AND 4),
+  base_owner     text NOT NULL,
+  base_point     text NOT NULL,
+  attach_owner   text NOT NULL,
+  attach_point   text NOT NULL,
+  cycle_seconds  double precision NOT NULL CHECK (cycle_seconds BETWEEN 0.2 AND 10),
+  created_at     timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at     timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+
+-- A record of each join. No foreign keys to shapes: the history stays if the shapes are deleted.
+CREATE TABLE IF NOT EXISTS assemblies (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name               text NOT NULL,
+  base_shape_id      uuid NOT NULL,
+  attached_shape_id  uuid NOT NULL,
+  base_point         text NOT NULL,
+  attached_point     text NOT NULL,
+  consumed           jsonb NOT NULL,
+  created_at         timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX IF NOT EXISTS assemblies_base ON assemblies (base_shape_id);
+CREATE INDEX IF NOT EXISTS assemblies_attached ON assemblies (attached_shape_id);
+
+-- Join one shape onto another, using up their parts from stock: all or nothing.
+--   returns {"ok": true, "id": "<assembly id>"} or {"ok": false, "reason": ..., "shortages": [...]}
+--
+-- Like inv_reserve, it locks before it checks: both shapes (in id order), then the parts it
+-- needs (in SKU order), so two joins touching the same things queue up instead of racing.
+-- A shape's part is used up the first time that shape is joined to anything; joining an
+-- assembly to a third object doesn't use the first two parts again.
+CREATE OR REPLACE FUNCTION inv_assemble(p_name text, p_base uuid, p_attached uuid, p_base_point text, p_attached_point text, p_attach jsonb)
+RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE
+  v_found int;
+  v_need jsonb;
+  v_short jsonb;
+  v_id uuid;
+BEGIN
+  PERFORM 1 FROM shapes WHERE id IN (p_base, p_attached) ORDER BY id FOR UPDATE;
+  SELECT count(*) INTO v_found FROM shapes WHERE id IN (p_base, p_attached);
+  IF v_found < 2 THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'not_found');
+  END IF;
+  IF (SELECT attached_to IS NOT NULL FROM shapes WHERE id = p_attached) THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'already_attached');
+  END IF;
+  -- The attached shape mustn't be the base, or anything the base already hangs from.
+  IF EXISTS (
+    WITH RECURSIVE up (id, parent, depth) AS (
+      SELECT id, attached_to, 0 FROM shapes WHERE id = p_base
+      UNION ALL
+      SELECT s.id, s.attached_to, up.depth + 1 FROM shapes s JOIN up ON s.id = up.parent WHERE up.depth < 50
+    )
+    SELECT 1 FROM up WHERE id = p_attached
+  ) THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'cycle');
+  END IF;
+
+  SELECT coalesce(jsonb_agg(jsonb_build_object('sku', sku, 'qty', qty) ORDER BY sku), '[]'::jsonb) INTO v_need
+    FROM (
+      SELECT s.sku, count(*)::int AS qty FROM shapes s
+       WHERE s.id IN (p_base, p_attached) AND s.sku IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM assemblies a WHERE s.id IN (a.base_shape_id, a.attached_shape_id))
+       GROUP BY s.sku
+    ) n;
+  PERFORM 1 FROM parts WHERE sku IN (SELECT x ->> 'sku' FROM jsonb_array_elements(v_need) x) ORDER BY sku FOR UPDATE;
+  SELECT coalesce(jsonb_agg(jsonb_build_object('sku', n.sku, 'need', n.qty, 'available', p.on_hand - p.reserved) ORDER BY n.sku), '[]'::jsonb)
+    INTO v_short
+    FROM jsonb_to_recordset(v_need) AS n (sku text, qty int) JOIN parts p ON p.sku = n.sku
+   WHERE p.on_hand - p.reserved < n.qty;
+  IF jsonb_array_length(v_short) > 0 THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'short', 'shortages', v_short);
+  END IF;
+
+  INSERT INTO assemblies (name, base_shape_id, attached_shape_id, base_point, attached_point, consumed)
+  VALUES (p_name, p_base, p_attached, p_base_point, p_attached_point, v_need)
+  RETURNING id INTO v_id;
+  UPDATE parts p SET on_hand = p.on_hand - n.qty, updated_at = now()
+    FROM jsonb_to_recordset(v_need) AS n (sku text, qty int) WHERE p.sku = n.sku;
+  INSERT INTO movements (sku, kind, qty, note)
+  SELECT n.sku, 'consume', n.qty, 'Assembly ' || p_name || ' (' || v_id || ')' FROM jsonb_to_recordset(v_need) AS n (sku text, qty int);
+  UPDATE shapes SET attached_to = p_base, attach = p_attach, updated_at = clock_timestamp() WHERE id = p_attached;
+  RETURN jsonb_build_object('ok', true, 'id', v_id);
+END $$;
+
 -- Reserve every line of a quote, or nothing.
 --   p_lines: [{"sku": "PL-200", "qty": 4}, ...]
 --   returns {"ok": true, "id": "<uuid>"} or {"ok": false, "shortages": [...]}

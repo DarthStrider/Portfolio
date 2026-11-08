@@ -20,6 +20,9 @@ import type { NewShape, Shape, ShapeKind, ShapePatch } from "../domain/shapes.ts
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
 import type { Exit, NewSplitter, Rule, Splitter, SplitterPatch } from "../domain/splitters.ts";
 import type { PartPatch } from "../domain/newPart.ts";
+import type {
+  AssembleResult, Assembly, Attachment, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner,
+} from "../domain/assembly.ts";
 
 
 interface PartRow {
@@ -31,7 +34,21 @@ interface ReservationRow { id: string; quote_ref: string; status: Reservation["s
 
 interface ShapeRow {
   id: string; name: string; kind: ShapeKind; size_x: number; size_y: number; size_z: number;
-  color: string; x: number; z: number; rotation_y: number; sku: string | null; created_at: Date; updated_at: Date;
+  color: string; x: number; z: number; rotation_y: number; sku: string | null;
+  attached_to: string | null; attach: Attachment | null; created_at: Date; updated_at: Date;
+}
+interface ConnectorsRow { owner: Owner; points: ConnectionPoint[]; updated_at: Date }
+interface MergerRow {
+  id: string; name: string; kind: Merger["kind"]; conveyor_id: string; along: number; feeder_ids: string[];
+  priority: Merger["priority"]; gap: number; created_at: Date; updated_at: Date;
+}
+interface MachineRow {
+  id: string; name: string; conveyor_id: string; along: number; base_owner: Owner; base_point: string;
+  attach_owner: Owner; attach_point: string; cycle_seconds: number; created_at: Date; updated_at: Date;
+}
+interface AssemblyRow {
+  id: string; name: string; base_shape_id: string; attached_shape_id: string; base_point: string; attached_point: string;
+  consumed: { sku: string; qty: number }[]; created_at: Date;
 }
 
 interface ConveyorRow {
@@ -204,8 +221,21 @@ export class PostgresRepo implements InventoryRepo {
 
   async deleteConveyor(id: string): Promise<void> {
     if (!UUID.test(id)) throw new NotFoundError(`No conveyor ${id}`);
-    const { rowCount } = await this.pool.query(Q.deleteConveyor, [id]);
-    if (!rowCount) throw new NotFoundError(`No conveyor ${id}`);
+    // Splitters, machines and mergers on this belt go by ON DELETE CASCADE. Mergers it only
+    // feeds are found through an array, so they're deleted first, in the same transaction.
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(Q.deleteMergersFeeding, [id]);
+      const { rowCount } = await client.query(Q.deleteConveyor, [id]);
+      if (!rowCount) throw new NotFoundError(`No conveyor ${id}`);
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async listSplitters(): Promise<Splitter[]> {
@@ -232,6 +262,88 @@ export class PostgresRepo implements InventoryRepo {
     if (!UUID.test(id)) throw new NotFoundError(`No splitter ${id}`);
     const { rowCount } = await this.pool.query(Q.deleteSplitter, [id]);
     if (!rowCount) throw new NotFoundError(`No splitter ${id}`);
+  }
+
+  async listConnectors(): Promise<Connectors[]> {
+    const { rows } = await this.pool.query<ConnectorsRow>(Q.listConnectors);
+    return rows.map((r) => ({ owner: r.owner, points: r.points, updatedAt: r.updated_at.toISOString() }));
+  }
+
+  async setConnectors(owner: Owner, points: ConnectionPoint[]): Promise<Connectors> {
+    // An upsert: one statement whether or not the kind had points before.
+    const { rows } = await this.pool.query<ConnectorsRow>(Q.setConnectors, [owner, JSON.stringify(points)]);
+    return { owner: rows[0].owner, points: rows[0].points, updatedAt: rows[0].updated_at.toISOString() };
+  }
+
+  async deleteConnectors(owner: Owner): Promise<void> {
+    const { rowCount } = await this.pool.query(Q.deleteConnectors, [owner]);
+    if (!rowCount) throw new NotFoundError(`No connection points stored for ${owner}`);
+  }
+
+  async listMergers(): Promise<Merger[]> {
+    const { rows } = await this.pool.query<MergerRow>(Q.listMergers);
+    return rows.map(toMerger);
+  }
+
+  async createMerger(m: NewMerger): Promise<Merger> {
+    const { rows } = await this.pool.query<MergerRow>(Q.createMerger, [m.name, m.kind, m.conveyorId, m.along, m.feederIds, m.priority, m.gap]);
+    return toMerger(rows[0]);
+  }
+
+  async updateMerger(id: string, p: MergerPatch): Promise<Merger> {
+    if (!UUID.test(id)) throw new NotFoundError(`No merger ${id}`);
+    const { rows } = await this.pool.query<MergerRow>(Q.updateMerger, [id, p.name ?? null, p.along ?? null, p.priority ?? null, p.gap ?? null]);
+    if (!rows[0]) throw new NotFoundError(`No merger ${id}`);
+    return toMerger(rows[0]);
+  }
+
+  async deleteMerger(id: string): Promise<void> {
+    if (!UUID.test(id)) throw new NotFoundError(`No merger ${id}`);
+    const { rowCount } = await this.pool.query(Q.deleteMerger, [id]);
+    if (!rowCount) throw new NotFoundError(`No merger ${id}`);
+  }
+
+  async listMachines(): Promise<Machine[]> {
+    const { rows } = await this.pool.query<MachineRow>(Q.listMachines);
+    return rows.map(toMachine);
+  }
+
+  async createMachine(m: NewMachine): Promise<Machine> {
+    const { rows } = await this.pool.query<MachineRow>(Q.createMachine, [
+      m.name, m.conveyorId, m.along, m.base.owner, m.base.point, m.attach.owner, m.attach.point, m.cycleSeconds,
+    ]);
+    return toMachine(rows[0]);
+  }
+
+  async updateMachine(id: string, p: MachinePatch): Promise<Machine> {
+    if (!UUID.test(id)) throw new NotFoundError(`No machine ${id}`);
+    const { rows } = await this.pool.query<MachineRow>(Q.updateMachine, [
+      id, p.name ?? null, p.along ?? null, p.base?.owner ?? null, p.base?.point ?? null, p.attach?.owner ?? null, p.attach?.point ?? null, p.cycleSeconds ?? null,
+    ]);
+    if (!rows[0]) throw new NotFoundError(`No machine ${id}`);
+    return toMachine(rows[0]);
+  }
+
+  async deleteMachine(id: string): Promise<void> {
+    if (!UUID.test(id)) throw new NotFoundError(`No machine ${id}`);
+    const { rowCount } = await this.pool.query(Q.deleteMachine, [id]);
+    if (!rowCount) throw new NotFoundError(`No machine ${id}`);
+  }
+
+  async assemble(a: NewAssembly): Promise<AssembleResult> {
+    // One call to inv_assemble (schema.sql): locks, checks, stock, ledger and the join in one transaction.
+    const { rows } = await this.pool.query<{ result: { ok: true; id: string } | Exclude<AssembleResult, { ok: true }> }>(Q.assemble, [
+      a.name, a.baseShapeId, a.attachedShapeId, a.basePoint, a.attachedPoint, JSON.stringify(a.attachment),
+    ]);
+    const result = rows[0].result;
+    if (!result.ok) return result;
+    const { rows: made } = await this.pool.query<AssemblyRow>(Q.listAssemblies, [result.id, 1]);
+    return { ok: true, assembly: toAssembly(made[0]) };
+  }
+
+  async listAssemblies(limit: number): Promise<Assembly[]> {
+    const { rows } = await this.pool.query<AssemblyRow>(Q.listAssemblies, [null, limit]);
+    return rows.map(toAssembly);
   }
 
   async reset(): Promise<void> {
@@ -276,7 +388,7 @@ function toReservation(r: ReservationRow): Reservation {
 function toShape(r: ShapeRow): Shape {
   return {
     id: r.id, name: r.name, kind: r.kind, size: { x: r.size_x, y: r.size_y, z: r.size_z }, color: r.color,
-    position: { x: r.x, z: r.z }, rotationY: r.rotation_y, sku: r.sku,
+    position: { x: r.x, z: r.z }, rotationY: r.rotation_y, sku: r.sku, attachedTo: r.attached_to, attach: r.attach,
     createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
   };
 }
@@ -293,5 +405,27 @@ function toSplitter(r: SplitterRow): Splitter {
   return {
     id: r.id, name: r.name, conveyorId: r.conveyor_id, along: r.along, rules: r.rules, otherwise: r.otherwise,
     createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
+  };
+}
+
+function toMerger(r: MergerRow): Merger {
+  return {
+    id: r.id, name: r.name, kind: r.kind, conveyorId: r.conveyor_id, along: r.along, feederIds: r.feeder_ids,
+    priority: r.priority, gap: r.gap, createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
+  };
+}
+
+function toMachine(r: MachineRow): Machine {
+  return {
+    id: r.id, name: r.name, conveyorId: r.conveyor_id, along: r.along,
+    base: { owner: r.base_owner, point: r.base_point }, attach: { owner: r.attach_owner, point: r.attach_point },
+    cycleSeconds: r.cycle_seconds, createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
+  };
+}
+
+function toAssembly(r: AssemblyRow): Assembly {
+  return {
+    id: r.id, name: r.name, baseShapeId: r.base_shape_id, attachedShapeId: r.attached_shape_id,
+    basePoint: r.base_point, attachedPoint: r.attached_point, consumed: r.consumed, createdAt: r.created_at.toISOString(),
   };
 }

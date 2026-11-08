@@ -61,19 +61,19 @@ export const Q = {
      ORDER BY r.created_at DESC, r.id
      LIMIT $2`,
   listShapes: `
-    SELECT id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, created_at, updated_at
+    SELECT id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, created_at, updated_at
       FROM shapes ORDER BY created_at, id`,
   createShape: `
     INSERT INTO shapes (name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, created_at, updated_at`,
+    RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, created_at, updated_at`,
   updateShape: `
     UPDATE shapes
        SET name = coalesce($2, name), color = coalesce($3, color),
            x = coalesce($4, x), z = coalesce($5, z), rotation_y = coalesce($6, rotation_y),
            updated_at = clock_timestamp()
      WHERE id = $1
-    RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, created_at, updated_at`,
+    RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, created_at, updated_at`,
   deleteShape: `DELETE FROM shapes WHERE id = $1 RETURNING id`,
   listConveyors: `
     SELECT id, name, length, width, height, speed, x, z, rotation_y, created_at, updated_at
@@ -105,9 +105,51 @@ export const Q = {
      WHERE id = $1
     RETURNING id, name, conveyor_id, along, rules, otherwise, created_at, updated_at`,
   deleteSplitter: `DELETE FROM splitters WHERE id = $1 RETURNING id`,
+  // A feeder is in an array, out of a foreign key's reach: remove mergers that use the belt being deleted.
+  deleteMergersFeeding: `DELETE FROM mergers WHERE $1::uuid = ANY (feeder_ids)`,
+  listConnectors: `SELECT owner, points, updated_at FROM connectors ORDER BY owner`,
+  setConnectors: `
+    INSERT INTO connectors (owner, points) VALUES ($1, $2::jsonb)
+    ON CONFLICT (owner) DO UPDATE SET points = excluded.points, updated_at = clock_timestamp()
+    RETURNING owner, points, updated_at`,
+  deleteConnectors: `DELETE FROM connectors WHERE owner = $1 RETURNING owner`,
+  listMergers: `
+    SELECT id, name, kind, conveyor_id, along, feeder_ids, priority, gap, created_at, updated_at
+      FROM mergers ORDER BY created_at, id`,
+  createMerger: `
+    INSERT INTO mergers (name, kind, conveyor_id, along, feeder_ids, priority, gap)
+    VALUES ($1, $2, $3, $4, $5::uuid[], $6, $7)
+    RETURNING id, name, kind, conveyor_id, along, feeder_ids, priority, gap, created_at, updated_at`,
+  updateMerger: `
+    UPDATE mergers
+       SET name = coalesce($2, name), along = coalesce($3, along), priority = coalesce($4, priority),
+           gap = coalesce($5, gap), updated_at = clock_timestamp()
+     WHERE id = $1
+    RETURNING id, name, kind, conveyor_id, along, feeder_ids, priority, gap, created_at, updated_at`,
+  deleteMerger: `DELETE FROM mergers WHERE id = $1 RETURNING id`,
+  listMachines: `
+    SELECT id, name, conveyor_id, along, base_owner, base_point, attach_owner, attach_point, cycle_seconds, created_at, updated_at
+      FROM machines ORDER BY created_at, id`,
+  createMachine: `
+    INSERT INTO machines (name, conveyor_id, along, base_owner, base_point, attach_owner, attach_point, cycle_seconds)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING id, name, conveyor_id, along, base_owner, base_point, attach_owner, attach_point, cycle_seconds, created_at, updated_at`,
+  updateMachine: `
+    UPDATE machines
+       SET name = coalesce($2, name), along = coalesce($3, along),
+           base_owner = coalesce($4, base_owner), base_point = coalesce($5, base_point),
+           attach_owner = coalesce($6, attach_owner), attach_point = coalesce($7, attach_point),
+           cycle_seconds = coalesce($8, cycle_seconds), updated_at = clock_timestamp()
+     WHERE id = $1
+    RETURNING id, name, conveyor_id, along, base_owner, base_point, attach_owner, attach_point, cycle_seconds, created_at, updated_at`,
+  deleteMachine: `DELETE FROM machines WHERE id = $1 RETURNING id`,
+  assemble: `SELECT inv_assemble($1, $2::uuid, $3::uuid, $4, $5, $6::jsonb) AS result`,
+  listAssemblies: `
+    SELECT id, name, base_shape_id, attached_shape_id, base_point, attached_point, consumed, created_at
+      FROM assemblies WHERE ($1::uuid IS NULL OR id = $1) ORDER BY created_at DESC, id LIMIT $2`,
   count: `SELECT count(*)::int AS n FROM parts`,
   insertPart: `
     INSERT INTO parts (sku, name, category, unit, on_hand, reorder_level, location)
     VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (sku) DO NOTHING`,
-  reset: `TRUNCATE splitters, conveyors, shapes, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
+  reset: `TRUNCATE assemblies, machines, mergers, connectors, splitters, conveyors, shapes, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
 } as const;

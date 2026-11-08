@@ -14,6 +14,7 @@ import type { NewShape, Shape, ShapePatch } from "../domain/shapes.ts";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
 import type { NewSplitter, Splitter, SplitterPatch } from "../domain/splitters.ts";
 import type { PartPatch } from "../domain/newPart.ts";
+import type { AssembleResult, Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner } from "../domain/assembly.ts";
 
 interface PartRow { sku: string; name: string; category: Part["category"]; unit: string; onHand: number; reserved: number; reorderLevel: number; location: string; updatedAt: string }
 
@@ -26,6 +27,10 @@ export class MemoryRepo implements InventoryRepo {
   private shapes = new Map<string, Shape>();
   private conveyors = new Map<string, Conveyor>();
   private splitters = new Map<string, Splitter>();
+  private connectors = new Map<string, Connectors>();
+  private mergers = new Map<string, Merger>();
+  private machines = new Map<string, Machine>();
+  private assemblies: Assembly[] = [];
 
   async init(): Promise<void> {}
   async ping(): Promise<void> {}
@@ -130,7 +135,7 @@ export class MemoryRepo implements InventoryRepo {
 
   async createShape(input: NewShape): Promise<Shape> {
     const now = new Date().toISOString();
-    const shape: Shape = { ...structuredClone(input), id: randomUUID(), createdAt: now, updatedAt: now };
+    const shape: Shape = { ...structuredClone(input), attachedTo: null, attach: null, id: randomUUID(), createdAt: now, updatedAt: now };
     this.shapes.set(shape.id, shape);
     return structuredClone(shape);
   }
@@ -144,6 +149,8 @@ export class MemoryRepo implements InventoryRepo {
 
   async deleteShape(id: string): Promise<void> {
     if (!this.shapes.delete(id)) throw new NotFoundError(`No shape ${id}`);
+    // Like ON DELETE CASCADE: what was joined onto it goes too, and what was joined onto that.
+    for (const s of [...this.shapes.values()]) if (s.attachedTo === id) await this.deleteShape(s.id);
   }
 
   async listConveyors(): Promise<Conveyor[]> {
@@ -168,6 +175,102 @@ export class MemoryRepo implements InventoryRepo {
     if (!this.conveyors.delete(id)) throw new NotFoundError(`No conveyor ${id}`);
     // Like the foreign key's ON DELETE CASCADE in Postgres.
     for (const [sid, s] of this.splitters) if (s.conveyorId === id) this.splitters.delete(sid);
+    for (const [mid, m] of this.machines) if (m.conveyorId === id) this.machines.delete(mid);
+    for (const [mid, m] of this.mergers) if (m.conveyorId === id || m.feederIds.includes(id)) this.mergers.delete(mid);
+  }
+
+  async listConnectors(): Promise<Connectors[]> {
+    return [...this.connectors.values()].sort((a, b) => (a.owner < b.owner ? -1 : 1)).map((c) => structuredClone(c));
+  }
+
+  async setConnectors(owner: Owner, points: ConnectionPoint[]): Promise<Connectors> {
+    const c: Connectors = { owner, points: structuredClone(points), updatedAt: new Date().toISOString() };
+    this.connectors.set(owner, c);
+    return structuredClone(c);
+  }
+
+  async deleteConnectors(owner: Owner): Promise<void> {
+    if (!this.connectors.delete(owner)) throw new NotFoundError(`No connection points stored for ${owner}`);
+  }
+
+  async listMergers(): Promise<Merger[]> {
+    return [...this.mergers.values()].map((m) => structuredClone(m));
+  }
+
+  async createMerger(input: NewMerger): Promise<Merger> {
+    const now = new Date().toISOString();
+    const m: Merger = { ...structuredClone(input), id: randomUUID(), createdAt: now, updatedAt: now };
+    this.mergers.set(m.id, m);
+    return structuredClone(m);
+  }
+
+  async updateMerger(id: string, patch: MergerPatch): Promise<Merger> {
+    const m = this.mergers.get(id);
+    if (!m) throw new NotFoundError(`No merger ${id}`);
+    Object.assign(m, structuredClone(patch), { updatedAt: new Date().toISOString() });
+    return structuredClone(m);
+  }
+
+  async deleteMerger(id: string): Promise<void> {
+    if (!this.mergers.delete(id)) throw new NotFoundError(`No merger ${id}`);
+  }
+
+  async listMachines(): Promise<Machine[]> {
+    return [...this.machines.values()].map((m) => structuredClone(m));
+  }
+
+  async createMachine(input: NewMachine): Promise<Machine> {
+    const now = new Date().toISOString();
+    const m: Machine = { ...structuredClone(input), id: randomUUID(), createdAt: now, updatedAt: now };
+    this.machines.set(m.id, m);
+    return structuredClone(m);
+  }
+
+  async updateMachine(id: string, patch: MachinePatch): Promise<Machine> {
+    const m = this.machines.get(id);
+    if (!m) throw new NotFoundError(`No machine ${id}`);
+    Object.assign(m, structuredClone(patch), { updatedAt: new Date().toISOString() });
+    return structuredClone(m);
+  }
+
+  async deleteMachine(id: string): Promise<void> {
+    if (!this.machines.delete(id)) throw new NotFoundError(`No machine ${id}`);
+  }
+
+  async assemble(input: NewAssembly): Promise<AssembleResult> {
+    const base = this.shapes.get(input.baseShapeId);
+    const attached = this.shapes.get(input.attachedShapeId);
+    if (!base || !attached) return { ok: false, reason: "not_found" };
+    if (attached.attachedTo) return { ok: false, reason: "already_attached" };
+    // Walk up from the base: the attached shape mustn't be anything the base hangs from.
+    for (let s: Shape | undefined = base, depth = 0; s && depth < 50; s = s.attachedTo ? this.shapes.get(s.attachedTo) : undefined, depth++) {
+      if (s.id === attached.id) return { ok: false, reason: "cycle" };
+    }
+    const need = consumption([base, attached], (id) => this.assemblies.some((a) => a.baseShapeId === id || a.attachedShapeId === id));
+    const shortages = need.flatMap(({ sku, qty }) => {
+      const p = this.parts.get(sku);
+      const available = p ? p.onHand - p.reserved : 0;
+      return available < qty ? [{ sku, need: qty, available }] : [];
+    });
+    if (shortages.length) return { ok: false, reason: "short", shortages };
+
+    const assembly: Assembly = {
+      id: randomUUID(), name: input.name, baseShapeId: base.id, attachedShapeId: attached.id,
+      basePoint: input.basePoint, attachedPoint: input.attachedPoint, consumed: need, createdAt: new Date().toISOString(),
+    };
+    for (const { sku, qty } of need) {
+      const p = this.parts.get(sku)!;
+      p.onHand -= qty;
+      this.touch(p);
+      this.log(sku, "consume", qty, `Assembly ${input.name} (${assembly.id})`, null);
+    }
+    Object.assign(attached, { attachedTo: base.id, attach: structuredClone(input.attachment), updatedAt: new Date().toISOString() });
+    this.assemblies.unshift(assembly);
+    return { ok: true, assembly: structuredClone(assembly) };
+  }
+
+  async listAssemblies(limit: number): Promise<Assembly[]> {
+    return this.assemblies.slice(0, limit).map((a) => structuredClone(a));
   }
 
   async listSplitters(): Promise<Splitter[]> {
@@ -194,6 +297,10 @@ export class MemoryRepo implements InventoryRepo {
 
   async reset(): Promise<void> {
     this.splitters.clear();
+    this.connectors.clear();
+    this.mergers.clear();
+    this.machines.clear();
+    this.assemblies = [];
     this.conveyors.clear();
     this.shapes.clear();
     this.parts.clear();
@@ -234,4 +341,14 @@ export class MemoryRepo implements InventoryRepo {
 
 function out(p: PartRow): Part {
   return withDerived({ ...p });
+}
+
+/**
+ * The parts a join uses up: each shape that stands for a part, unless that shape was already
+ * joined into an earlier assembly (its part was used then). Sorted by SKU.
+ */
+export function consumption(shapes: readonly Shape[], alreadyJoined: (id: string) => boolean): { sku: string; qty: number }[] {
+  const need = new Map<string, number>();
+  for (const s of shapes) if (s.sku && !alreadyJoined(s.id)) need.set(s.sku, (need.get(s.sku) ?? 0) + 1);
+  return [...need].sort(([a], [b]) => (a < b ? -1 : 1)).map(([sku, qty]) => ({ sku, qty }));
 }

@@ -10,7 +10,7 @@ A set of small projects mirroring Vention's stack: browser-based 3D design and r
 | 4 | [Legacy Refactor Kata](snack4-refactor-kata/) | TypeScript, unit tests | ~0.5 day | Built |
 | 5 | [Parts Inventory](snack5-inventory/) | Node.js, React, PostgreSQL or MongoDB, Docker, Kubernetes | ~1 day | Built |
 
-**Walkthrough:** [Five Snacks, Line by Line](walkthrough/vention-snacks-book.pdf) (PDF, 422 pages) explains every project line by line, with concepts, diagrams, interview questions and exercises, including the robot arm's shapes, conveyor belts and rule-driven splitters. Snack 5 also has its own [walkthrough](walkthrough/snack5-inventory-walkthrough.pdf).
+**Walkthrough:** [Five Snacks, Line by Line](walkthrough/vention-snacks-book.pdf) (PDF, 477 pages) explains every project line by line, with concepts, diagrams, interview questions and exercises, including the robot arm's shapes, conveyor belts, rule-driven splitters, mergers, joining machines and connection points. Snack 5 also has its own [walkthrough](walkthrough/snack5-inventory-walkthrough.pdf).
 
 ---
 

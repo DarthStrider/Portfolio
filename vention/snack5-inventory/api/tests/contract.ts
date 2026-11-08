@@ -250,6 +250,80 @@ export function contractTests(name: string, makeRepo: () => Promise<InventoryRep
       await assert.rejects(repo.updatePart("NOPE-1", { location: "A" }), NotFoundError);
     });
 
+    test("connection points: stored per kind, replaced whole, back to defaults", async () => {
+      assert.deepEqual(await repo.listConnectors(), []);
+      const pts = [{ name: "left", x: -0.5, y: 0, z: 0 }, { name: "top", x: 0, y: 0.5, z: 0 }];
+      await repo.setConnectors("part:PL-200", pts);
+      await repo.setConnectors("kind:box", [pts[1]]);
+      const again = await repo.setConnectors("part:PL-200", [pts[0]]); // an upsert: replaces, doesn't add
+      assert.deepEqual(again.points, [pts[0]]);
+      assert.deepEqual((await repo.listConnectors()).map((c) => [c.owner, c.points.length]), [["kind:box", 1], ["part:PL-200", 1]]);
+      await repo.deleteConnectors("kind:box");
+      await assert.rejects(repo.deleteConnectors("kind:box"), NotFoundError);
+    });
+
+    test("mergers and machines: stored, patched, deleted with any belt they use", async () => {
+      const mk = (name: string) => repo.createConveyor({ name, length: 1.5, width: 0.3, height: 0.3, speed: 0.3, position: { x: 0, z: 0 }, rotationY: 0 });
+      const [main, a, b] = [await mk("Main"), await mk("Feeder A"), await mk("Feeder B")];
+      const side = await repo.createMerger({ name: "Side", kind: "side", conveyorId: main.id, along: 0.8, feederIds: [a.id], priority: "main", gap: 0.3 });
+      const y = await repo.createMerger({ name: "Y", kind: "y", conveyorId: main.id, along: 0, feederIds: [a.id, b.id], priority: "alternate", gap: 0.25 });
+      assert.deepEqual([y.feederIds, y.priority], [[a.id, b.id], "alternate"]);
+      assert.equal((await repo.updateMerger(side.id, { priority: "feeders" })).priority, "feeders");
+      const m = await repo.createMachine({ name: "Joiner", conveyorId: main.id, along: 1.2, base: { owner: "part:PL-200", point: "top" }, attach: { owner: "kind:cylinder", point: "bottom" }, cycleSeconds: 1.5 });
+      const m2 = await repo.updateMachine(m.id, { attach: { owner: "part:LA-300", point: "bottom" } });
+      assert.deepEqual([m2.attach, m2.base, m2.along], [{ owner: "part:LA-300", point: "bottom" }, { owner: "part:PL-200", point: "top" }, 1.2]);
+      // Deleting feeder B removes only the Y merger, which used it; deleting the main belt removes the rest.
+      await repo.deleteConveyor(b.id);
+      assert.deepEqual((await repo.listMergers()).map((x) => x.name), ["Side"]);
+      await repo.deleteConveyor(main.id);
+      assert.deepEqual([await repo.listMergers(), await repo.listMachines()], [[], []]);
+      await assert.rejects(repo.deleteMachine(m.id), NotFoundError);
+    });
+
+    test("assemble: joins, uses each part once, refuses loops, double joins and shortages", async () => {
+      const at = { x: 0, z: 0 };
+      const shape = (name: string, sku: string | null) => repo.createShape({ name, kind: "box", size: { x: 0.2, y: 0.1, z: 0.2 }, color: "#9aa3af", position: at, rotationY: 0, sku });
+      const plate = await shape("Plate", "PL-200");
+      const motor = await shape("Actuator", "LA-300");
+      const plain = await shape("Spacer", null);
+      const stock = async () => Object.fromEntries((await repo.getParts(["PL-200", "LA-300"])).map((p) => [p.sku, p.onHand]));
+      const before = await stock();
+      const join = (base: string, attached: string) => repo.assemble({ name: "Bracket", baseShapeId: base, attachedShapeId: attached, basePoint: "top", attachedPoint: "bottom", attachment: { x: 0, y: 0.1, z: 0, rotationY: 0 } });
+
+      const first = await join(plate.id, motor.id);
+      assert.ok(first.ok);
+      assert.deepEqual(first.ok && first.assembly.consumed, [{ sku: "LA-300", qty: 1 }, { sku: "PL-200", qty: 1 }]);
+      assert.deepEqual(await stock(), { "PL-200": before["PL-200"] - 1, "LA-300": before["LA-300"] - 1 });
+      const joined = (await repo.listShapes()).find((s) => s.id === motor.id)!;
+      assert.deepEqual([joined.attachedTo, joined.attach], [plate.id, { x: 0, y: 0.1, z: 0, rotationY: 0 }]);
+      assert.match((await repo.movements({ sku: "LA-300", limit: 1 }))[0].note, /^Assembly Bracket/);
+
+      // A plain shape onto the assembly: no stock used, and the plate isn't used again.
+      const second = await join(plate.id, plain.id);
+      assert.deepEqual(second.ok && second.assembly.consumed, []);
+      assert.deepEqual(await stock(), { "PL-200": before["PL-200"] - 1, "LA-300": before["LA-300"] - 1 });
+
+      assert.deepEqual(await join(motor.id, plate.id), { ok: false, reason: "cycle" }); // the plate holds the actuator
+      assert.deepEqual(await join(motor.id, plain.id), { ok: false, reason: "already_attached" });
+      assert.deepEqual(await join(plate.id, "00000000-0000-4000-8000-000000000000"), { ok: false, reason: "not_found" });
+
+      // Not enough actuators: nothing changes, nothing is attached.
+      const p2 = await shape("Plate 2", "PL-200");
+      const m2 = await shape("Actuator 2", "LA-300");
+      const la = (await repo.getParts(["LA-300"]))[0];
+      await repo.consume("LA-300", la.available, "use them all");
+      const plates = (await stock())["PL-200"];
+      const short = await join(p2.id, m2.id);
+      assert.deepEqual(short, { ok: false, reason: "short", shortages: [{ sku: "LA-300", need: 1, available: 0 }] });
+      assert.equal((await stock())["PL-200"], plates);
+      assert.equal((await repo.listShapes()).find((s) => s.id === m2.id)!.attachedTo, null);
+
+      assert.deepEqual((await repo.listAssemblies(10)).length, 2);
+      // Deleting the base deletes what's joined onto it.
+      await repo.deleteShape(plate.id);
+      assert.deepEqual((await repo.listShapes()).map((s) => s.name).sort(), ["Actuator 2", "Plate 2"]);
+    });
+
     test("reservations and movements come newest first, with a limit", async () => {
       for (const q of ["Q-1", "Q-2", "Q-3"]) assert.ok((await repo.reserve(q, [{ sku: "PL-200", qty: 1 }])).ok);
       assert.deepEqual((await repo.reservations(2)).map((r) => r.quoteRef), ["Q-3", "Q-2"]);

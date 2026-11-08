@@ -81,14 +81,43 @@ export interface Body {
   vx: number;
   vy: number;
   vz: number;
+  /** Its length along a belt, meters, for spacing in a queue. Defaults to 0.2. */
+  size?: number;
+  /** Set while it's held at a stop line (that line's id) or queued behind something held ("queue"). */
+  heldAt?: string;
+  /** Set when a station slides it somewhere, such as onto a main belt at a merge: target and speed. */
+  guide?: { x: number; z: number; y: number; speed: number };
+}
+
+/**
+ * A line across a belt where a station (a merger, a machine) may hold items. With `queue`,
+ * items arriving behind a held item stop behind it, spaced by their sizes, instead of
+ * passing through it: that's how a feeder belt backs up while it waits to merge.
+ */
+export interface StopLine {
+  id: string;
+  conveyorId: string;
+  along: number;
+  queue?: boolean;
 }
 
 export interface StepOptions {
   gates?: readonly Gate[];
   /** Asked once when a body crosses a gate: where should it go? */
   route?: (body: Body, gate: Gate) => Exit;
+  stops?: readonly StopLine[];
+  /** Asked every step while a body is at or crossing a stop line: hold it there? */
+  hold?: (body: Body, stop: StopLine) => boolean;
   floorLimit?: number;
 }
+
+/** World position of a point given in a belt's frame: the inverse of toBelt. */
+export function fromBelt(b: Belt, u: number, v: number): { x: number; z: number } {
+  const t = b.rotationY * DEG;
+  return { x: b.position.x + u * Math.cos(t) + v * Math.sin(t), z: b.position.z - u * Math.sin(t) + v * Math.cos(t) };
+}
+
+const QUEUE_GAP = 0.02; // meters between queued items
 
 /**
  * Which side of a belt is "left" depends on which way it runs. Seen from above, facing the
@@ -111,8 +140,27 @@ export function divertVelocity(b: Belt, side: 1 | -1): { vx: number; vz: number 
 
 /** Advances every body by dt seconds. Bodies are changed in place. */
 export function step(bodies: Iterable<Body>, belts: readonly Belt[], dt: number, options: StepOptions | number = {}): void {
-  const { gates = [], route, floorLimit = 2.95 } = typeof options === "number" ? { floorLimit: options } : options;
-  for (const body of bodies) {
+  const { gates = [], route, stops = [], hold, floorLimit = 2.95 } = typeof options === "number" ? { floorLimit: options } : options;
+  const all = [...bodies];
+  for (const body of all) {
+    if (body.guide) {
+      // Slid by a station: straight to the target at the guide's speed, then let go on whatever is there.
+      const g = body.guide;
+      const dx = g.x - body.x;
+      const dz = g.z - body.z;
+      const d = Math.hypot(dx, dz);
+      body.y = g.y;
+      body.vx = body.vy = body.vz = 0;
+      if (d <= g.speed * dt) {
+        body.x = g.x;
+        body.z = g.z;
+        body.guide = undefined;
+      } else {
+        body.x += (dx / d) * g.speed * dt;
+        body.z += (dz / d) * g.speed * dt;
+      }
+      continue;
+    }
     // Only what's at or below the base can hold it up: a belt above it doesn't lift it.
     const support = supportHeight(belts, body.x, body.z, body.y);
     if (body.y > support + 1e-4) {
@@ -140,14 +188,54 @@ export function step(bodies: Iterable<Body>, belts: readonly Belt[], dt: number,
     const diverted = body.divert && body.divert.beltId === belt.id ? body.divert : undefined;
     if (!diverted) body.divert = undefined;
     const v = diverted ? divertVelocity(belt, diverted.side) : beltVelocity(belt);
-    const before = toBelt(belt, body.x, body.z).u;
+    const start = toBelt(belt, body.x, body.z);
+    const before = start.u;
     body.vx = v.vx;
     body.vz = v.vz;
     move(body, v.vx, v.vz, dt, floorLimit);
-    if (diverted || !route || belt.id === undefined) continue;
+    if (diverted || belt.id === undefined) continue;
+    let after = toBelt(belt, body.x, body.z).u;
+    const dir = belt.speed >= 0 ? 1 : -1;
+
+    // Stop lines: a station may hold the item at the line (it's put back exactly on it).
+    let held: string | undefined;
+    if (hold) {
+      for (const stop of stops) {
+        if (stop.conveyorId !== belt.id) continue;
+        const g = stop.along - belt.length / 2;
+        if (Math.min(before, after) <= g && g <= Math.max(before, after) && before !== after && hold(body, stop)) {
+          after = g;
+          held = stop.id;
+          break;
+        }
+      }
+    }
+    // Queues: don't pass through something held at a queueing line, or queued behind one.
+    if (!held) {
+      const queueing = new Set(stops.filter((s) => s.queue && s.conveyorId === belt.id).map((s) => s.id));
+      for (const other of all) {
+        if (other === body || !other.heldAt || (other.heldAt !== "queue" && !queueing.has(other.heldAt))) continue;
+        if (!isOver(belt, other.x, other.z) || Math.abs(other.y - body.y) > 1e-3) continue;
+        const ou = toBelt(belt, other.x, other.z).u;
+        const limit = ou - dir * ((body.size ?? 0.2) + (other.size ?? 0.2)) / 2 - dir * QUEUE_GAP;
+        // Only what's ahead of it counts, and only if this step would take it past the limit.
+        if ((ou - before) * dir > 0 && (after - limit) * dir > 0) {
+          after = (before - limit) * dir > 0 ? before : limit;
+          held = "queue";
+        }
+      }
+    }
+    body.heldAt = held;
+    if (held) {
+      const p = fromBelt(belt, after, start.v);
+      body.x = p.x;
+      body.z = p.z;
+      body.vx = body.vz = 0;
+      continue;
+    }
+    if (!route) continue;
 
     // Did this step carry it past a gate on this belt? Gates are measured from the belt's -u end.
-    const after = toBelt(belt, body.x, body.z).u;
     for (const gate of gates) {
       if (gate.conveyorId !== belt.id) continue;
       const g = gate.along - belt.length / 2;

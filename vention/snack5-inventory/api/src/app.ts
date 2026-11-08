@@ -10,6 +10,9 @@ import { parseNewPart, parsePartPatch } from "./domain/newPart.ts";
 import { parseNewShape, parseShapePatch } from "./domain/shapes.ts";
 import { parseConveyorPatch, parseNewConveyor } from "./domain/conveyors.ts";
 import { parseNewSplitter, parseSplitterPatch } from "./domain/splitters.ts";
+import {
+  DEFAULT_POINTS, isOwner, parseMachinePatch, parseMergerPatch, parseNewAssembly, parseNewMachine, parseNewMerger, parsePoints,
+} from "./domain/assembly.ts";
 import type { InventoryRepo } from "./domain/types.ts";
 import { checkDesign, reserveDesign } from "./service.ts";
 
@@ -122,6 +125,84 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
     return [200, { deleted: params.id }];
   });
 
+  // ---- Connection points, per kind of object ----
+  function owner(s: string) {
+    if (!isOwner(s)) throw new ValidationError([`"${s}" isn't a kind of object: use part:<SKU> or kind:<box|cylinder|sphere|cone>`]);
+    return s;
+  }
+  route("GET", "/api/connectors", async () => [200, { defaultPoints: DEFAULT_POINTS, connectors: await repo.listConnectors() }]);
+  route("PUT", "/api/connectors/:owner", async ({ params, body }) => {
+    const o = owner(params.owner);
+    if (o.startsWith("part:") && (await repo.getParts([o.slice(5)])).length === 0) throw new ValidationError([`No part ${o.slice(5)} in the inventory`]);
+    return [200, await repo.setConnectors(o, parsePoints(body))];
+  });
+  route("DELETE", "/api/connectors/:owner", async ({ params }) => {
+    await repo.deleteConnectors(owner(params.owner));
+    return [200, { deleted: params.owner, points: DEFAULT_POINTS }];
+  });
+
+  // ---- Mergers and joining machines ----
+  async function belt(id: string) {
+    const b = (await repo.listConveyors()).find((c) => c.id === id);
+    if (!b) throw new ValidationError([`No conveyor ${id}`]);
+    return b;
+  }
+  route("GET", "/api/mergers", async () => [200, await repo.listMergers()]);
+  route("POST", "/api/mergers", async ({ body }) => {
+    const m = parseNewMerger(body);
+    await checkFits(m.conveyorId, m.along);
+    for (const f of m.feederIds) await belt(f);
+    return [201, await repo.createMerger(m)];
+  });
+  route("PATCH", "/api/mergers/:id", async ({ params, body }) => {
+    const patch = parseMergerPatch(body);
+    if (patch.along !== undefined) {
+      const m = (await repo.listMergers()).find((x) => x.id === params.id);
+      if (!m) throw new NotFoundError(`No merger ${params.id}`);
+      if (m.kind === "y" && patch.along !== 0) throw new ValidationError(["a y merger is always at the start of its output belt (along 0)"]);
+      await checkFits(m.conveyorId, patch.along);
+    }
+    return [200, await repo.updateMerger(params.id, patch)];
+  });
+  route("DELETE", "/api/mergers/:id", async ({ params }) => {
+    await repo.deleteMerger(params.id);
+    return [200, { deleted: params.id }];
+  });
+
+  route("GET", "/api/machines", async () => [200, await repo.listMachines()]);
+  route("POST", "/api/machines", async ({ body }) => {
+    const m = parseNewMachine(body);
+    await checkFits(m.conveyorId, m.along);
+    return [201, await repo.createMachine(m)];
+  });
+  route("PATCH", "/api/machines/:id", async ({ params, body }) => {
+    const patch = parseMachinePatch(body);
+    if (patch.along !== undefined) {
+      const m = (await repo.listMachines()).find((x) => x.id === params.id);
+      if (!m) throw new NotFoundError(`No machine ${params.id}`);
+      await checkFits(m.conveyorId, patch.along);
+    }
+    return [200, await repo.updateMachine(params.id, patch)];
+  });
+  route("DELETE", "/api/machines/:id", async ({ params }) => {
+    await repo.deleteMachine(params.id);
+    return [200, { deleted: params.id }];
+  });
+
+  // ---- Assemblies: join two shapes, using up their parts ----
+  route("GET", "/api/assemblies", async ({ query }) => [200, await repo.listAssemblies(limit(query, 50, 200))]);
+  route("POST", "/api/assemblies", async ({ body }) => {
+    const result = await repo.assemble(parseNewAssembly(body));
+    if (result.ok) return [201, result.assembly];
+    const message = {
+      not_found: "One of the shapes doesn't exist",
+      already_attached: "That shape is already joined to something",
+      cycle: "That join would make a loop: the shape is already part of this assembly",
+      short: "Not enough stock to make this assembly",
+    }[result.reason];
+    return [result.reason === "not_found" ? 404 : 409, { error: message, reason: result.reason, ...(result.shortages ? { shortages: result.shortages } : {}) }];
+  });
+
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const started = performance.now();
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -145,7 +226,7 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
       } else {
         const m = r.pattern.exec(url.pathname)!;
         const params = Object.fromEntries(r.keys.map((k, i) => [k, decode(m[i + 1])]));
-        const body = req.method === "POST" || req.method === "PATCH" ? await readJson(req) : undefined;
+        const body = req.method === "POST" || req.method === "PATCH" || req.method === "PUT" ? await readJson(req) : undefined;
         [status, payload] = await r.handler({ params, query: url.searchParams, body });
       }
     } catch (err) {
@@ -225,7 +306,7 @@ function corsHeaders(origin: string | undefined): Record<string, string> | null 
   if (!allowed) return null;
   return {
     "access-control-allow-origin": origin,
-    "access-control-allow-methods": "GET, POST, PATCH, DELETE",
+    "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE",
     "access-control-allow-headers": "content-type",
     "access-control-max-age": "600",
     vary: "origin",

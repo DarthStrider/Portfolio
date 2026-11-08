@@ -2,6 +2,7 @@ import type { NewShape, Shape, ShapePatch } from "./shapes.ts";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "./conveyors.ts";
 import type { NewSplitter, Splitter, SplitterPatch } from "./splitters.ts";
 import type { PartPatch } from "./newPart.ts";
+import type { AssembleResult, Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner } from "./assembly.ts";
 
 /**
  * The inventory's data model and the one interface every database implements.
@@ -157,6 +158,34 @@ export interface InventoryRepo {
   updateSplitter(id: string, patch: SplitterPatch): Promise<Splitter>;
   /** Throws NotFoundError for an unknown id. */
   deleteSplitter(id: string): Promise<void>;
+
+  /** Connection points stored for each kind of object; kinds not listed use DEFAULT_POINTS. */
+  listConnectors(): Promise<Connectors[]>;
+  /** Replaces a kind's points (creating the entry if needed). */
+  setConnectors(owner: Owner, points: ConnectionPoint[]): Promise<Connectors>;
+  /** Back to the defaults. Throws NotFoundError if none were stored. */
+  deleteConnectors(owner: Owner): Promise<void>;
+
+  /** Mergers, oldest first. Deleting a belt deletes the mergers it's the main belt or a feeder of. */
+  listMergers(): Promise<Merger[]>;
+  createMerger(merger: NewMerger): Promise<Merger>;
+  updateMerger(id: string, patch: MergerPatch): Promise<Merger>;
+  deleteMerger(id: string): Promise<void>;
+
+  /** Joining machines, oldest first. Deleting a belt deletes its machines. */
+  listMachines(): Promise<Machine[]>;
+  createMachine(machine: NewMachine): Promise<Machine>;
+  updateMachine(id: string, patch: MachinePatch): Promise<Machine>;
+  deleteMachine(id: string): Promise<void>;
+
+  /**
+   * Joins one shape onto another and uses up their parts from stock, all or nothing.
+   * Refuses (ok: false) if a shape is missing, the attached one is already joined to
+   * something, the join would make a loop, or a part is short.
+   */
+  assemble(input: NewAssembly): Promise<AssembleResult>;
+  /** Newest first. */
+  listAssemblies(limit: number): Promise<Assembly[]>;
 
   /** Deletes everything. Tests only. */
   reset(): Promise<void>;

@@ -230,6 +230,36 @@ button:disabled { opacity: 0.45; cursor: default; }
 .live { margin: 8px 0 0; padding: 6px 8px; border-radius: 6px; background: rgba(245, 158, 11, 0.12); color: #fbbf24; font-size: 12px; }
 .shapes-panel { width: 360px; }
 
+/* ---- Machines, mergers and connection points ---- */
+.tabs { grid-template-columns: repeat(4, 1fr); }
+.tabs button { font-size: 12.5px; }
+.shapes-panel { width: 380px; }
+.shapes-panel label.check { flex-direction: row; align-items: center; gap: 8px; margin-top: 8px; color: var(--text); font-size: 12px; }
+.shapes-panel label.check input { width: auto; }
+.shape-list .pick.static { cursor: default; border: 1px solid var(--border); border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
+.shape-list .label select { margin-top: 4px; }
+.merge-swatch { background: #22c55e !important; border-radius: 50% !important; }
+.machine-swatch { background: #7c3aed !important; }
+.slot { margin-top: 8px; padding: 6px 8px 8px; border: 1px solid var(--border); border-radius: 8px; }
+.slot .row { margin-top: 4px; }
+.slot-label { font-size: 11px; color: var(--warm); font-weight: 600; }
+.machine-status { color: #93c5fd !important; }
+.machine-status.waiting { color: #fbbf24 !important; }
+.machine-status.error { color: #fb7185 !important; }
+.assembly-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.assembly-list li { display: flex; flex-direction: column; font-size: 12px; }
+.assembly-list li.empty { color: var(--muted); }
+.assembly-list small, .joined { color: var(--muted); font-size: 11px; }
+.joined { color: #c4b5fd !important; }
+.points { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+.points li { display: grid; grid-template-columns: 14px 1.6fr 1fr 1fr 1fr auto; gap: 4px; align-items: center; }
+.points li.empty { display: block; color: var(--muted); }
+.shapes-panel .points input { padding: 4px 5px; font-size: 12px; }
+.points .dot { width: 12px; height: 12px; padding: 0; border-radius: 50%; background: #22d3ee; border: 0; }
+.points li.on .dot { background: #f97316; }
+.points li button:last-child { padding: 2px 7px; }
+.link-btn { margin-top: 6px; background: none; border: 0; color: var(--muted); text-decoration: underline; }
+
 @media (max-width: 700px) {
   .panel {
     top: auto;

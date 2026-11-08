@@ -190,6 +190,41 @@ test("parts: change details, not stock", async () => {
   assert.equal((await call("PATCH", "/api/parts/NOPE-1", { location: "A" })).status, 404);
 });
 
+test("connection points, mergers, machines and assemblies over HTTP", async () => {
+  const put = await call("PUT", "/api/connectors/part:PL-200", { points: [{ name: "hole A", x: -0.3, y: 0.5, z: 0 }] });
+  assert.equal(put.status, 200);
+  assert.equal((await call("PUT", "/api/connectors/part:NOPE-1", { points: [] })).status, 400);
+  assert.equal((await call("PUT", "/api/connectors/widget", { points: [] })).status, 400);
+  const badPoints = await call("PUT", "/api/connectors/kind:box", { points: [{ name: "a", x: 0, y: 0, z: 0 }, { name: "A", x: 0.1, y: 0, z: 0 }, { name: "b", x: 0.9, y: 0, z: 0 }] });
+  assert.deepEqual(badPoints.body.problems, ["point 2: there's already a point called A", "point 3: x, y and z must be fractions of the size, -0.5 to 0.5"]);
+  const listed = (await call("GET", "/api/connectors")).body;
+  assert.deepEqual([listed.defaultPoints.map((p: any) => p.name), listed.connectors[0].owner], [["top", "bottom"], "part:PL-200"]);
+
+  const belt = async (name: string) => (await call("POST", "/api/conveyors", { name, length: 1.5, width: 0.3, height: 0.3, position: { x: 0, z: 0 } })).body;
+  const [main, feeder] = [await belt("Main"), await belt("Feeder")];
+  const merger = await call("POST", "/api/mergers", { name: "Side in", kind: "side", conveyorId: main.id, along: 0.7, feederIds: [feeder.id] });
+  assert.deepEqual([merger.status, merger.body.priority, merger.body.gap], [201, "main", 0.3]);
+  const y = await call("POST", "/api/mergers", { name: "Y", kind: "y", conveyorId: main.id, feederIds: [feeder.id] });
+  assert.match(y.body.problems[0], /2 conveyor ids/);
+  assert.equal((await call("POST", "/api/mergers", { name: "Self", kind: "side", conveyorId: main.id, along: 0.2, feederIds: [main.id] })).status, 400);
+  assert.equal((await call("POST", "/api/mergers", { name: "Far", kind: "side", conveyorId: main.id, along: 2, feederIds: [feeder.id] })).status, 400);
+
+  const machine = await call("POST", "/api/machines", { name: "Joiner", conveyorId: main.id, along: 1.2, base: { owner: "part:PL-200", point: "hole A" }, attach: { owner: "kind:cylinder", point: "bottom" } });
+  assert.deepEqual([machine.status, machine.body.cycleSeconds], [201, 1.5]);
+  assert.equal((await call("PATCH", `/api/machines/${machine.body.id}`, { conveyorId: feeder.id })).status, 400);
+
+  const shape = async (name: string, kind: string, sku?: string) => (await call("POST", "/api/shapes", { name, kind, size: { x: 0.2, y: 0.05, z: 0.2 }, color: "#9aa3af", position: { x: 0.5, z: 0 }, ...(sku ? { sku } : {}) })).body;
+  const plate = await shape("Plate", "box", "PL-200");
+  const can = await shape("Can", "cylinder");
+  const made = await call("POST", "/api/assemblies", { name: "Plate + can", baseShapeId: plate.id, attachedShapeId: can.id, basePoint: "hole A", attachedPoint: "bottom", attachment: { x: -0.06, y: 0.05, z: 0, rotationY: 0 } });
+  assert.deepEqual([made.status, made.body.consumed], [201, [{ sku: "PL-200", qty: 1 }]]);
+  const again = await call("POST", "/api/assemblies", { baseShapeId: plate.id, attachedShapeId: can.id, basePoint: "top", attachedPoint: "bottom", attachment: { x: 0, y: 0, z: 0 } });
+  assert.deepEqual([again.status, again.body.reason], [409, "already_attached"]);
+  assert.equal((await call("GET", "/api/assemblies")).body[0].name, "Plate + can");
+  assert.equal((await call("DELETE", `/api/conveyors/${main.id}`)).status, 200);
+  assert.deepEqual([(await call("GET", "/api/mergers")).body, (await call("GET", "/api/machines")).body], [[], []]);
+});
+
 test("CORS: pages on localhost may call the API; other sites may not", async () => {
   const pre = await fetch(base + "/api/shapes", { method: "OPTIONS", headers: { origin: "http://localhost:5173", "access-control-request-method": "POST" } });
   assert.equal(pre.status, 204);

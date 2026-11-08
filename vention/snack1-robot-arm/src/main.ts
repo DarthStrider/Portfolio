@@ -9,6 +9,7 @@ import { createPanel, type JogDirection } from "./ui/panel";
 import { createShapes } from "./shapes/controller";
 import { createConveyors } from "./conveyors/controller";
 import { createSplitters } from "./splitters/controller";
+import { createLine } from "./line/controller";
 
 const JOG_SPEED = 60; // degrees per second while a key or jog button is held
 const DEMO_SMOOTHING = 3; // higher = joints follow the demo path more tightly
@@ -37,11 +38,15 @@ const belts = createConveyors({
 // Splitters: gates on the belts that send each item left, right or straight on, by your rules.
 const splitters = createSplitters({ root: document.getElementById("splitters-panel")!, scene, camera, canvas, shapes, conveyors: belts });
 
+// Mergers and joining machines, plus the connection point editor in the Shapes tab.
+const line = createLine({ root: document.getElementById("machines-panel")!, scene, camera, canvas, shapes, conveyors: belts });
+
 // The right-hand panel's tabs.
 const tabs = {
   shapes: document.getElementById("tab-shapes")!,
   conveyors: document.getElementById("tab-conveyors")!,
   splitters: document.getElementById("tab-splitters")!,
+  machines: document.getElementById("tab-machines")!,
 };
 function showTab(name: keyof typeof tabs) {
   for (const [key, tab] of Object.entries(tabs)) {
@@ -53,6 +58,7 @@ function showTab(name: keyof typeof tabs) {
 tabs.shapes.addEventListener("click", () => showTab("shapes"));
 tabs.conveyors.addEventListener("click", () => showTab("conveyors"));
 tabs.splitters.addEventListener("click", () => showTab("splitters"));
+tabs.machines.addEventListener("click", () => showTab("machines"));
 belts.onShowTab(() => showTab("conveyors"));
 splitters.onShowTab(() => showTab("splitters"));
 
@@ -190,6 +196,7 @@ canvas.addEventListener("pointerup", (e) => {
   if (Math.hypot(e.clientX - pressX, e.clientY - pressY) > 4) return; // that was an orbit drag
   // Whoever is placing something gets the click; then shapes (they sit on top of belts), then
   // splitter gates (they stand over belts), then belts.
+  if (line.isActive() && line.handleClick(e)) return; // putting a connection point on an object
   if (splitters.isActive() && splitters.handleClick(e)) return;
   if (belts.isActive() && belts.handleClick(e)) return;
   if (shapes.handleClick(e)) return; // placing, moving or selecting a shape
@@ -200,7 +207,7 @@ canvas.addEventListener("pointerup", (e) => {
 });
 canvas.addEventListener("pointermove", (e) => {
   if (e.buttons !== 0) return;
-  if (splitters.isActive() ? splitters.handleHover(e) : belts.isActive() ? belts.handleHover(e) : shapes.handleHover(e)) return;
+  if (line.isActive() ? line.handleHover() : splitters.isActive() ? splitters.handleHover(e) : belts.isActive() ? belts.handleHover(e) : shapes.handleHover(e)) return;
   canvas.style.cursor = housingAt(e) || splitters.hoversGate(e) || belts.hoversBelt(e) ? "pointer" : "";
 });
 
