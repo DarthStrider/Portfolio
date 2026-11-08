@@ -1,0 +1,41 @@
+# Runs the whole app locally with Docker: http://localhost:8080
+#   docker compose up --build
+name: tasks-node
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: tasks
+      POSTGRES_PASSWORD: tasks-dev-password
+      POSTGRES_DB: tasks
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tasks -d tasks"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./api
+    image: tasks-node-api:1.0
+    environment:
+      PGHOST: db
+      PGUSER: tasks
+      PGPASSWORD: tasks-dev-password
+      PGDATABASE: tasks
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    image: tasks-node-web:1.0
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  db-data:

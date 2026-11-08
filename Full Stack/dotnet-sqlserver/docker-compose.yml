@@ -1,0 +1,38 @@
+# Runs the whole app locally with Docker: http://localhost:8081
+#   docker compose up --build
+name: tasks-dotnet
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Tasks-dev-Passw0rd"
+    volumes:
+      - db-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  api:
+    build: ./api
+    image: tasks-dotnet-api:1.0
+    environment:
+      ConnectionStrings__Default: "Server=db,1433;Database=TaskDb;User Id=sa;Password=Tasks-dev-Passw0rd;TrustServerCertificate=True"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    image: tasks-dotnet-web:1.0
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+
+volumes:
+  db-data:

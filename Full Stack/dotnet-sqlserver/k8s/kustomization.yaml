@@ -1,0 +1,10 @@
+# Apply everything with:  kubectl apply -k k8s
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tasks-dotnet
+resources:
+  - namespace.yaml
+  - db-secret.yaml
+  - sqlserver.yaml
+  - api.yaml
+  - web.yaml
