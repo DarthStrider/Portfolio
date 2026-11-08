@@ -4,6 +4,7 @@
  */
 import type { InventoryPart } from "./fromPart";
 import type { NewShape, Shape, ShapePatch } from "./types";
+import type { Conveyor, ConveyorPatch, NewConveyor } from "../conveyors/types";
 
 /** Override with VITE_INVENTORY_API, e.g. http://localhost:8080 for the API without Docker. */
 export const API_BASE: string = (import.meta.env.VITE_INVENTORY_API as string | undefined) ?? "http://localhost:8081";
@@ -39,4 +40,11 @@ export const shapesApi = {
   create: (shape: NewShape) => call<Shape>("POST", "/shapes", shape),
   update: (id: string, patch: ShapePatch) => call<Shape>("PATCH", `/shapes/${id}`, patch),
   remove: (id: string) => call<{ deleted: string }>("DELETE", `/shapes/${id}`),
+};
+
+export const conveyorsApi = {
+  list: () => call<Conveyor[]>("GET", "/conveyors"),
+  create: (belt: NewConveyor) => call<Conveyor>("POST", "/conveyors", belt),
+  update: (id: string, patch: ConveyorPatch) => call<Conveyor>("PATCH", `/conveyors/${id}`, patch),
+  remove: (id: string) => call<{ deleted: string }>("DELETE", `/conveyors/${id}`),
 };

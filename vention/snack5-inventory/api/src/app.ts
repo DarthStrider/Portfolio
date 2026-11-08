@@ -8,6 +8,7 @@ import { isQty, isSku } from "./domain/design.ts";
 import { ValidationError } from "./domain/errors.ts";
 import { parseNewPart } from "./domain/newPart.ts";
 import { parseNewShape, parseShapePatch } from "./domain/shapes.ts";
+import { parseConveyorPatch, parseNewConveyor } from "./domain/conveyors.ts";
 import type { InventoryRepo } from "./domain/types.ts";
 import { checkDesign, reserveDesign } from "./service.ts";
 
@@ -80,6 +81,15 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
   route("PATCH", "/api/shapes/:id", async ({ params, body }) => [200, await repo.updateShape(params.id, parseShapePatch(body))]);
   route("DELETE", "/api/shapes/:id", async ({ params }) => {
     await repo.deleteShape(params.id);
+    return [200, { deleted: params.id }];
+  });
+
+  // ---- Conveyor belts in the robot arm's scene ----
+  route("GET", "/api/conveyors", async () => [200, await repo.listConveyors()]);
+  route("POST", "/api/conveyors", async ({ body }) => [201, await repo.createConveyor(parseNewConveyor(body))]);
+  route("PATCH", "/api/conveyors/:id", async ({ params, body }) => [200, await repo.updateConveyor(params.id, parseConveyorPatch(body))]);
+  route("DELETE", "/api/conveyors/:id", async ({ params }) => {
+    await repo.deleteConveyor(params.id);
     return [200, { deleted: params.id }];
   });
 

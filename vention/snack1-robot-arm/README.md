@@ -15,6 +15,7 @@ checked against each other every frame.
 - [x] Orbit camera, grid floor, soft shadows, hemisphere + directional lighting
 - [x] Demo mode, a trail of the tool's path, click-to-select joints, keyboard and touch controls
 - [x] Shapes: create boxes, cylinders, spheres and cones, place and move them on the floor with the mouse, and see which ones the arm can reach. They're saved in the inventory database (Snack 5), PostgreSQL or MongoDB
+- [x] Conveyor belts: build your own (length, width, height, speed, angle), place them with the mouse, then **Run** them: shapes on a belt ride along, fall off the end, and can land on another belt. Stop saves where everything ended up
 
 ## How to run
 
@@ -49,6 +50,18 @@ app with `$env:VITE_INVENTORY_API="http://localhost:8080"; npm run dev`.
 - Each shape shows **in reach**, **out of reach**, **too close** or **hits the base**. The blue ring on the floor is how far the gripper reaches at floor level.
 - Changes from another browser show up within a few seconds (the panel re-reads the list every 4 s).
 
+### Conveyors (also saved by Snack 5's API)
+
+The **Conveyors** tab, next to Shapes, builds belts.
+
+- Set **length, width, height** (of the belt surface) in cm, a **speed** in cm/s (negative runs it backwards) and a **turn** in degrees, then **Add at X, Z** or **Place with mouse**.
+- Each belt in the list has **Move**, **↻ 90°**, **⇄** (reverse) and **✕**. Clicking a belt in the scene selects it.
+- A shape placed over a belt sits on top of it. Placing with the mouse snaps onto the belt surface under the pointer.
+- **▶ Run belts** (top of the panel) starts the line. Shapes on a belt move at its speed in the direction of the chevrons. Past the end, they fall, keeping their forward speed, onto the floor or onto a lower belt that carries them on. Editing pauses while it runs.
+- **■ Stop belts** saves each moved shape's new position to the database (one PATCH per shape). Until then, a run is only a preview.
+
+The model is simple on purpose: shapes don't collide with each other or with a belt's side rails.
+
 ### Controls
 
 | Input | Action |
@@ -73,13 +86,19 @@ src/
 │   ├── stage.ts         renderer, camera, OrbitControls, lights, floor
 │   └── Trail.ts         tool-path line on a preallocated buffer
 ├── ui/panel.ts          joint list, TCP readout, toggles
-└── shapes/
-    ├── api.ts           calls the inventory API (/api/shapes)
-    ├── reach.ts         can the gripper reach a shape's top? (pure math, unit-tested)
-    ├── ShapeLayer.ts    meshes for the stored shapes, the placement preview, the reach ring
-    └── controller.ts    the Shapes panel and mouse placement
+├── shapes/
+│   ├── api.ts           calls the inventory API (/api/shapes, /api/conveyors)
+│   ├── reach.ts         can the gripper reach a shape's top? (pure math, unit-tested)
+│   ├── ShapeLayer.ts    meshes for the stored shapes, the placement preview, the reach ring
+│   └── controller.ts    the Shapes panel and mouse placement
+└── conveyors/
+    ├── types.ts         a belt as the API stores it
+    ├── transport.ts     what a belt does to a shape: ride, fall, land (pure math, unit-tested)
+    ├── ConveyorLayer.ts belt models, the scrolling chevron texture, the placement preview
+    └── controller.ts    the Conveyors tab, Run / Stop, saving positions after a run
 tests/kinematics.test.ts FK tests (node:test)
 tests/reach.test.ts      reach tests
+tests/transport.test.ts  belt tests: riding, falling off, hand-over between belts, gravity timing
 scripts/build-gripper.ts writes the gripper .glb with no dependencies
 ```
 

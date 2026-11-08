@@ -69,9 +69,24 @@ export const Q = {
      WHERE id = $1
     RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, created_at, updated_at`,
   deleteShape: `DELETE FROM shapes WHERE id = $1 RETURNING id`,
+  listConveyors: `
+    SELECT id, name, length, width, height, speed, x, z, rotation_y, created_at, updated_at
+      FROM conveyors ORDER BY created_at, id`,
+  createConveyor: `
+    INSERT INTO conveyors (name, length, width, height, speed, x, z, rotation_y)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING id, name, length, width, height, speed, x, z, rotation_y, created_at, updated_at`,
+  updateConveyor: `
+    UPDATE conveyors
+       SET name = coalesce($2, name), x = coalesce($3, x), z = coalesce($4, z),
+           rotation_y = coalesce($5, rotation_y), speed = coalesce($6, speed),
+           updated_at = clock_timestamp()
+     WHERE id = $1
+    RETURNING id, name, length, width, height, speed, x, z, rotation_y, created_at, updated_at`,
+  deleteConveyor: `DELETE FROM conveyors WHERE id = $1 RETURNING id`,
   count: `SELECT count(*)::int AS n FROM parts`,
   insertPart: `
     INSERT INTO parts (sku, name, category, unit, on_hand, reorder_level, location)
     VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (sku) DO NOTHING`,
-  reset: `TRUNCATE shapes, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
+  reset: `TRUNCATE conveyors, shapes, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
 } as const;

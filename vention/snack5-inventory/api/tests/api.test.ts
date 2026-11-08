@@ -142,6 +142,20 @@ test("shapes: create, validate, move, delete", async () => {
   assert.match(ghost.body.problems[0], /No part NOPE-1/);
 });
 
+test("conveyors: create with defaults, validate, patch, delete", async () => {
+  const made = await call("POST", "/api/conveyors", { name: "Belt A", length: 1.5, width: 0.3, height: 0.3, position: { x: 0.7, z: 0 } });
+  assert.equal(made.status, 201);
+  assert.deepEqual([made.body.speed, made.body.rotationY], [0.2, 0]); // defaults
+  const bad = await call("POST", "/api/conveyors", { name: "", length: 9, width: 0.3, height: 0, speed: 5, position: { x: 0, z: 0 } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.problems.length, 4); // name, length, height, speed
+  const fast = await call("PATCH", `/api/conveyors/${made.body.id}`, { speed: -0.5, rotationY: 90 });
+  assert.deepEqual([fast.body.speed, fast.body.rotationY], [-0.5, 90]);
+  assert.equal((await call("PATCH", `/api/conveyors/${made.body.id}`, { length: 2 })).status, 400);
+  assert.equal((await call("DELETE", `/api/conveyors/${made.body.id}`)).status, 200);
+  assert.deepEqual((await call("GET", "/api/conveyors")).body, []);
+});
+
 test("CORS: pages on localhost may call the API; other sites may not", async () => {
   const pre = await fetch(base + "/api/shapes", { method: "OPTIONS", headers: { origin: "http://localhost:5173", "access-control-request-method": "POST" } });
   assert.equal(pre.status, 204);

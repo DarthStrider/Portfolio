@@ -64,6 +64,21 @@ CREATE TABLE IF NOT EXISTS shapes (
 ALTER TABLE shapes ADD COLUMN IF NOT EXISTS sku text REFERENCES parts (sku);
 CREATE INDEX IF NOT EXISTS shapes_by_sku ON shapes (sku);
 
+-- Conveyor belts in the robot arm's scene. Meters, meters per second, degrees.
+CREATE TABLE IF NOT EXISTS conveyors (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        text NOT NULL CHECK (length(name) BETWEEN 1 AND 40),
+  length      double precision NOT NULL CHECK (length BETWEEN 0.3 AND 4),
+  width       double precision NOT NULL CHECK (width BETWEEN 0.1 AND 1.2),
+  height      double precision NOT NULL CHECK (height BETWEEN 0.05 AND 1.2),
+  speed       double precision NOT NULL DEFAULT 0.2 CHECK (speed BETWEEN -1 AND 1),
+  x           double precision NOT NULL CHECK (x BETWEEN -3 AND 3),
+  z           double precision NOT NULL CHECK (z BETWEEN -3 AND 3),
+  rotation_y  double precision NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at  timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+
 -- Reserve every line of a quote, or nothing.
 --   p_lines: [{"sku": "PL-200", "qty": 4}, ...]
 --   returns {"ok": true, "id": "<uuid>"} or {"ok": false, "shortages": [...]}

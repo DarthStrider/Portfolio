@@ -11,6 +11,7 @@ import type {
   InventoryRepo, Line, Movement, MovementKind, Part, PartFilter, Reservation, ReserveResult, SeedPart, Shortage,
 } from "../domain/types.ts";
 import type { NewShape, Shape, ShapePatch } from "../domain/shapes.ts";
+import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
 
 interface PartRow { sku: string; name: string; category: Part["category"]; unit: string; onHand: number; reserved: number; reorderLevel: number; location: string; updatedAt: string }
 
@@ -21,6 +22,7 @@ export class MemoryRepo implements InventoryRepo {
   private res = new Map<string, Reservation>();
   private seq = 0;
   private shapes = new Map<string, Shape>();
+  private conveyors = new Map<string, Conveyor>();
 
   async init(): Promise<void> {}
   async ping(): Promise<void> {}
@@ -134,7 +136,30 @@ export class MemoryRepo implements InventoryRepo {
     if (!this.shapes.delete(id)) throw new NotFoundError(`No shape ${id}`);
   }
 
+  async listConveyors(): Promise<Conveyor[]> {
+    return [...this.conveyors.values()].map((c) => structuredClone(c));
+  }
+
+  async createConveyor(input: NewConveyor): Promise<Conveyor> {
+    const now = new Date().toISOString();
+    const c: Conveyor = { ...structuredClone(input), id: randomUUID(), createdAt: now, updatedAt: now };
+    this.conveyors.set(c.id, c);
+    return structuredClone(c);
+  }
+
+  async updateConveyor(id: string, patch: ConveyorPatch): Promise<Conveyor> {
+    const c = this.conveyors.get(id);
+    if (!c) throw new NotFoundError(`No conveyor ${id}`);
+    Object.assign(c, structuredClone(patch), { updatedAt: new Date().toISOString() });
+    return structuredClone(c);
+  }
+
+  async deleteConveyor(id: string): Promise<void> {
+    if (!this.conveyors.delete(id)) throw new NotFoundError(`No conveyor ${id}`);
+  }
+
   async reset(): Promise<void> {
+    this.conveyors.clear();
     this.shapes.clear();
     this.parts.clear();
     this.moves = [];

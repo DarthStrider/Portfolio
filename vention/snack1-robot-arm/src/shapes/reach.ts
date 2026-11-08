@@ -23,13 +23,14 @@ export function footprintRadius(shape: Pick<Shape, "kind" | "size">): number {
   return shape.kind === "box" ? Math.hypot(shape.size.x, shape.size.z) / 2 : shape.size.x / 2;
 }
 
-export function reachOf(shape: Pick<Shape, "kind" | "size" | "position">, arm: ArmDimensions): Reach {
+/** baseY is what the shape stands on: 0 on the floor, a belt's height on a conveyor. */
+export function reachOf(shape: Pick<Shape, "kind" | "size" | "position">, arm: ArmDimensions, baseY = 0): Reach {
   const { x, z } = shape.position;
   const radius = Math.hypot(x, z); // horizontal distance from the base axis
   if (radius - footprintRadius(shape) < BASE_RADIUS) return "overlaps-base";
   if (radius < MIN_REACH_RADIUS) return "too-close";
   const shoulderY = arm.baseHeight + arm.shoulderHeight;
-  const topY = shape.size.y;
+  const topY = baseY + shape.size.y;
   const distance = Math.hypot(radius, topY - shoulderY);
   return distance <= maxReach(arm) - REACH_MARGIN ? "reachable" : "too-far";
 }

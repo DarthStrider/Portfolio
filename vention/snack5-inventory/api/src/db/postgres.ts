@@ -17,6 +17,7 @@ import type {
   InventoryRepo, Line, Movement, Part, PartFilter, Reservation, ReserveResult, SeedPart, Shortage,
 } from "../domain/types.ts";
 import type { NewShape, Shape, ShapeKind, ShapePatch } from "../domain/shapes.ts";
+import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
 
 
 interface PartRow {
@@ -29,6 +30,11 @@ interface ReservationRow { id: string; quote_ref: string; status: Reservation["s
 interface ShapeRow {
   id: string; name: string; kind: ShapeKind; size_x: number; size_y: number; size_z: number;
   color: string; x: number; z: number; rotation_y: number; sku: string | null; created_at: Date; updated_at: Date;
+}
+
+interface ConveyorRow {
+  id: string; name: string; length: number; width: number; height: number; speed: number;
+  x: number; z: number; rotation_y: number; created_at: Date; updated_at: Date;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -163,6 +169,33 @@ export class PostgresRepo implements InventoryRepo {
     if (!rowCount) throw new NotFoundError(`No shape ${id}`);
   }
 
+  async listConveyors(): Promise<Conveyor[]> {
+    const { rows } = await this.pool.query<ConveyorRow>(Q.listConveyors);
+    return rows.map(toConveyor);
+  }
+
+  async createConveyor(c: NewConveyor): Promise<Conveyor> {
+    const { rows } = await this.pool.query<ConveyorRow>(Q.createConveyor, [
+      c.name, c.length, c.width, c.height, c.speed, c.position.x, c.position.z, c.rotationY,
+    ]);
+    return toConveyor(rows[0]);
+  }
+
+  async updateConveyor(id: string, p: ConveyorPatch): Promise<Conveyor> {
+    if (!UUID.test(id)) throw new NotFoundError(`No conveyor ${id}`);
+    const { rows } = await this.pool.query<ConveyorRow>(Q.updateConveyor, [
+      id, p.name ?? null, p.position?.x ?? null, p.position?.z ?? null, p.rotationY ?? null, p.speed ?? null,
+    ]);
+    if (!rows[0]) throw new NotFoundError(`No conveyor ${id}`);
+    return toConveyor(rows[0]);
+  }
+
+  async deleteConveyor(id: string): Promise<void> {
+    if (!UUID.test(id)) throw new NotFoundError(`No conveyor ${id}`);
+    const { rowCount } = await this.pool.query(Q.deleteConveyor, [id]);
+    if (!rowCount) throw new NotFoundError(`No conveyor ${id}`);
+  }
+
   async reset(): Promise<void> {
     await this.pool.query(Q.reset);
   }
@@ -206,6 +239,14 @@ function toShape(r: ShapeRow): Shape {
   return {
     id: r.id, name: r.name, kind: r.kind, size: { x: r.size_x, y: r.size_y, z: r.size_z }, color: r.color,
     position: { x: r.x, z: r.z }, rotationY: r.rotation_y, sku: r.sku,
+    createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
+  };
+}
+
+function toConveyor(r: ConveyorRow): Conveyor {
+  return {
+    id: r.id, name: r.name, length: r.length, width: r.width, height: r.height, speed: r.speed,
+    position: { x: r.x, z: r.z }, rotationY: r.rotation_y,
     createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
   };
 }

@@ -25,6 +25,7 @@ import type {
   InventoryRepo, Line, Movement, MovementKind, Part, PartFilter, Reservation, ReserveResult, SeedPart, Shortage,
 } from "../domain/types.ts";
 import type { NewShape, Shape, ShapePatch } from "../domain/shapes.ts";
+import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
 
 interface PartDoc {
   _id: string; // the SKU
@@ -37,6 +38,7 @@ interface ReservationDoc {
 }
 interface CounterDoc { _id: string; value: number }
 /** A shape is stored almost exactly as the API returns it: documents fit nested data like size and position. */
+interface ConveyorDoc extends Omit<Conveyor, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 interface ShapeDoc extends Omit<Shape, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 
 /** `onHand - reserved >= qty`, as a query filter. */
@@ -51,6 +53,7 @@ export class MongoRepo implements InventoryRepo {
   private readonly res: Collection<ReservationDoc>;
   private readonly counters: Collection<CounterDoc>;
   private readonly shapes: Collection<ShapeDoc>;
+  private readonly conveyors: Collection<ConveyorDoc>;
 
   constructor(url: string, dbName = "inventory") {
     this.client = new MongoClient(url, { serverSelectionTimeoutMS: 5000 });
@@ -60,6 +63,7 @@ export class MongoRepo implements InventoryRepo {
     this.res = this.db.collection<ReservationDoc>("reservations");
     this.counters = this.db.collection<CounterDoc>("counters");
     this.shapes = this.db.collection<ShapeDoc>("shapes");
+    this.conveyors = this.db.collection<ConveyorDoc>("conveyors");
   }
 
   async init(): Promise<void> {
@@ -224,8 +228,30 @@ export class MongoRepo implements InventoryRepo {
     if (r.deletedCount !== 1) throw new NotFoundError(`No shape ${id}`);
   }
 
+  async listConveyors(): Promise<Conveyor[]> {
+    return (await this.conveyors.find({}).sort({ createdAt: 1, _id: 1 }).toArray()).map(toConveyor);
+  }
+
+  async createConveyor(c: NewConveyor): Promise<Conveyor> {
+    const now = new Date();
+    const doc: ConveyorDoc = { ...c, _id: randomUUID(), createdAt: now, updatedAt: now };
+    await this.conveyors.insertOne(doc);
+    return toConveyor(doc);
+  }
+
+  async updateConveyor(id: string, patch: ConveyorPatch): Promise<Conveyor> {
+    const doc = await this.conveyors.findOneAndUpdate({ _id: id }, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
+    if (!doc) throw new NotFoundError(`No conveyor ${id}`);
+    return toConveyor(doc);
+  }
+
+  async deleteConveyor(id: string): Promise<void> {
+    const r = await this.conveyors.deleteOne({ _id: id });
+    if (r.deletedCount !== 1) throw new NotFoundError(`No conveyor ${id}`);
+  }
+
   async reset(): Promise<void> {
-    await Promise.all([this.shapes.deleteMany({}), this.parts.deleteMany({}), this.moves.deleteMany({}), this.res.deleteMany({}), this.counters.deleteMany({})]);
+    await Promise.all([this.conveyors.deleteMany({}), this.shapes.deleteMany({}), this.parts.deleteMany({}), this.moves.deleteMany({}), this.res.deleteMany({}), this.counters.deleteMany({})]);
   }
 
   /**
@@ -298,6 +324,14 @@ function toShape(d: ShapeDoc): Shape {
   return {
     id: d._id, name: d.name, kind: d.kind, size: d.size, color: d.color, position: d.position, rotationY: d.rotationY,
     sku: d.sku ?? null, // shapes saved before parts could be placed have no sku field
+    createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
+  };
+}
+
+function toConveyor(d: ConveyorDoc): Conveyor {
+  return {
+    id: d._id, name: d.name, length: d.length, width: d.width, height: d.height, speed: d.speed,
+    position: d.position, rotationY: d.rotationY,
     createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
   };
 }

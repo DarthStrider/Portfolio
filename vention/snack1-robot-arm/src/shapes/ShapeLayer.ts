@@ -17,6 +17,12 @@ export class ShapeLayer {
   private ghostKey = "";
   private selectedId: string | null = null;
 
+  /**
+   * What a shape at (x, z) stands on: the floor (0) unless a conveyor is there. Set by the
+   * conveyor controller, so this layer doesn't need to know about belts.
+   */
+  supportAt: (x: number, z: number) => number = () => 0;
+
   constructor(reachRadius: number) {
     this.root.name = "Shapes";
 
@@ -67,9 +73,19 @@ export class ShapeLayer {
       }
       mesh.name = s.name;
       mesh.material.color.set(s.color);
-      place(mesh, s.size, s.position.x, s.position.z, s.rotationY);
+      mesh.userData.halfHeight = s.size.y / 2;
+      place(mesh, s.size, s.position.x, s.position.z, s.rotationY, this.supportAt(s.position.x, s.position.z));
     }
     this.select(this.selectedId && keep.has(this.selectedId) ? this.selectedId : null);
+  }
+
+  /**
+   * Moves one shape's mesh without touching the database: used every frame while the
+   * belts run. y is the height of the shape's base.
+   */
+  pose(id: string, x: number, y: number, z: number): void {
+    const mesh = this.meshes.get(id);
+    if (mesh) mesh.position.set(x, y + (mesh.userData.halfHeight as number), z);
   }
 
   /** Highlights one shape (or none) by making it glow slightly. */
@@ -94,7 +110,7 @@ export class ShapeLayer {
       this.ghostKey = key;
     }
     this.ghost.material.color.set(color);
-    place(this.ghost, size, x, z, rotationY);
+    place(this.ghost, size, x, z, rotationY, this.supportAt(x, z));
     this.ghost.visible = true;
   }
 
@@ -103,9 +119,9 @@ export class ShapeLayer {
   }
 }
 
-/** Three.js builds every shape centered on its origin; ours rest on the floor. */
-function place(mesh: THREE.Object3D, size: Size, x: number, z: number, rotationY: number) {
-  mesh.position.set(x, size.y / 2, z);
+/** Three.js builds every shape centered on its origin; ours rest on the floor or a belt. */
+function place(mesh: THREE.Object3D, size: Size, x: number, z: number, rotationY: number, baseY: number) {
+  mesh.position.set(x, baseY + size.y / 2, z);
   mesh.rotation.y = rotationY * DEG;
 }
 

@@ -21,6 +21,7 @@ repository interface and pass the same contract tests.
 - [x] Reserve a design's stock for a quote, all or nothing; release it, or ship it
 - [x] Concurrency-safe on both databases: stock never goes negative and is never promised twice
 - [x] Shapes for the robot arm's scene (Snack 1): boxes, cylinders, spheres and cones with size, color, position and rotation, stored with the inventory
+- [x] Conveyor belts for the same scene: size, speed (forward or reversed), position and angle, so a line layout is saved with the parts it uses
 - [x] Switchable storage: `DB=postgres`, `DB=mongo`, or `DB=memory` (no database at all)
 - [x] Docker Compose profiles and Kubernetes overlays for each database
 
@@ -141,6 +142,10 @@ replica set, the same steps could run inside a multi-document transaction instea
 | POST | `/api/shapes` | `{ "name": "Crate", "kind": "box", "size": { "x": 0.3, "y": 0.2, "z": 0.25 }, "color": "#d97706", "position": { "x": 0.5, "z": -0.2 }, "rotationY": 15 }` | 201 + shape (meters, degrees; round shapes' depth follows the diameter) |
 | PATCH | `/api/shapes/{id}` | `{ "position": {...} }`, `name`, `color` or `rotationY` | Updated shape |
 | DELETE | `/api/shapes/{id}` | | `{ "deleted": id }`, or 404 |
+| GET | `/api/conveyors` | | Conveyor belts in the robot arm's scene, oldest first |
+| POST | `/api/conveyors` | `{ "name": "Infeed", "length": 1.5, "width": 0.3, "height": 0.3, "speed": 0.2, "position": { "x": 0.7, "z": -0.6 }, "rotationY": 0 }` | 201 + belt (meters, m/s, degrees; speed defaults to 0.2, rotationY to 0) |
+| PATCH | `/api/conveyors/{id}` | `name`, `position`, `rotationY` or `speed` | Updated belt (size can't change: make a new belt) |
+| DELETE | `/api/conveyors/{id}` | | `{ "deleted": id }`, or 404 |
 | GET | `/api/health/live`, `/api/health/ready`, `/api/info` | | Liveness, database reachable, which database and pod |
 
 Browsers on other `http://localhost:<port>` pages may call the API (CORS), which is how the robot
@@ -148,7 +153,7 @@ arm's dev server uses it. Set `CORS_ORIGINS` to a comma-separated list to allow 
 
 ## Testing
 
-- **Contract tests** (`tests/contract.ts`, 20 tests) run against every implementation: filtering, the
+- **Contract tests** (`tests/contract.ts`, 21 tests) run against every implementation: filtering, the
   ledger, all-or-nothing reservations, consuming around reservations, closing exactly once, and
   concurrency (8 simultaneous reservations for 3 actuators: exactly 3 succeed).
   The in-memory run is part of `npm test`; Postgres and MongoDB run with `--profile test`.

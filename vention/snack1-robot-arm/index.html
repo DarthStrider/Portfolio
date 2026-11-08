@@ -57,7 +57,17 @@
       <p id="status" class="status" role="status" hidden></p>
     </aside>
 
-    <aside class="panel shapes-panel" id="shapes-panel" aria-label="Shapes"></aside>
+    <aside class="panel shapes-panel" aria-label="Scene objects">
+      <div class="runbar">
+        <button type="button" id="btn-run" class="primary" aria-pressed="false" disabled>▶ Run belts</button>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Scene objects">
+        <button type="button" role="tab" id="tab-shapes" aria-controls="shapes-panel" aria-selected="true">Shapes</button>
+        <button type="button" role="tab" id="tab-conveyors" aria-controls="conveyors-panel" aria-selected="false">Conveyors</button>
+      </div>
+      <div id="shapes-panel" role="tabpanel" aria-labelledby="tab-shapes"></div>
+      <div id="conveyors-panel" role="tabpanel" aria-labelledby="tab-conveyors" hidden></div>
+    </aside>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

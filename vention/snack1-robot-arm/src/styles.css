@@ -184,6 +184,16 @@ button:disabled { opacity: 0.45; cursor: default; }
 .shapes-status { margin: 12px 0 0; padding: 8px 10px; border-radius: 8px; background: rgba(34, 197, 94, 0.12); color: #4ade80; }
 .shapes-status.error { background: rgba(255, 169, 77, 0.14); color: var(--warm); }
 
+/* ---- Run bar, tabs and belts ---- */
+.runbar { display: grid; margin-bottom: 10px; }
+.runbar button { padding: 8px 10px; font-weight: 600; }
+.runbar button:disabled { opacity: 0.5; cursor: default; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.tabs button { border: 0; border-radius: 8px 8px 0 0; background: none; color: var(--muted); padding: 8px 0; border-bottom: 2px solid transparent; }
+.tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.belt-swatch { background: repeating-linear-gradient(90deg, #1f2937 0 4px, #9ca3af 4px 6px) !important; }
+.shapes-panel button:disabled { opacity: 0.45; cursor: default; }
+
 @media (max-width: 700px) {
   .panel {
     top: auto;

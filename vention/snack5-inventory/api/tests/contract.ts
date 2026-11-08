@@ -211,6 +211,19 @@ export function contractTests(name: string, makeRepo: () => Promise<InventoryRep
       await assert.rejects(repo.updateShape("00000000-0000-4000-8000-000000000000", { rotationY: 1 }), NotFoundError);
     });
 
+    test("conveyors: create, list, move, change speed, delete", async () => {
+      const a = await repo.createConveyor({ name: "Infeed", length: 1.2, width: 0.3, height: 0.25, speed: 0.2, position: { x: 0.6, z: -0.5 }, rotationY: 0 });
+      const b = await repo.createConveyor({ name: "Outfeed", length: 0.8, width: 0.25, height: 0.15, speed: -0.1, position: { x: -0.4, z: 0.6 }, rotationY: 90 });
+      assert.match(a.id, /^[0-9a-f-]{36}$/);
+      assert.deepEqual((await repo.listConveyors()).map((c) => [c.name, c.speed]), [["Infeed", 0.2], ["Outfeed", -0.1]]);
+      const moved = await repo.updateConveyor(a.id, { position: { x: 0.5, z: -0.6 }, speed: 0.35 });
+      assert.deepEqual([moved.position, moved.speed, moved.length, moved.rotationY], [{ x: 0.5, z: -0.6 }, 0.35, 1.2, 0]);
+      await repo.deleteConveyor(b.id);
+      assert.deepEqual((await repo.listConveyors()).map((c) => c.id), [a.id]);
+      await assert.rejects(repo.deleteConveyor(b.id), NotFoundError);
+      await assert.rejects(repo.updateConveyor("00000000-0000-4000-8000-000000000000", { speed: 0 }), NotFoundError);
+    });
+
     test("reservations and movements come newest first, with a limit", async () => {
       for (const q of ["Q-1", "Q-2", "Q-3"]) assert.ok((await repo.reserve(q, [{ sku: "PL-200", qty: 1 }])).ok);
       assert.deepEqual((await repo.reservations(2)).map((r) => r.quoteRef), ["Q-3", "Q-2"]);

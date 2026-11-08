@@ -7,6 +7,7 @@ import { createStage } from "./scene/stage";
 import { Trail } from "./scene/Trail";
 import { createPanel, type JogDirection } from "./ui/panel";
 import { createShapes } from "./shapes/controller";
+import { createConveyors } from "./conveyors/controller";
 
 const JOG_SPEED = 60; // degrees per second while a key or jog button is held
 const DEMO_SMOOTHING = 3; // higher = joints follow the demo path more tightly
@@ -24,6 +25,26 @@ let gripper: Gripper | null = null;
 
 // Shapes on the floor, stored in the inventory database (Snack 5's API).
 const shapes = createShapes({ root: document.getElementById("shapes-panel")!, scene, camera, canvas, arm: ARM });
+
+// Conveyor belts, also stored there. Shapes on a running belt ride along.
+const belts = createConveyors({
+  root: document.getElementById("conveyors-panel")!,
+  runButton: document.getElementById("btn-run") as HTMLButtonElement,
+  scene, camera, canvas, shapes,
+});
+
+// The right-hand panel's two tabs.
+const tabs = { shapes: document.getElementById("tab-shapes")!, conveyors: document.getElementById("tab-conveyors")! };
+function showTab(name: keyof typeof tabs) {
+  for (const [key, tab] of Object.entries(tabs)) {
+    const on = key === name;
+    tab.setAttribute("aria-selected", String(on));
+    document.getElementById(tab.getAttribute("aria-controls")!)!.hidden = !on;
+  }
+}
+tabs.shapes.addEventListener("click", () => showTab("shapes"));
+tabs.conveyors.addEventListener("click", () => showTab("conveyors"));
+belts.onShowTab(() => showTab("conveyors"));
 
 const state = {
   selected: 1,
@@ -105,7 +126,7 @@ window.addEventListener("keydown", (e) => {
   // Typing a shape's name or size must not move the arm (R would reset it, G open the gripper…).
   const t = e.target;
   if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return;
-  if (shapes.handleKey(e)) {
+  if (belts.handleKey(e) || shapes.handleKey(e)) {
     e.preventDefault();
     return;
   }
@@ -157,12 +178,17 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointerup", (e) => {
   if (Math.hypot(e.clientX - pressX, e.clientY - pressY) > 4) return; // that was an orbit drag
+  // Whoever is placing something gets the click; then shapes (they sit on top of belts), then belts.
+  if (belts.isActive() && belts.handleClick(e)) return;
   if (shapes.handleClick(e)) return; // placing, moving or selecting a shape
+  if (belts.handlePick(e)) return;
   const hit = housingAt(e);
   if (hit) select(hit.userData.jointIndex as number);
 });
 canvas.addEventListener("pointermove", (e) => {
-  if (e.buttons === 0 && !shapes.handleHover(e)) canvas.style.cursor = housingAt(e) ? "pointer" : "";
+  if (e.buttons !== 0) return;
+  if (belts.isActive() ? belts.handleHover(e) : shapes.handleHover(e)) return;
+  canvas.style.cursor = housingAt(e) || belts.hoversBelt(e) ? "pointer" : "";
 });
 
 // ---- Frame loop ----
@@ -197,6 +223,7 @@ renderer.setAnimationLoop((time) => {
   }
 
   gripper?.update(dt);
+  belts.update(dt); // moves shapes riding the belts while running
 
   // getWorldPosition walks up the hierarchy and refreshes world matrices first,
   // so it's correct even though the joints changed since the last render.

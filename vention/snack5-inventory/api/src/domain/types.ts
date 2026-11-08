@@ -1,4 +1,5 @@
 import type { NewShape, Shape, ShapePatch } from "./shapes.ts";
+import type { Conveyor, ConveyorPatch, NewConveyor } from "./conveyors.ts";
 
 /**
  * The inventory's data model and the one interface every database implements.
@@ -135,6 +136,14 @@ export interface InventoryRepo {
   updateShape(id: string, patch: ShapePatch): Promise<Shape>;
   /** Throws NotFoundError for an unknown id. */
   deleteShape(id: string): Promise<void>;
+
+  /** Conveyor belts in the robot arm's scene, oldest first. */
+  listConveyors(): Promise<Conveyor[]>;
+  createConveyor(conveyor: NewConveyor): Promise<Conveyor>;
+  /** Throws NotFoundError for an unknown id. */
+  updateConveyor(id: string, patch: ConveyorPatch): Promise<Conveyor>;
+  /** Throws NotFoundError for an unknown id. */
+  deleteConveyor(id: string): Promise<void>;
 
   /** Deletes everything. Tests only. */
   reset(): Promise<void>;

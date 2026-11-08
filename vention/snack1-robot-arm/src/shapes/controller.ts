@@ -31,6 +31,16 @@ interface Draft {
   x: number; z: number;
 }
 
+/**
+ * What's under the floor plane's way: conveyor belts, provided by the conveyor controller.
+ * support(x, z) is the height a shape at (x, z) stands on; pick() is where the mouse ray
+ * hits the top of a belt, so you can place a shape on one.
+ */
+export interface Surface {
+  support(x: number, z: number): number;
+  pick(raycaster: THREE.Raycaster): { x: number; z: number } | null;
+}
+
 interface Options {
   root: HTMLElement;
   scene: THREE.Scene;
@@ -55,6 +65,10 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
   let busy = false;
   let message: { text: string; error: boolean } | null = null;
   let hover: { x: number; z: number } | null = null;
+  /** True while the belts run: shapes move on their own, so editing waits until Stop. */
+  let running = false;
+  let surface: Surface = { support: () => 0, pick: () => null };
+  const reach = (s: Pick<Shape, "kind" | "size" | "position">) => reachOf(s, arm, surface.support(s.position.x, s.position.z));
   const draft: Draft = { kind: "box", w: 20, h: 20, d: 20, color: DEFAULT_COLORS.box, name: "", rotationY: 0, x: 60, z: 0 };
 
   // ---- Talking to the API ----
@@ -131,7 +145,7 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
 
   // Poll so changes from other browsers (or the API directly) show up. Skipped mid-placement.
   setInterval(() => {
-    if (mode.kind === "idle" && !busy) void load();
+    if (mode.kind === "idle" && !busy && !running) void load();
   }, POLL_MS);
 
   // ---- Pointer: placing and moving on the floor ----
@@ -147,12 +161,19 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
     raycaster.setFromCamera(pointer, camera);
   }
 
-  /** Where the pointer meets the floor, rounded to the centimeter, or null if off the floor area. */
+  /**
+   * Where the pointer meets the top of a belt, or else the floor, rounded to the centimeter;
+   * null if off the floor area.
+   */
   function floorPoint(e: PointerEvent): { x: number; z: number } | null {
     aim(e);
-    if (!raycaster.ray.intersectPlane(floorPlane, hitPoint)) return null;
-    const x = Math.round(hitPoint.x * 100) / 100;
-    const z = Math.round(hitPoint.z * 100) / 100;
+    let at = surface.pick(raycaster);
+    if (!at) {
+      if (!raycaster.ray.intersectPlane(floorPlane, hitPoint)) return null;
+      at = { x: hitPoint.x, z: hitPoint.z };
+    }
+    const x = Math.round(at.x * 100) / 100;
+    const z = Math.round(at.z * 100) / 100;
     return Math.abs(x) <= FLOOR_LIMIT && Math.abs(z) <= FLOOR_LIMIT ? { x, z } : null;
   }
 
@@ -212,7 +233,7 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
       setMode({ kind: "idle" });
       return true;
     }
-    if ((e.key === "Delete" || e.key === "Backspace") && selected && mode.kind === "idle") {
+    if ((e.key === "Delete" || e.key === "Backspace") && selected && mode.kind === "idle" && !running) {
       remove(selected);
       return true;
     }
@@ -390,13 +411,13 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
 
     placeBtn.textContent = mode.kind === "placing" ? "Cancel placing" : "Place with mouse";
     placeBtn.setAttribute("aria-pressed", String(mode.kind === "placing"));
-    placeBtn.disabled = addBtn.disabled = !online || busy || (source === "part" && !partSku);
+    placeBtn.disabled = addBtn.disabled = !online || busy || running || (source === "part" && !partSku);
     if (!online) dbLabel.textContent = "offline";
 
     list.innerHTML = shapes.length === 0
       ? `<li class="empty">${online ? "No shapes yet. Place one with the mouse." : "Start the inventory API to add shapes."}</li>`
       : shapes.map((s) => {
-          const reach = reachOf(s, arm);
+          const where = reach(s);
           const part = s.sku ? parts.find((p) => p.sku === s.sku) : undefined;
           const placed = s.sku ? placedBySku(shapes).get(s.sku) ?? 0 : 0;
           const stockNote = part
@@ -407,11 +428,11 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
             <button type="button" class="pick" data-id="${s.id}" aria-pressed="${s.id === selected}">
               <span class="swatch" style="background:${s.color}"></span>
               <span class="label"><strong>${escapeHtml(s.name)}</strong><small>${s.kind} · ${sizeText(s)}</small>${stockNote}
-                <span class="pill ${reach}">${REACH_LABEL[reach]}</span></span>
+                <span class="pill ${where}">${REACH_LABEL[where]}</span></span>
             </button>
             <span class="row-actions">
-              <button type="button" data-id="${s.id}" data-do="move" aria-pressed="${moving}" title="Click the floor to move it">${moving ? "Cancel" : "Move"}</button>
-              <button type="button" data-id="${s.id}" data-do="delete" title="Delete (or press Delete)">✕</button>
+              <button type="button" data-id="${s.id}" data-do="move" aria-pressed="${moving}" ${running ? "disabled" : ""} title="Click the floor to move it">${moving ? "Cancel" : "Move"}</button>
+              <button type="button" data-id="${s.id}" data-do="delete" ${running ? "disabled" : ""} title="Delete (or press Delete)">✕</button>
             </span>
           </li>`;
         }).join("");
@@ -426,7 +447,7 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
   /** The reach pill for the typed position, and what the mouse is doing. */
   function renderHint() {
     const draftShape = { kind: draft.kind, size: sizeOf(draft), position: { x: draft.x / 100, z: draft.z / 100 } };
-    setReach(reachSpan, reachOf(draftShape, arm));
+    setReach(reachSpan, reach(draftShape));
     if (mode.kind === "idle") {
       hint.hidden = true;
       return;
@@ -436,7 +457,7 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
     if (!hover) hint.textContent = `Click the floor to ${verb}. Esc cancels.`;
     else {
       const src = ghostSource()!;
-      const r = reachOf({ kind: src.kind, size: src.size, position: hover }, arm);
+      const r = reach({ kind: src.kind, size: src.size, position: hover });
       hint.textContent = `x ${(hover.x * 100).toFixed(0)} cm, z ${(hover.z * 100).toFixed(0)} cm · ${REACH_LABEL[r]}. Click to ${verb}.`;
     }
   }
@@ -449,7 +470,48 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
   render();
   void load();
 
-  return { layer, handleClick, handleHover, handleKey };
+  // ---- For the conveyor controller ----
+
+  /** Belts changed: shapes may now stand on (or fall off) one. */
+  function setSurface(next: Surface) {
+    surface = next;
+    layer.supportAt = (x, z) => surface.support(x, z);
+    refresh();
+  }
+
+  function refresh() {
+    layer.sync(shapes);
+    render();
+  }
+
+  function setRunning(on: boolean) {
+    running = on;
+    if (on) setMode({ kind: "idle" });
+    else render();
+  }
+
+  /** After a run: keep where the belts left each shape, here and in the database. */
+  function saveMoves(moves: readonly { id: string; x: number; z: number }[]) {
+    const byId = new Map(moves.map((m) => [m.id, m]));
+    shapes = shapes.map((s) => {
+      const m = byId.get(s.id);
+      return m ? { ...s, position: { x: m.x, z: m.z } } : s;
+    });
+    refresh();
+    if (moves.length === 0) return;
+    void act(async () => {
+      // One request per shape; a few dozen at most, so a bulk endpoint isn't worth it.
+      for (const m of moves) await shapesApi.update(m.id, { position: { x: m.x, z: m.z } });
+    }, `Saved where ${moves.length} shape${moves.length === 1 ? "" : "s"} ended up.`);
+  }
+
+  return {
+    layer, handleClick, handleHover, handleKey, setSurface, setRunning, saveMoves, refresh,
+    /** The shapes as last loaded (or saved). */
+    get shapes(): readonly Shape[] {
+      return shapes;
+    },
+  };
 }
 
 function sizeText(s: Shape): string {
