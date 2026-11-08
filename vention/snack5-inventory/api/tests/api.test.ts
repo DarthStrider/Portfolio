@@ -225,6 +225,35 @@ test("connection points, mergers, machines and assemblies over HTTP", async () =
   assert.deepEqual([(await call("GET", "/api/mergers")).body, (await call("GET", "/api/machines")).body], [[], []]);
 });
 
+test("bins over HTTP: validation, loading, catching and releasing", async () => {
+  const bad = await call("POST", "/api/bins", { name: "", holds: [], capacity: 0, position: { x: 9, z: 0 }, feed: { type: "belt" } });
+  assert.equal(bad.status, 400);
+  assert.ok(bad.body.problems.length >= 4);
+  const missing = await call("POST", "/api/bins", { name: "X", holds: ["kind:box", "part:NOPE-1"], position: { x: 0, z: 0 } });
+  assert.deepEqual([missing.status, missing.body.problems], [400, ["No part NOPE-1 in the inventory"]]);
+  const bin = await call("POST", "/api/bins", { name: "Cans", holds: ["kind:cylinder"], position: { x: 1, z: 1 }, accept: [{ field: "color", op: "eq", value: "#22c55e" }] });
+  assert.deepEqual([bin.status, bin.body.capacity, bin.body.feed, bin.body.count], [201, 50, { type: "none" }, 0]);
+  const look = { kind: "cylinder", size: { x: 0.08, y: 0.12, z: 0.08 }, color: "#22C55E", name: "Can" };
+  assert.deepEqual((await call("POST", `/api/bins/${bin.body.id}/load`, { qty: 2, owner: "kind:cylinder", look })).body, { count: 2, holds: ["kind:cylinder"] });
+  // Several lines; the second names a part that doesn't exist, so nothing loads.
+  const many = await call("POST", `/api/bins/${bin.body.id}/load`, { lines: [{ qty: 1, owner: "kind:cylinder", look }, { qty: 1, owner: "part:NOPE-1", look }], addToHolds: true });
+  assert.deepEqual([many.status, many.body.problems], [400, ["No part NOPE-1 in the inventory"]]);
+  assert.equal((await call("POST", `/api/bins/${bin.body.id}/load`, { lines: [] })).status, 400);
+  const stored = (await call("GET", "/api/shapes")).body.filter((s: any) => s.binId === bin.body.id);
+  assert.deepEqual([stored.length, stored[0].color, stored[0].stockTaken], [2, "#22c55e", false]); // plain shapes take no stock
+  const out = await call("POST", `/api/bins/${bin.body.id}/release`, { shapeId: stored[0].id, position: { x: 0.4, z: 0.2 } });
+  assert.equal(out.status, 200);
+  assert.equal((await call("POST", `/api/bins/${bin.body.id}/release`, { shapeId: stored[0].id, position: { x: 0.4, z: 0.2 } })).status, 404);
+  assert.equal((await call("POST", `/api/bins/${bin.body.id}/catch`, { shapeId: stored[0].id })).status, 200);
+  assert.deepEqual((await call("PATCH", `/api/bins/${bin.body.id}`, { holds: ["kind:cylinder", "kind:box"] })).body.holds, ["kind:cylinder", "kind:box"]);
+  assert.equal((await call("POST", `/api/bins/${bin.body.id}/load`, { qty: 1, owner: "kind:sphere", look })).status, 409);
+  const feed = await call("PATCH", `/api/bins/${bin.body.id}`, { feed: { type: "machine", machineId: "00000000-0000-4000-8000-000000000000" } });
+  assert.match(feed.body.problems[0], /No machine/);
+  assert.equal((await call("DELETE", `/api/bins/${bin.body.id}`)).status, 409);
+  assert.deepEqual((await call("POST", `/api/bins/${bin.body.id}/unload`, { qty: 5 })).body, { unloaded: 2 });
+  assert.equal((await call("DELETE", `/api/bins/${bin.body.id}`)).status, 200);
+});
+
 test("CORS: pages on localhost may call the API; other sites may not", async () => {
   const pre = await fetch(base + "/api/shapes", { method: "OPTIONS", headers: { origin: "http://localhost:5173", "access-control-request-method": "POST" } });
   assert.equal(pre.status, 204);

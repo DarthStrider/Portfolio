@@ -260,6 +260,24 @@ button:disabled { opacity: 0.45; cursor: default; }
 .points li button:last-child { padding: 2px 7px; }
 .link-btn { margin-top: 6px; background: none; border: 0; color: var(--muted); text-decoration: underline; }
 
+/* ---- Bins ---- */
+.tabs { grid-template-columns: repeat(5, 1fr); }
+.tabs button { font-size: 12px; padding: 8px 0; }
+.bin-swatch { background: #0d9488 !important; }
+.load { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: end; margin-top: 10px; }
+.holds { max-height: 150px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; margin: 4px 0 8px; }
+.shapes-panel .holds label.check { margin-top: 3px; }
+.load-line { display: grid; grid-template-columns: 1fr 64px auto; gap: 4px; margin-top: 4px; }
+.load-line button { padding: 2px 8px; }
+.shapes-panel label.inline { flex-direction: row; align-items: center; gap: 8px; margin-top: 6px; color: var(--text); font-size: 12px; }
+.shapes-panel label.inline input { width: 70px; }
+.load-preview { list-style: none; margin: 8px 0 0; padding: 6px 8px; border: 1px dashed var(--border); border-radius: 8px; display: grid; gap: 2px; font-size: 12px; }
+.load-preview li { display: flex; justify-content: space-between; gap: 8px; }
+.load-preview li.empty { color: var(--muted); }
+.load-preview li.total { border-top: 1px solid var(--border); padding-top: 3px; margin-top: 2px; font-weight: 600; }
+.load-preview small { color: var(--muted); }
+.shapes-panel .load label { font-size: 11px; }
+
 @media (max-width: 700px) {
   .panel {
     top: auto;

@@ -324,6 +324,88 @@ export function contractTests(name: string, makeRepo: () => Promise<InventoryRep
       assert.deepEqual((await repo.listShapes()).map((s) => s.name).sort(), ["Actuator 2", "Plate 2"]);
     });
 
+    test("bins: load from stock, catch, release, unload; stock taken exactly once", async () => {
+      const on = async (sku: string) => (await repo.getParts([sku]))[0].onHand;
+      const plates0 = await on("PL-200");
+      const look = { kind: "box" as const, size: { x: 0.2, y: 0.02, z: 0.2 }, color: "#9aa3af", name: "Plate" };
+      const bin = await repo.createBin({ name: "Plates", holds: ["part:PL-200", "kind:cylinder"], accept: [], capacity: 5, position: { x: 1, z: 1 }, rotationY: 0, feed: { type: "none" } });
+
+      const loaded = await repo.loadBin(bin.id, [{ owner: "part:PL-200", qty: 3, look }], false);
+      assert.deepEqual(loaded, { ok: true, value: { count: 3, holds: ["part:PL-200", "kind:cylinder"] } });
+      assert.equal(await on("PL-200"), plates0 - 3);
+      assert.match((await repo.movements({ sku: "PL-200", limit: 1 }))[0].note, /^Loaded into bin Plates/);
+      assert.equal((await repo.loadBin(bin.id, [{ owner: "part:PL-200", qty: 3, look }], false)).ok, false); // 3 + 3 > capacity 5
+      const stored = (await repo.listShapes()).filter((s) => s.binId === bin.id);
+      assert.equal(stored.length, 3);
+      assert.ok(stored.every((s) => s.stockTaken && s.sku === "PL-200"));
+
+      // Released onto the floor, then joined: the plate isn't taken from stock again.
+      assert.ok((await repo.releaseFromBin(bin.id, stored[0].id, { x: 0.5, z: 0 })).ok);
+      assert.equal((await repo.releaseFromBin(bin.id, stored[0].id, { x: 0.5, z: 0 })).ok, false);
+      const can = await repo.createShape({ name: "Can", kind: "cylinder", size: { x: 0.08, y: 0.12, z: 0.08 }, color: "#22c55e", position: { x: 0.5, z: 0 }, rotationY: 0, sku: null });
+      const joined = await repo.assemble({ name: "Plate + can", baseShapeId: stored[0].id, attachedShapeId: can.id, basePoint: "top", attachedPoint: "bottom", attachment: { x: 0, y: 0.07, z: 0, rotationY: 0 } });
+      assert.deepEqual(joined.ok && joined.assembly.consumed, []);
+      assert.equal(await on("PL-200"), plates0 - 3);
+
+      // Caught back in, with the can on it: nothing more is taken.
+      assert.ok((await repo.catchIntoBin(bin.id, stored[0].id)).ok);
+      assert.equal(await on("PL-200"), plates0 - 3);
+      assert.equal((await repo.listBins())[0].count, 3);
+      // A plate placed in the scene (never taken from stock) is taken as it's caught.
+      const loose = await repo.createShape({ name: "Loose plate", kind: "box", size: look.size, color: look.color, position: { x: 0, z: 0 }, rotationY: 0, sku: "PL-200" });
+      assert.ok((await repo.catchIntoBin(bin.id, loose.id)).ok);
+      assert.equal(await on("PL-200"), plates0 - 4);
+      assert.deepEqual(await repo.catchIntoBin(bin.id, can.id), { ok: false, reason: "not_found" }); // joined onto something
+      // It holds cylinders too: a plain can goes in, and takes no stock; a ball doesn't.
+      const can2 = await repo.createShape({ name: "Can 2", kind: "cylinder", size: { x: 0.08, y: 0.12, z: 0.08 }, color: "#22c55e", position: { x: 0, z: 0 }, rotationY: 0, sku: null });
+      assert.ok((await repo.catchIntoBin(bin.id, can2.id)).ok);
+      assert.equal(await on("PL-200"), plates0 - 4);
+      const wrong = await repo.loadBin(bin.id, [{ owner: "kind:sphere", qty: 1, look }], false);
+      assert.equal(wrong.ok === false && wrong.reason, "wrong_kind");
+      const ball = await repo.createShape({ name: "Ball", kind: "sphere", size: { x: 0.1, y: 0.1, z: 0.1 }, color: "#e11d48", position: { x: 0, z: 0 }, rotationY: 0, sku: null });
+      assert.deepEqual(await repo.catchIntoBin(bin.id, ball.id), { ok: false, reason: "wrong_kind" });
+
+      await assert.rejects(repo.deleteBin(bin.id), ConflictError);
+      // Unload takes plain items only (the plate with the can on it stays), giving each plate back.
+      assert.deepEqual(await repo.unloadBin(bin.id, 10), { ok: true, value: { unloaded: 4 } });
+      assert.equal(await on("PL-200"), plates0 - 1);
+      assert.equal((await repo.listBins())[0].count, 1);
+
+      // Short stock: nothing loads.
+      const avail = (await repo.getParts(["PL-200"]))[0].available;
+      const big = await repo.createBin({ name: "Big", holds: ["part:PL-200"], accept: [], capacity: 200, position: { x: -1, z: 1 }, rotationY: 0, feed: { type: "none" } });
+      const short = await repo.loadBin(big.id, [{ owner: "part:PL-200", qty: avail + 1, look }], false);
+      assert.equal(short.ok === false && short.reason, "short");
+      assert.equal((await repo.listBins()).find((b) => b.id === big.id)!.count, 0);
+    });
+
+    test("bins: load several kinds at once, all or nothing, adding kinds when asked", async () => {
+      const on = async (sku: string) => (await repo.getParts([sku]))[0].onHand;
+      const [pl, la] = [await on("PL-200"), await on("LA-300")];
+      const look = (name: string, kind: "box" | "cylinder") => ({ kind, size: { x: 0.1, y: 0.1, z: 0.1 }, color: "#9aa3af", name });
+      const bin = await repo.createBin({ name: "Kit", holds: ["part:PL-200"], accept: [], capacity: 20, position: { x: 1, z: -1 }, rotationY: 0, feed: { type: "none" } });
+      const lines = [
+        { owner: "part:PL-200" as const, qty: 2, look: look("Plate", "box") },
+        { owner: "part:LA-300" as const, qty: 1, look: look("Actuator", "cylinder") },
+        { owner: "kind:cylinder" as const, qty: 3, look: look("Can", "cylinder") },
+      ];
+      const refused = await repo.loadBin(bin.id, lines, false);
+      assert.equal(refused.ok === false && refused.reason, "wrong_kind"); // LA-300 and cylinders aren't held
+      const loaded = await repo.loadBin(bin.id, lines, true);
+      assert.deepEqual(loaded, { ok: true, value: { count: 6, holds: ["part:PL-200", "part:LA-300", "kind:cylinder"] } });
+      assert.deepEqual([await on("PL-200"), await on("LA-300")], [pl - 2, la - 1]);
+      const stored = (await repo.listShapes()).filter((s) => s.binId === bin.id);
+      assert.deepEqual(stored.map((s) => s.sku ?? s.kind).sort(), ["LA-300", "PL-200", "PL-200", "cylinder", "cylinder", "cylinder"]);
+
+      // One short line stops the whole load: nothing taken, nothing added.
+      const avail = (await repo.getParts(["LA-300"]))[0].available;
+      const short = await repo.loadBin(bin.id, [{ ...lines[0], qty: 1 }, { ...lines[1], qty: avail + 1 }], false);
+      assert.equal(short.ok === false && short.reason, "short");
+      assert.deepEqual([await on("PL-200"), (await repo.listBins()).find((b) => b.id === bin.id)!.count], [pl - 2, 6]);
+      const full = await repo.loadBin(bin.id, [{ ...lines[2], qty: 15 }], false);
+      assert.equal(full.ok === false && full.reason, "full");
+    });
+
     test("reservations and movements come newest first, with a limit", async () => {
       for (const q of ["Q-1", "Q-2", "Q-3"]) assert.ok((await repo.reserve(q, [{ sku: "PL-200", qty: 1 }])).ok);
       assert.deepEqual((await repo.reservations(2)).map((r) => r.quoteRef), ["Q-3", "Q-2"]);

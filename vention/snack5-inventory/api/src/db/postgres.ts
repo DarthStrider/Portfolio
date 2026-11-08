@@ -20,6 +20,8 @@ import type { NewShape, Shape, ShapeKind, ShapePatch } from "../domain/shapes.ts
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
 import type { Exit, NewSplitter, Rule, Splitter, SplitterPatch } from "../domain/splitters.ts";
 import type { PartPatch } from "../domain/newPart.ts";
+import type { Bin, BinPatch, BinResult, Feed, LoadLine, NewBin } from "../domain/bins.ts";
+import type { Condition } from "../domain/splitters.ts";
 import type {
   AssembleResult, Assembly, Attachment, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner,
 } from "../domain/assembly.ts";
@@ -35,7 +37,11 @@ interface ReservationRow { id: string; quote_ref: string; status: Reservation["s
 interface ShapeRow {
   id: string; name: string; kind: ShapeKind; size_x: number; size_y: number; size_z: number;
   color: string; x: number; z: number; rotation_y: number; sku: string | null;
-  attached_to: string | null; attach: Attachment | null; created_at: Date; updated_at: Date;
+  attached_to: string | null; attach: Attachment | null; bin_id: string | null; stock_taken: boolean; created_at: Date; updated_at: Date;
+}
+interface BinRow {
+  id: string; name: string; holds: Owner[]; accept: Condition[]; capacity: number; x: number; z: number; rotation_y: number;
+  feed: Feed; count: number; created_at: Date; updated_at: Date;
 }
 interface ConnectorsRow { owner: Owner; points: ConnectionPoint[]; updated_at: Date }
 interface MergerRow {
@@ -346,6 +352,76 @@ export class PostgresRepo implements InventoryRepo {
     return rows.map(toAssembly);
   }
 
+  async listBins(): Promise<Bin[]> {
+    const { rows } = await this.pool.query<BinRow>(Q.listBins, [null]);
+    return rows.map(toBin);
+  }
+
+  private async bin(id: string): Promise<Bin> {
+    const { rows } = await this.pool.query<BinRow>(Q.listBins, [id]);
+    if (!rows[0]) throw new NotFoundError(`No bin ${id}`);
+    return toBin(rows[0]);
+  }
+
+  async createBin(b: NewBin): Promise<Bin> {
+    const { rows } = await this.pool.query<{ id: string }>(Q.createBin, [
+      b.name, b.holds, JSON.stringify(b.accept), b.capacity, b.position.x, b.position.z, b.rotationY, JSON.stringify(b.feed),
+    ]);
+    return this.bin(rows[0].id);
+  }
+
+  async updateBin(id: string, p: BinPatch): Promise<Bin> {
+    if (!UUID.test(id)) throw new NotFoundError(`No bin ${id}`);
+    const { rows } = await this.pool.query<{ id: string }>(Q.updateBin, [
+      id, p.name ?? null, p.holds ?? null, p.accept ? JSON.stringify(p.accept) : null, p.capacity ?? null,
+      p.position?.x ?? null, p.position?.z ?? null, p.rotationY ?? null, p.feed ? JSON.stringify(p.feed) : null,
+    ]);
+    if (!rows[0]) throw new NotFoundError(`No bin ${id}`);
+    return this.bin(id);
+  }
+
+  async deleteBin(id: string): Promise<void> {
+    if (!UUID.test(id)) throw new NotFoundError(`No bin ${id}`);
+    try {
+      const { rowCount } = await this.pool.query(Q.deleteBin, [id]);
+      if (!rowCount) throw new NotFoundError(`No bin ${id}`);
+    } catch (err) {
+      // ON DELETE RESTRICT: shapes are still stored in it.
+      if ((err as { code?: string }).code === "23503") throw new ConflictError("Empty the bin before deleting it");
+      throw err;
+    }
+  }
+
+  async loadBin(id: string, lines: readonly LoadLine[], addToHolds: boolean): Promise<BinResult<{ count: number; holds: Owner[] }>> {
+    if (!UUID.test(id)) return { ok: false, reason: "not_found" };
+    // One call: inv_bin_load (schema.sql) locks, checks and loads every line in one transaction.
+    const { rows } = await this.pool.query<{ result: { ok: true; count: number; holds: Owner[] } | Exclude<BinResult, { ok: true }> }>(Q.loadBin, [
+      id, JSON.stringify(lines.map((l) => ({ owner: l.owner, qty: l.qty, ...l.look }))), addToHolds,
+    ]);
+    const r = rows[0].result;
+    return r.ok ? { ok: true, value: { count: r.count, holds: r.holds } } : r;
+  }
+
+  async unloadBin(id: string, qty: number): Promise<BinResult<{ unloaded: number }>> {
+    if (!UUID.test(id)) return { ok: false, reason: "not_found" };
+    const { rows } = await this.pool.query<{ result: { ok: true; unloaded: number } | Exclude<BinResult, { ok: true }> }>(Q.unloadBin, [id, qty]);
+    const r = rows[0].result;
+    return r.ok ? { ok: true, value: { unloaded: r.unloaded } } : r;
+  }
+
+  async catchIntoBin(id: string, shapeId: string): Promise<BinResult> {
+    if (!UUID.test(id) || !UUID.test(shapeId)) return { ok: false, reason: "not_found" };
+    const { rows } = await this.pool.query<{ result: { ok: true } | Exclude<BinResult, { ok: true }> }>(Q.catchIntoBin, [id, shapeId]);
+    const r = rows[0].result;
+    return r.ok ? { ok: true, value: undefined } : r;
+  }
+
+  async releaseFromBin(id: string, shapeId: string, at: { x: number; z: number }): Promise<BinResult> {
+    if (!UUID.test(id) || !UUID.test(shapeId)) return { ok: false, reason: "not_in_bin" };
+    const { rowCount } = await this.pool.query(Q.releaseFromBin, [id, shapeId, at.x, at.z]);
+    return rowCount ? { ok: true, value: undefined } : { ok: false, reason: "not_in_bin" };
+  }
+
   async reset(): Promise<void> {
     await this.pool.query(Q.reset);
   }
@@ -388,7 +464,7 @@ function toReservation(r: ReservationRow): Reservation {
 function toShape(r: ShapeRow): Shape {
   return {
     id: r.id, name: r.name, kind: r.kind, size: { x: r.size_x, y: r.size_y, z: r.size_z }, color: r.color,
-    position: { x: r.x, z: r.z }, rotationY: r.rotation_y, sku: r.sku, attachedTo: r.attached_to, attach: r.attach,
+    position: { x: r.x, z: r.z }, rotationY: r.rotation_y, sku: r.sku, attachedTo: r.attached_to, attach: r.attach, binId: r.bin_id, stockTaken: r.stock_taken,
     createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
   };
 }
@@ -427,5 +503,12 @@ function toAssembly(r: AssemblyRow): Assembly {
   return {
     id: r.id, name: r.name, baseShapeId: r.base_shape_id, attachedShapeId: r.attached_shape_id,
     basePoint: r.base_point, attachedPoint: r.attached_point, consumed: r.consumed, createdAt: r.created_at.toISOString(),
+  };
+}
+
+function toBin(r: BinRow): Bin {
+  return {
+    id: r.id, name: r.name, holds: r.holds, accept: r.accept, capacity: r.capacity, position: { x: r.x, z: r.z },
+    rotationY: r.rotation_y, feed: r.feed, count: r.count, createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
   };
 }

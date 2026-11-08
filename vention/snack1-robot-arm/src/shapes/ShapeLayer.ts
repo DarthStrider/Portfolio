@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { DEG } from "../arm/kinematics";
 import type { Shape, ShapeKind, Size } from "./types";
-import { poses, type Pose } from "../line/joints";
+import { poses, rootOf, type Pose } from "../line/joints";
 
 /**
  * Draws the stored shapes in the scene, plus a see-through "ghost" that follows the mouse
@@ -81,6 +81,9 @@ export class ShapeLayer {
       x: s.position.x, y: this.supportAt(s.position.x, s.position.z) + s.size.y / 2, z: s.position.z, rotationY: s.rotationY,
     }));
     for (const [id, p] of where) this.poseCenter(id, p);
+    // Items stored in a bin (with anything joined onto them) are out of sight.
+    const byId = new Map(shapes.map((s) => [s.id, s]));
+    for (const s of shapes) this.setVisible(s.id, !byId.get(rootOf(s.id, shapes))?.binId);
     this.select(this.selectedId && keep.has(this.selectedId) ? this.selectedId : null);
   }
 
@@ -99,6 +102,11 @@ export class ShapeLayer {
     if (!mesh) return;
     mesh.position.set(p.x, p.y, p.z);
     mesh.rotation.y = p.rotationY * DEG;
+  }
+
+  setVisible(id: string, visible: boolean): void {
+    const mesh = this.meshes.get(id);
+    if (mesh) mesh.visible = visible;
   }
 
   /** The mesh drawing a shape, so connection point markers can be added to it. */

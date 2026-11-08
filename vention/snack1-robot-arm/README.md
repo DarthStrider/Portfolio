@@ -19,6 +19,7 @@ checked against each other every frame.
 - [x] Splitters: diverter gates on a belt that send each item left, right or straight on by rules you write (shape kind, color, size, name, SKU, or the inventory part's category, location and stock). Rules are stored in the database, and inventory changes apply to the next item through the gate
 - [x] Mergers: a feeder belt joining a main belt at a point, or a Y where two belts become one. Feeder items queue and wait for a gap; choose main belt first, feeders first, or take turns
 - [x] Joining machines: a station on a belt holds one item of each of two kinds and joins them at their connection points; the joined object carries on down the line. Each join is saved as an assembly that uses up the parts from stock
+- [x] Bins that hold the kinds of object you choose (one or several, with optional accept conditions): they catch items falling off belts and splitters, and feed them back onto a belt or straight into a joining machine. Loading a bin takes parts from stock
 - [x] Connection points per kind of object (inventory part or plain shape kind), edited by typing positions or clicking on the object
 
 ## How to run
@@ -102,6 +103,14 @@ PL-200 plate shares them, as does every plain cylinder. Until you change them, e
 - On **Stop**, each join is saved as an **assembly**: the joined shape is attached to its base in the database (it moves with it from then on), and each part is used up from stock once, with a ledger entry. If a part is short, that join is refused and nothing changes for it.
 - Recent assemblies are listed at the bottom of the tab.
 
+### Bins (Bins tab)
+
+- **Holds**: tick the kinds of object it takes (inventory parts and plain shape kinds, as many as you like). Add **conditions** (like a splitter rule's: color, size, part category…) to be pickier.
+- Put it where items fall: at the end of a belt, or beside a splitter exit. An item that comes to rest inside a bin is stored if it's one of its kinds, meets the conditions and there's room; anything else is left lying there. A joined object goes in as one, if its base is one of the bin's kinds.
+- **Feeds**: nothing, **a belt** at a point along it (*whenever there's room*, or *only when a machine needs one*: when a joining machine further along that belt has an empty slot for this kind and none is already on its way), or **a machine** directly (an item is put into the machine whenever it has an empty slot for that item's kind). A bin with several kinds sends its oldest item that's wanted.
+- **Load** fills the bin with new items of the kind you pick; for a part they're **taken from stock** (one ledger line), and you can't load more than is available or than fits. **Unload** takes plain items out and gives parts back to stock.
+- The label over each bin shows how full it is; the dashed line shows what it feeds. As always, nothing is saved until **Stop**: then items that left bins are put back on the floor, and items that ended up in bins are stored (a part that hadn't left stock yet is taken as it goes in, and refused if there isn't enough).
+
 ### Controls
 
 | Input | Action |
@@ -147,12 +156,14 @@ src/
     ├── stations.ts      what mergers and machines do each step: hold, release, queue, join (pure)
     ├── LineLayer.ts     merger posts and machine portals, with their lights and press
     ├── PointEditor.ts   the connection point editor and its markers
+    ├── BinLayer.ts      bin models: walls, fill level, count label, the line to what it feeds
+    ├── BinPanel.ts      the Bins tab
     └── controller.ts    the Machines tab, and saving assemblies after a run
 tests/kinematics.test.ts FK tests (node:test)
 tests/reach.test.ts      reach tests
 tests/transport.test.ts  belt tests: riding, falling off, hand-over between belts, gravity timing
 tests/splitters.test.ts  rule matching, and gates sending items left, right or straight
-tests/stations.test.ts   mergers (gaps, queues, priorities, a Y taking turns), joining geometry, machines
+tests/stations.test.ts   mergers (gaps, queues, priorities, a Y taking turns), joining geometry, machines, bins (catching, feeding)
 scripts/build-gripper.ts writes the gripper .glb with no dependencies
 ```
 

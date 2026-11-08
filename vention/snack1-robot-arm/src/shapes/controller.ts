@@ -418,9 +418,13 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
     placeBtn.disabled = addBtn.disabled = !online || busy || running || (source === "part" && !partSku);
     if (!online) dbLabel.textContent = "offline";
 
-    list.innerHTML = shapes.length === 0
+    // Items stored in bins are listed with their bin (Bins tab), not here.
+    const stored = new Set(shapes.filter((s) => s.binId).map((s) => s.id));
+    const isStored = (s: Shape): boolean => stored.has(s.id) || (!!s.attachedTo && !!shapes.find((x) => x.id === s.attachedTo && isStored(x)));
+    const visible = shapes.filter((s) => !isStored(s));
+    list.innerHTML = visible.length === 0
       ? `<li class="empty">${online ? "No shapes yet. Place one with the mouse." : "Start the inventory API to add shapes."}</li>`
-      : shapes.map((s) => {
+      : visible.map((s) => {
           const where = reach(s);
           const part = s.sku ? parts.find((p) => p.sku === s.sku) : undefined;
           const placed = s.sku ? placedBySku(shapes).get(s.sku) ?? 0 : 0;
@@ -444,7 +448,7 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
             </span>
           </li>`;
         }).join("");
-    $("span.count").textContent = shapes.length ? `(${shapes.length})` : "";
+    $("span.count").textContent = visible.length ? `(${visible.length})` : "";
 
     status.hidden = !message;
     status.textContent = message?.text ?? "";

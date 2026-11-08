@@ -19,12 +19,22 @@
  *   (by kind of object). With both, it works for `cycleSeconds`, then joins the attach item onto
  *   the base at their connection points and lets the base, now carrying it, go on. Items it
  *   doesn't need, or doesn't need yet, pass straight through.
+ *
+ * Bins
+ *   An item that comes to rest on the floor inside a bin is caught if it's one of the bin's kinds, meets
+ *   its accept conditions and the bin has room; otherwise it's left lying there. A bin with a feed
+ *   puts its items back on the line: onto a belt whenever the spot is clear ("steady") or only
+ *   when a machine further along that belt needs one ("demand"), or straight into a machine's slot.
+ *   A bin holding several kinds releases its oldest item that's wanted: for a machine, the oldest
+ *   one whose kind the machine has an empty slot for.
  */
 import { beltUnder, fromBelt, isOver, toBelt, type Body, type StopLine } from "../conveyors/transport";
 import type { Conveyor } from "../conveyors/types";
 import type { Shape } from "../shapes/types";
 import { attachmentFor, findPoint, ownerOf } from "./joints";
-import type { Attachment, Connectors, Machine, Merger } from "./types";
+import type { Attachment, Bin, Connectors, Machine, Merger } from "./types";
+import { BIN_SIZE } from "./types";
+import { matches, type Part } from "../splitters/rules";
 
 export interface World {
   belts: readonly Conveyor[];
@@ -32,6 +42,8 @@ export interface World {
   machines: readonly Machine[];
   shapes: readonly Shape[];
   connectors: readonly Connectors[];
+  bins?: readonly Bin[];
+  parts?: readonly Part[];
 }
 
 export interface Join {
@@ -62,6 +74,11 @@ export function createStations(world: () => World) {
   const slots = new Map<string, { base?: string; attach?: string; progress: number }>();
   const done = new Map<string, Set<string>>(); // machine id -> bodies it has finished with
   const status = new Map<string, MachineStatus>();
+  const binQueue = new Map<string, string[]>(); // bin id -> stored shape ids, oldest first
+  const binOf = new Map<string, string>(); // stored shape id -> bin id
+  const refused = new Set<string>(); // landed in a bin and weren't accepted: not asked again until they leave
+  const cooldown = new Map<string, number>(); // bin id -> seconds until it may release again
+  const placed = new Map<string, string>(); // bin id -> body it just put into a machine, until the machine holds it
 
   const beltById = (id: string) => world().belts.find((b) => b.id === id);
 
@@ -230,6 +247,16 @@ export function createStations(world: () => World) {
   }
 
   function reset() {
+    binQueue.clear();
+    binOf.clear();
+    refused.clear();
+    cooldown.clear();
+    placed.clear();
+    const stored = world().shapes.filter((s) => s.binId && !s.attachedTo).sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    for (const s of stored) {
+      binOf.set(s.id, s.binId!);
+      binQueue.set(s.binId!, [...(binQueue.get(s.binId!) ?? []), s.id]);
+    }
     waitingFeed.clear();
     waitingMain.clear();
     lastFrom.clear();
@@ -248,7 +275,119 @@ export function createStations(world: () => World) {
     return { mergers, machines: new Map(status) };
   }
 
-  return { stops, hold, prepare, afterStep, reset, snapshot, mergePoint };
+  // ---- Bins ----
+
+  /** Is a machine's slot for this kind of object empty? */
+  function needs(mc: Machine, owner: string): boolean {
+    const slot = slots.get(mc.id);
+    return (mc.base.owner === owner && !slot?.base) || (mc.attach.owner === owner && !slot?.attach);
+  }
+
+  function inBin(b: Bin, x: number, z: number): boolean {
+    const p = toBelt({ ...BIN_SIZE, length: BIN_SIZE.x, width: BIN_SIZE.z, height: BIN_SIZE.y, speed: 0, position: b.position, rotationY: b.rotationY }, x, z);
+    return Math.abs(p.u) <= BIN_SIZE.x / 2 && Math.abs(p.v) <= BIN_SIZE.z / 2;
+  }
+
+  /**
+   * After each step: catch items that came to rest in a bin, and release items from bins that
+   * feed the line. Returns the ids caught (the caller removes their bodies) and the new bodies.
+   */
+  function binStep(dt: number, current: Map<string, Body>): { caught: { binId: string; shapeId: string }[]; released: { binId: string; body: Body }[] } {
+    const { bins = [], shapes, parts = [], machines, belts } = world();
+    const caught: { binId: string; shapeId: string }[] = [];
+    const released: { binId: string; body: Body }[] = [];
+    const shapeOf = (id: string) => shapes.find((s) => s.id === id);
+
+    for (const body of current.values()) {
+      if (body.y > 1e-4 || body.vy !== 0 || body.guide) continue; // only items lying on the floor
+      const bin = bins.find((b) => inBin(b, body.x, body.z));
+      if (!bin) {
+        refused.delete(body.id!);
+        continue;
+      }
+      if (refused.has(body.id!)) continue;
+      const shape = shapeOf(body.id!);
+      const part = shape?.sku ? parts.find((p) => p.sku === shape.sku) : undefined;
+      const queue = binQueue.get(bin.id) ?? [];
+      const ok = shape && bin.holds.includes(ownerOf(shape)) && bin.accept.every((c) => matches(c, shape, part)) && queue.length < bin.capacity;
+      if (!ok) {
+        refused.add(body.id!);
+        continue;
+      }
+      binQueue.set(bin.id, [...queue, body.id!]);
+      binOf.set(body.id!, bin.id);
+      caught.push({ binId: bin.id, shapeId: body.id! });
+    }
+
+    for (const bin of bins) {
+      const queue = binQueue.get(bin.id) ?? [];
+      const wait = (cooldown.get(bin.id) ?? 0) - dt;
+      cooldown.set(bin.id, wait);
+      if (!queue.length || wait > 0 || bin.feed.type === "none") continue;
+      let target: { belt: Conveyor; u: number } | null = null;
+      /** Which stored items may go: by default any (the oldest goes first). */
+      let wanted = (_owner: string) => true;
+
+      if (bin.feed.type === "belt") {
+        const belt = beltById(bin.feed.conveyorId);
+        if (!belt) continue;
+        const u = bin.feed.along - belt.length / 2;
+        const onBelt = [...current.values()].filter((b) => Math.abs(b.y - belt.height) < 1e-3 && isOver(belt, b.x, b.z));
+        if (onBelt.some((b) => Math.abs(toBelt(belt, b.x, b.z).u - u) < 0.25)) continue; // the spot isn't clear
+        if (bin.feed.mode === "demand") {
+          // Only kinds a machine further along needs, with none already on its way to it.
+          const d = dirOf(belt);
+          wanted = (owner) => machines.some((mc) => {
+            if (mc.conveyorId !== belt.id || !needs(mc, owner)) return false;
+            const mu = mc.along - belt.length / 2;
+            if ((mu - u) * d <= 0) return false;
+            return !onBelt.some((b) => {
+              const s = shapeOf(b.id!);
+              const bu = toBelt(belt, b.x, b.z).u;
+              return s && ownerOf(s) === owner && (bu - u) * d >= 0 && (mu - bu) * d >= 0;
+            });
+          });
+        }
+        target = { belt, u };
+      } else {
+        const machineId = bin.feed.machineId;
+        const mc = machines.find((m) => m.id === machineId);
+        const belt = mc && beltById(mc.conveyorId);
+        if (!mc || !belt) continue;
+        wanted = (owner) => needs(mc, owner);
+        const pending = placed.get(bin.id);
+        if (pending && current.has(pending) && current.get(pending)!.heldAt !== `machine:${mc.id}`) continue; // still arriving
+        // Just upstream of the machine's line, so the next step carries it across and the machine takes it.
+        target = { belt, u: mc.along - belt.length / 2 - dirOf(belt) * 0.01 };
+      }
+
+      // Drop anything no longer in the scene, then take the oldest item that's wanted.
+      const live = queue.filter((id) => shapeOf(id));
+      binQueue.set(bin.id, live);
+      const id = live.find((sid) => wanted(ownerOf(shapeOf(sid)!)));
+      if (!id) continue;
+      const shape = shapeOf(id)!;
+      const at = fromBelt(target.belt, target.u, 0);
+      const body: Body = { id, x: at.x, z: at.z, y: target.belt.height, vx: 0, vy: 0, vz: 0, size: Math.max(shape.size.x, shape.size.z) };
+      binQueue.set(bin.id, live.filter((sid) => sid !== id));
+      binOf.delete(id);
+      if (bin.feed.type === "machine") placed.set(bin.id, id);
+      cooldown.set(bin.id, 0.4);
+      released.push({ binId: bin.id, body });
+    }
+    return { caught, released };
+  }
+
+  /** Where every stored item is now: shape id -> bin id. */
+  function stored(): ReadonlyMap<string, string> {
+    return binOf;
+  }
+
+  function binCounts(): Map<string, number> {
+    return new Map([...binQueue].map(([id, q]) => [id, q.length]));
+  }
+
+  return { stops, hold, prepare, afterStep, reset, snapshot, mergePoint, binStep, stored, binCounts };
 }
 
 export type Stations = ReturnType<typeof createStations>;

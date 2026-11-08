@@ -1,5 +1,6 @@
 /** Line equipment as the inventory API stores it (snack5-inventory/api/src/domain/assembly.ts). */
-import type { ShapeKind } from "../shapes/types";
+import type { ShapeKind, Size } from "../shapes/types";
+import type { Condition } from "../splitters/types";
 
 /** A kind of object: an inventory part, or plain shapes of one kind. */
 export type Owner = `part:${string}` | `kind:${ShapeKind}`;
@@ -79,4 +80,38 @@ export interface Assembly extends Omit<NewAssembly, "attachment"> {
   id: string;
   consumed: { sku: string; qty: number }[];
   createdAt: string;
+}
+
+export type FeedMode = "steady" | "demand";
+export type Feed =
+  | { type: "none" }
+  | { type: "belt"; conveyorId: string; along: number; mode: FeedMode }
+  | { type: "machine"; machineId: string };
+
+export interface Bin {
+  id: string;
+  name: string;
+  /** The kinds of object it holds: one or more. */
+  holds: Owner[];
+  /** Extra conditions an item must meet to be caught (all of them). */
+  accept: Condition[];
+  capacity: number;
+  position: { x: number; z: number };
+  rotationY: number;
+  feed: Feed;
+  count: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export type NewBin = Omit<Bin, "id" | "count" | "createdAt" | "updatedAt">;
+export type BinPatch = Partial<Pick<Bin, "name" | "holds" | "accept" | "capacity" | "position" | "rotationY" | "feed">>;
+
+/** Bins are this size, meters (the API's BIN_SIZE). */
+export const BIN_SIZE = { x: 0.5, y: 0.35, z: 0.4 } as const;
+
+export interface ItemLook {
+  kind: ShapeKind;
+  size: Size;
+  color: string;
+  name: string;
 }

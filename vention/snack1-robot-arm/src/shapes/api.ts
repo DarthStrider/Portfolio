@@ -7,6 +7,7 @@ import type { NewShape, Shape, ShapePatch } from "./types";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../conveyors/types";
 import type { NewSplitter, Splitter, SplitterPatch } from "../splitters/types";
 import type { Part } from "../splitters/rules";
+import type { Bin, BinPatch, ItemLook, NewBin } from "../line/types";
 import type { Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner } from "../line/types";
 
 /** Override with VITE_INVENTORY_API, e.g. http://localhost:8080 for the API without Docker. */
@@ -75,4 +76,17 @@ export const lineApi = {
   removeMachine: (id: string) => call<{ deleted: string }>("DELETE", `/machines/${id}`),
   assemble: (a: NewAssembly) => call<Assembly>("POST", "/assemblies", a),
   assemblies: () => call<Assembly[]>("GET", "/assemblies?limit=20"),
+};
+
+export const binsApi = {
+  list: () => call<Bin[]>("GET", "/bins"),
+  create: (b: NewBin) => call<Bin>("POST", "/bins", b),
+  update: (id: string, patch: BinPatch) => call<Bin>("PATCH", `/bins/${id}`, patch),
+  remove: (id: string) => call<{ deleted: string }>("DELETE", `/bins/${id}`),
+  /** Several kinds at once, all or nothing; addToHolds adds kinds the bin doesn't hold yet. */
+  load: (id: string, lines: { owner: Owner; qty: number; look: ItemLook }[], addToHolds: boolean) =>
+    call<{ count: number; holds: Owner[] }>("POST", `/bins/${id}/load`, { lines, addToHolds }),
+  unload: (id: string, qty: number) => call<{ unloaded: number }>("POST", `/bins/${id}/unload`, { qty }),
+  catch: (id: string, shapeId: string) => call<{ caught: string }>("POST", `/bins/${id}/catch`, { shapeId }),
+  release: (id: string, shapeId: string, position: { x: number; z: number }) => call<{ released: string }>("POST", `/bins/${id}/release`, { shapeId, position }),
 };

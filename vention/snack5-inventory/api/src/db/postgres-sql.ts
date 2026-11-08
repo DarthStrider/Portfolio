@@ -61,19 +61,19 @@ export const Q = {
      ORDER BY r.created_at DESC, r.id
      LIMIT $2`,
   listShapes: `
-    SELECT id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, created_at, updated_at
+    SELECT id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, bin_id, stock_taken, created_at, updated_at
       FROM shapes ORDER BY created_at, id`,
   createShape: `
     INSERT INTO shapes (name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, created_at, updated_at`,
+    RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, bin_id, stock_taken, created_at, updated_at`,
   updateShape: `
     UPDATE shapes
        SET name = coalesce($2, name), color = coalesce($3, color),
            x = coalesce($4, x), z = coalesce($5, z), rotation_y = coalesce($6, rotation_y),
            updated_at = clock_timestamp()
      WHERE id = $1
-    RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, created_at, updated_at`,
+    RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, bin_id, stock_taken, created_at, updated_at`,
   deleteShape: `DELETE FROM shapes WHERE id = $1 RETURNING id`,
   listConveyors: `
     SELECT id, name, length, width, height, speed, x, z, rotation_y, created_at, updated_at
@@ -144,6 +144,27 @@ export const Q = {
     RETURNING id, name, conveyor_id, along, base_owner, base_point, attach_owner, attach_point, cycle_seconds, created_at, updated_at`,
   deleteMachine: `DELETE FROM machines WHERE id = $1 RETURNING id`,
   assemble: `SELECT inv_assemble($1, $2::uuid, $3::uuid, $4, $5, $6::jsonb) AS result`,
+  listBins: `
+    SELECT b.id, b.name, b.holds, b.accept, b.capacity, b.x, b.z, b.rotation_y, b.feed, b.created_at, b.updated_at,
+           (SELECT count(*)::int FROM shapes s WHERE s.bin_id = b.id) AS count
+      FROM bins b WHERE ($1::uuid IS NULL OR b.id = $1) ORDER BY b.created_at, b.id`,
+  createBin: `
+    INSERT INTO bins (name, holds, accept, capacity, x, z, rotation_y, feed)
+    VALUES ($1, $2::text[], $3::jsonb, $4, $5, $6, $7, $8::jsonb) RETURNING id`,
+  updateBin: `
+    UPDATE bins
+       SET name = coalesce($2, name), holds = coalesce($3::text[], holds), accept = coalesce($4::jsonb, accept),
+           capacity = coalesce($5, capacity), x = coalesce($6, x), z = coalesce($7, z), rotation_y = coalesce($8, rotation_y),
+           feed = coalesce($9::jsonb, feed),
+           updated_at = clock_timestamp()
+     WHERE id = $1 RETURNING id`,
+  deleteBin: `DELETE FROM bins WHERE id = $1 RETURNING id`,
+  loadBin: `SELECT inv_bin_load($1::uuid, $2::jsonb, $3) AS result`,
+  unloadBin: `SELECT inv_bin_unload($1::uuid, $2) AS result`,
+  catchIntoBin: `SELECT inv_bin_catch($1::uuid, $2::uuid) AS result`,
+  releaseFromBin: `
+    UPDATE shapes SET bin_id = NULL, x = $3, z = $4, updated_at = clock_timestamp()
+     WHERE id = $2 AND bin_id = $1 RETURNING id`,
   listAssemblies: `
     SELECT id, name, base_shape_id, attached_shape_id, base_point, attached_point, consumed, created_at
       FROM assemblies WHERE ($1::uuid IS NULL OR id = $1) ORDER BY created_at DESC, id LIMIT $2`,
@@ -151,5 +172,5 @@ export const Q = {
   insertPart: `
     INSERT INTO parts (sku, name, category, unit, on_hand, reorder_level, location)
     VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (sku) DO NOTHING`,
-  reset: `TRUNCATE assemblies, machines, mergers, connectors, splitters, conveyors, shapes, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
+  reset: `TRUNCATE shapes, bins, assemblies, machines, mergers, connectors, splitters, conveyors, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
 } as const;

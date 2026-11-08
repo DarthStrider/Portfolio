@@ -40,12 +40,16 @@ export interface Shape {
   attachedTo: string | null;
   /** Where it sits on that shape, in that shape's frame. Null unless attached. */
   attach: Attachment | null;
+  /** Set while the shape is stored in a bin: off the floor and out of sight. */
+  binId: string | null;
+  /** True once this shape's part has left stock (loaded into or caught by a bin, or joined): it's never taken twice. */
+  stockTaken: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 /** New shapes stand alone; only an assembly attaches one shape to another. */
-export type NewShape = Omit<Shape, "id" | "createdAt" | "updatedAt" | "attachedTo" | "attach">;
+export type NewShape = Omit<Shape, "id" | "createdAt" | "updatedAt" | "attachedTo" | "attach" | "binId" | "stockTaken">;
 /** What can change after a shape is placed: move it, turn it, rename or recolor it. */
 export type ShapePatch = Partial<Pick<Shape, "name" | "color" | "position" | "rotationY">>;
 

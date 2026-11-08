@@ -39,7 +39,10 @@ const belts = createConveyors({
 const splitters = createSplitters({ root: document.getElementById("splitters-panel")!, scene, camera, canvas, shapes, conveyors: belts });
 
 // Mergers and joining machines, plus the connection point editor in the Shapes tab.
-const line = createLine({ root: document.getElementById("machines-panel")!, scene, camera, canvas, shapes, conveyors: belts });
+const line = createLine({
+  root: document.getElementById("machines-panel")!, binsRoot: document.getElementById("bins-panel")!,
+  scene, camera, canvas, shapes, conveyors: belts,
+});
 
 // The right-hand panel's tabs.
 const tabs = {
@@ -47,6 +50,7 @@ const tabs = {
   conveyors: document.getElementById("tab-conveyors")!,
   splitters: document.getElementById("tab-splitters")!,
   machines: document.getElementById("tab-machines")!,
+  bins: document.getElementById("tab-bins")!,
 };
 function showTab(name: keyof typeof tabs) {
   for (const [key, tab] of Object.entries(tabs)) {
@@ -59,6 +63,7 @@ tabs.shapes.addEventListener("click", () => showTab("shapes"));
 tabs.conveyors.addEventListener("click", () => showTab("conveyors"));
 tabs.splitters.addEventListener("click", () => showTab("splitters"));
 tabs.machines.addEventListener("click", () => showTab("machines"));
+tabs.bins.addEventListener("click", () => showTab("bins"));
 belts.onShowTab(() => showTab("conveyors"));
 splitters.onShowTab(() => showTab("splitters"));
 
@@ -142,7 +147,7 @@ window.addEventListener("keydown", (e) => {
   // Typing a shape's name or size must not move the arm (R would reset it, G open the gripper…).
   const t = e.target;
   if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return;
-  if (splitters.handleKey(e) || belts.handleKey(e) || shapes.handleKey(e)) {
+  if (line.handleKey(e) || splitters.handleKey(e) || belts.handleKey(e) || shapes.handleKey(e)) {
     e.preventDefault();
     return;
   }
@@ -196,7 +201,7 @@ canvas.addEventListener("pointerup", (e) => {
   if (Math.hypot(e.clientX - pressX, e.clientY - pressY) > 4) return; // that was an orbit drag
   // Whoever is placing something gets the click; then shapes (they sit on top of belts), then
   // splitter gates (they stand over belts), then belts.
-  if (line.isActive() && line.handleClick(e)) return; // putting a connection point on an object
+  if (line.isActive() && line.handleClick(e)) return; // putting a connection point on an object, or placing a bin
   if (splitters.isActive() && splitters.handleClick(e)) return;
   if (belts.isActive() && belts.handleClick(e)) return;
   if (shapes.handleClick(e)) return; // placing, moving or selecting a shape
@@ -207,7 +212,7 @@ canvas.addEventListener("pointerup", (e) => {
 });
 canvas.addEventListener("pointermove", (e) => {
   if (e.buttons !== 0) return;
-  if (line.isActive() ? line.handleHover() : splitters.isActive() ? splitters.handleHover(e) : belts.isActive() ? belts.handleHover(e) : shapes.handleHover(e)) return;
+  if (line.isActive() ? line.handleHover(e) : splitters.isActive() ? splitters.handleHover(e) : belts.isActive() ? belts.handleHover(e) : shapes.handleHover(e)) return;
   canvas.style.cursor = housingAt(e) || splitters.hoversGate(e) || belts.hoversBelt(e) ? "pointer" : "";
 });
 

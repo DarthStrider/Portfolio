@@ -80,7 +80,7 @@ type Body = Record<string, unknown>;
 const asBody = (v: unknown): Body => (v && typeof v === "object" && !Array.isArray(v) ? (v as Body) : {});
 
 /** Checks one condition, returning a normalized copy or a problem. Texts are compared ignoring case. */
-function parseCondition(c: unknown, where: string, problems: string[]): Condition | null {
+export function parseCondition(c: unknown, where: string, problems: string[]): Condition | null {
   const b = asBody(c);
   const field = b.field as Field;
   if (!(typeof field === "string" && field in FIELDS)) {

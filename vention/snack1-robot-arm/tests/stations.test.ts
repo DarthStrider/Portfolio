@@ -5,7 +5,7 @@ import type { Conveyor } from "../src/conveyors/types";
 import type { Shape } from "../src/shapes/types";
 import { attachmentFor, localPoint, poses, turn } from "../src/line/joints";
 import { createStations, type Join, type World } from "../src/line/stations";
-import type { Machine, Merger } from "../src/line/types";
+import type { Bin, Machine, Merger } from "../src/line/types";
 
 const T = "2026-01-01T00:00:00Z";
 const belt = (id: string, over: Partial<Conveyor>): Conveyor => ({
@@ -176,4 +176,139 @@ test("a machine whose connection point was removed lets both items go unjoined",
   assert.deepEqual(joins, []);
   assert.ok(bodies.get("plate")!.x > 0.3 && bodies.get("can")!.x > 0.3);
   assert.equal(st.snapshot().machines.get("j1")?.state, "idle"); // the error showed, then it carried on
+});
+
+// ---- Bins ----
+
+const bin = (over: Partial<Bin> = {}): Bin => ({
+  id: "bin1", name: "Bin", holds: ["kind:box"], accept: [], capacity: 10, position: { x: 1.3, z: 0 }, rotationY: 0,
+  feed: { type: "none" }, count: 0, createdAt: T, updatedAt: T, ...over,
+});
+
+function runBins(w: World, bodies: Map<string, Body>, seconds: number) {
+  const st = createStations(() => w);
+  st.reset();
+  const caught: string[] = [];
+  const released: string[] = [];
+  const joins: Join[] = [];
+  const dt = 1 / 120;
+  for (let t = 0; t < seconds; t += dt) {
+    st.prepare(bodies);
+    step(bodies.values(), w.belts, dt, { stops: st.stops(), hold: st.hold });
+    for (const j of st.afterStep(dt)) {
+      joins.push(j);
+      bodies.delete(j.attachedId);
+    }
+    const r = st.binStep(dt, bodies);
+    for (const c of r.caught) {
+      caught.push(c.shapeId);
+      bodies.delete(c.shapeId);
+    }
+    for (const x of r.released) {
+      released.push(x.body.id!);
+      bodies.set(x.body.id!, x.body);
+    }
+  }
+  return { st, caught, released, joins };
+}
+
+test("a bin at the end of a belt catches its kind, and leaves anything else lying in it", () => {
+  // The main belt ends at x = 1; the bin's footprint is x 1.05..1.55.
+  const red = shape("red", { color: "#e11d48" });
+  const blue = shape("blue", { color: "#2563eb" });
+  const ball = shape("ball", { kind: "sphere" });
+  const w = world({ mergers: [], shapes: [red, blue, ball], bins: [bin({ accept: [{ field: "color", op: "eq", value: "#e11d48" }] })] });
+  const bodies = new Map([["red", body("red", 0.5, 0, 0.3)], ["blue", body("blue", 0.2, 0, 0.3)], ["ball", body("ball", -0.1, 0, 0.3)]]);
+  const { caught, st } = runBins(w, bodies, 4);
+  assert.deepEqual(caught, ["red"]);
+  assert.deepEqual([...st.stored()], [["red", "bin1"]]);
+  assert.ok(bodies.has("blue") && bodies.has("ball"), "the others lie where they fell");
+  assert.equal(bodies.get("blue")!.y, 0);
+});
+
+test("a full bin catches nothing more", () => {
+  const items = ["a", "b", "c"].map((id) => shape(id));
+  const w = world({ mergers: [], shapes: items, bins: [bin({ capacity: 2 })] });
+  const bodies = new Map(items.map((s, i) => [s.id, body(s.id, 0.5 - i * 0.3, 0, 0.3)] as const));
+  const { caught } = runBins(w, bodies, 5);
+  assert.deepEqual(caught, ["a", "b"]);
+});
+
+test("a steady bin feeds a belt one item at a time, keeping the spot clear", () => {
+  const stored = ["s1", "s2", "s3"].map((id, i) => shape(id, { binId: "bin1", createdAt: `2026-01-0${i + 1}` }));
+  const w = world({ mergers: [], shapes: stored, bins: [bin({ position: { x: -1.5, z: 0 }, feed: { type: "belt", conveyorId: "main", along: 0.1, mode: "steady" } })] });
+  const bodies = new Map<string, Body>();
+  let closest = Infinity;
+  const st = createStations(() => w);
+  st.reset();
+  const dt = 1 / 120;
+  const order: string[] = [];
+  for (let t = 0; t < 2.5; t += dt) {
+    step(bodies.values(), w.belts, dt, {});
+    for (const x of st.binStep(dt, bodies).released) {
+      order.push(x.body.id!);
+      bodies.set(x.body.id!, x.body);
+    }
+    const xs = [...bodies.values()].filter((b) => b.y > 0.29).map((b) => b.x).sort((a, b) => a - b);
+    for (let i = 1; i < xs.length; i++) closest = Math.min(closest, xs[i] - xs[i - 1]);
+  }
+  assert.deepEqual(order, ["s1", "s2", "s3"], "oldest first");
+  assert.ok(closest >= 0.25 - 1e-6, `spaced at least 25 cm apart on the belt: ${closest}`);
+  assert.equal(st.binCounts().get("bin1"), 0);
+});
+
+test("a bin wired to a machine supplies its slot, and the machine joins the item onto the base", () => {
+  const plate = shape("plate", { sku: "PL-200", size: { x: 0.2, y: 0.02, z: 0.2 } });
+  const cans = ["c1", "c2"].map((id) => shape(id, { kind: "cylinder", size: { x: 0.08, y: 0.12, z: 0.08 }, binId: "bin1" }));
+  const w = world({
+    mergers: [], machines: [machine], shapes: [plate, ...cans],
+    bins: [bin({ holds: ["kind:cylinder"], position: { x: 0.2, z: 0.6 }, feed: { type: "machine", machineId: "j1" } })],
+  });
+  const bodies = new Map([["plate", body("plate", -0.6, 0, 0.3)]]);
+  const { joins, released, st } = runBins(w, bodies, 4);
+  assert.deepEqual(joins.map((j) => [j.baseId, j.attachedId]), [["plate", "c1"]]);
+  // As soon as its can slot is empty again, the machine gets the next can, which waits there for the next plate.
+  assert.deepEqual(released, ["c1", "c2"]);
+  assert.equal(bodies.get("c2")!.heldAt, "machine:j1");
+  assert.equal(st.binCounts().get("bin1"), 0);
+});
+
+test("a demand bin feeds a belt only when a machine further along needs its kind", () => {
+  const plate = shape("plate", { sku: "PL-200" });
+  const cans = ["c1", "c2", "c3"].map((id) => shape(id, { kind: "cylinder", binId: "bin1" }));
+  const w = world({
+    mergers: [], machines: [machine], shapes: [plate, ...cans],
+    bins: [bin({ holds: ["kind:cylinder"], position: { x: -1.5, z: 0.6 }, feed: { type: "belt", conveyorId: "main", along: 0.2, mode: "demand" } })],
+  });
+  const bodies = new Map([["plate", body("plate", -0.4, 0, 0.3)]]);
+  const { released, joins } = runBins(w, bodies, 6);
+  // One can for the one plate: after the join the machine's slot is empty again, and it asks
+  // for another. That's demand: a can whenever the cylinder slot is empty and none is on its way.
+  assert.equal(joins.length, 1);
+  assert.ok(released.length >= 1 && released.length <= 3, `${released}`);
+  assert.equal(released[0], "c1");
+});
+
+test("a bin holding several kinds catches each of them, and hands a machine the kind it needs", () => {
+  // One bin holds plates and cans, wired to the machine. The machine needs one of each, so the
+  // bin hands over its oldest plate, then a can; once the plate slot is full, it only sends cans.
+  const onBelt = shape("plate1", { sku: "PL-200", size: { x: 0.2, y: 0.02, z: 0.2 } });
+  const stored = [
+    shape("plate2", { sku: "PL-200", size: { x: 0.2, y: 0.02, z: 0.2 }, binId: "bin1", createdAt: "2026-01-01" }),
+    shape("can", { kind: "cylinder", size: { x: 0.08, y: 0.12, z: 0.08 }, binId: "bin1", createdAt: "2026-01-02" }),
+  ];
+  const mixed = bin({ holds: ["part:PL-200", "kind:cylinder"], position: { x: 0.2, z: 0.6 }, feed: { type: "machine", machineId: "j1" } });
+  const w = world({ mergers: [], machines: [machine], shapes: [onBelt, ...stored], bins: [mixed] });
+  const bodies = new Map([["plate1", body("plate1", -0.6, 0, 0.3)]]);
+  const { released, joins } = runBins(w, bodies, 1.5);
+  assert.deepEqual(released, ["plate2", "can"]);
+  assert.deepEqual(joins.map((j) => [j.baseId, j.attachedId]), [["plate2", "can"]]);
+  assert.ok(!bodies.get("plate1")!.heldAt, "the belt's own plate found the slot taken and passed by");
+
+  // Catching: both kinds go in; a ball doesn't.
+  const out = bin({ id: "out", holds: ["kind:box", "kind:cylinder"], position: { x: 1.3, z: 0 } });
+  const items = [shape("b", {}), shape("c", { kind: "cylinder" }), shape("s", { kind: "sphere" })];
+  const bodies2 = new Map(items.map((s, i) => [s.id, body(s.id, 0.5 - i * 0.3, 0, 0.3)] as const));
+  const { caught } = runBins(world({ mergers: [], shapes: items, bins: [out] }), bodies2, 5);
+  assert.deepEqual(caught.sort(), ["b", "c"]);
 });

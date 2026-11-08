@@ -2,6 +2,7 @@ import type { NewShape, Shape, ShapePatch } from "./shapes.ts";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "./conveyors.ts";
 import type { NewSplitter, Splitter, SplitterPatch } from "./splitters.ts";
 import type { PartPatch } from "./newPart.ts";
+import type { Bin, BinPatch, BinResult, LoadLine, NewBin } from "./bins.ts";
 import type { AssembleResult, Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner } from "./assembly.ts";
 
 /**
@@ -186,6 +187,24 @@ export interface InventoryRepo {
   assemble(input: NewAssembly): Promise<AssembleResult>;
   /** Newest first. */
   listAssemblies(limit: number): Promise<Assembly[]>;
+
+  /** Bins, oldest first, each with how many items it holds. */
+  listBins(): Promise<Bin[]>;
+  createBin(bin: NewBin): Promise<Bin>;
+  updateBin(id: string, patch: BinPatch): Promise<Bin>;
+  /** Refuses (ConflictError) while the bin still holds anything. */
+  deleteBin(id: string): Promise<void>;
+  /**
+   * Puts new items in the bin, several kinds at once, taking parts from stock: all or nothing.
+   * Kinds the bin doesn't hold are refused, or added to it with addToHolds.
+   */
+  loadBin(id: string, lines: readonly LoadLine[], addToHolds: boolean): Promise<BinResult<{ count: number; holds: Owner[] }>>;
+  /** Takes up to qty plain items out of the bin and off the floor, giving parts back to stock. */
+  unloadBin(id: string, qty: number): Promise<BinResult<{ unloaded: number }>>;
+  /** Stores a free shape (and anything joined onto it) in the bin, taking its parts from stock if they haven't left yet. */
+  catchIntoBin(id: string, shapeId: string): Promise<BinResult>;
+  /** Takes a stored shape out of the bin and puts it on the floor at (x, z). */
+  releaseFromBin(id: string, shapeId: string, at: { x: number; z: number }): Promise<BinResult>;
 
   /** Deletes everything. Tests only. */
   reset(): Promise<void>;

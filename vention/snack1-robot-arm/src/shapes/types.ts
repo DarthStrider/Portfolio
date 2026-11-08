@@ -26,9 +26,13 @@ export interface Shape {
   attachedTo?: string | null;
   /** Where it sits on that shape: its center in that shape's frame (meters), and its turn relative to it. */
   attach?: { x: number; y: number; z: number; rotationY: number } | null;
+  /** Set while it's stored in a bin: off the floor and out of sight. */
+  binId?: string | null;
+  /** True once its part has left stock (loaded into or caught by a bin, or joined). */
+  stockTaken?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export type NewShape = Omit<Shape, "id" | "createdAt" | "updatedAt" | "attachedTo" | "attach">;
+export type NewShape = Omit<Shape, "id" | "createdAt" | "updatedAt" | "attachedTo" | "attach" | "binId" | "stockTaken">;
 export type ShapePatch = Partial<Pick<Shape, "name" | "color" | "position" | "rotationY">>;

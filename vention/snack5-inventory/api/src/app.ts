@@ -13,6 +13,7 @@ import { parseNewSplitter, parseSplitterPatch } from "./domain/splitters.ts";
 import {
   DEFAULT_POINTS, isOwner, parseMachinePatch, parseMergerPatch, parseNewAssembly, parseNewMachine, parseNewMerger, parsePoints,
 } from "./domain/assembly.ts";
+import { parseBinPatch, parseLoad, parseNewBin, type BinResult, type Feed } from "./domain/bins.ts";
 import type { InventoryRepo } from "./domain/types.ts";
 import { checkDesign, reserveDesign } from "./service.ts";
 
@@ -187,6 +188,73 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
   route("DELETE", "/api/machines/:id", async ({ params }) => {
     await repo.deleteMachine(params.id);
     return [200, { deleted: params.id }];
+  });
+
+  // ---- Bins: hold the kinds of object you choose; catch items off the line, feed them back on ----
+  async function checkFeed(feed: Feed) {
+    if (feed.type === "belt") await checkFits(feed.conveyorId, feed.along);
+    if (feed.type === "machine" && !(await repo.listMachines()).some((m) => m.id === feed.machineId)) {
+      throw new ValidationError([`No machine ${feed.machineId}`]);
+    }
+  }
+  /** A refused bin operation: 404 for something missing, 409 for the rest, with a reason a person can act on. */
+  function binAnswer<T>(r: BinResult<T>, ok: number, value: (v: T) => unknown): [number, unknown] {
+    if (r.ok) return [ok, value(r.value)];
+    const message = {
+      not_found: "No such bin, or that shape can't go in one (it's joined onto something, or already in a bin)",
+      short: "Not enough stock",
+      full: "The bin is full",
+      wrong_kind: "That bin doesn't hold that kind of object",
+      not_in_bin: "That shape isn't in this bin",
+      not_empty: "Empty the bin first",
+    }[r.reason];
+    return [r.reason === "not_found" || r.reason === "not_in_bin" ? 404 : 409, { error: r.detail ? `${message}: ${r.detail}` : message, reason: r.reason }];
+  }
+  /** Every part a bin holds must exist. */
+  async function checkKinds(holds: readonly string[]) {
+    const skus = holds.filter((h) => h.startsWith("part:")).map((h) => h.slice(5));
+    const found = new Set((await repo.getParts(skus)).map((p) => p.sku));
+    const missing = skus.filter((s) => !found.has(s));
+    if (missing.length) throw new ValidationError(missing.map((s) => `No part ${s} in the inventory`));
+  }
+  route("GET", "/api/bins", async () => [200, await repo.listBins()]);
+  route("POST", "/api/bins", async ({ body }) => {
+    const b = parseNewBin(body);
+    await checkKinds(b.holds);
+    await checkFeed(b.feed);
+    return [201, await repo.createBin(b)];
+  });
+  route("PATCH", "/api/bins/:id", async ({ params, body }) => {
+    const patch = parseBinPatch(body);
+    if (patch.holds) await checkKinds(patch.holds);
+    if (patch.feed) await checkFeed(patch.feed);
+    return [200, await repo.updateBin(params.id, patch)];
+  });
+  route("DELETE", "/api/bins/:id", async ({ params }) => {
+    await repo.deleteBin(params.id);
+    return [200, { deleted: params.id }];
+  });
+  route("POST", "/api/bins/:id/load", async ({ params, body }) => {
+    const { lines, addToHolds } = parseLoad(body);
+    await checkKinds(lines.map((l) => l.owner));
+    return binAnswer(await repo.loadBin(params.id, lines, addToHolds), 200, (v) => v);
+  });
+  route("POST", "/api/bins/:id/unload", async ({ params, body }) => {
+    const qty = field(body, "qty");
+    if (!Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > 200) throw new ValidationError(["qty must be a whole number from 1 to 200"]);
+    return binAnswer(await repo.unloadBin(params.id, qty as number), 200, (v) => v);
+  });
+  route("POST", "/api/bins/:id/catch", async ({ params, body }) => {
+    const shapeId = field(body, "shapeId");
+    if (typeof shapeId !== "string") throw new ValidationError(["shapeId must be a shape's id"]);
+    return binAnswer(await repo.catchIntoBin(params.id, shapeId), 200, () => ({ caught: shapeId }));
+  });
+  route("POST", "/api/bins/:id/release", async ({ params, body }) => {
+    const shapeId = field(body, "shapeId");
+    const at = field(body, "position") as { x?: unknown; z?: unknown } | undefined;
+    const ok = (v: unknown) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 3;
+    if (typeof shapeId !== "string" || !at || !ok(at.x) || !ok(at.z)) throw new ValidationError(["send { shapeId, position: { x, z } } with x and z from -3 to 3"]);
+    return binAnswer(await repo.releaseFromBin(params.id, shapeId, { x: at.x as number, z: at.z as number }), 200, () => ({ released: shapeId }));
   });
 
   // ---- Assemblies: join two shapes, using up their parts ----

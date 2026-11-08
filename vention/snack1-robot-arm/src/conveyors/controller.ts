@@ -11,7 +11,7 @@ import { conveyorsApi, ShapesApiError } from "../shapes/api";
 import type { createShapes } from "../shapes/controller";
 import { ConveyorLayer } from "./ConveyorLayer";
 import { step, supportHeight, type Body, type Exit, type Gate } from "./transport";
-import { poses } from "../line/joints";
+import { poses, rootOf } from "../line/joints";
 import type { Join, Stations } from "../line/stations";
 import type { Attachment } from "../line/types";
 import type { Conveyor, NewConveyor } from "./types";
@@ -36,6 +36,9 @@ export interface Line {
   stations: Stations;
   /** Called on Stop, after positions are saved, with the joins machines made during the run. */
   saveJoins(joins: readonly Join[]): Promise<void>;
+  /** Called on Stop: items that left bins (first) and items that ended up in bins (last). */
+  saveReleases(items: readonly { binId: string; shapeId: string; x: number; z: number }[]): Promise<void>;
+  saveCatches(items: readonly { binId: string; shapeId: string }[]): Promise<void>;
   /** Called every frame while running, after the step, to update the stations' 3D models. */
   frame(dt: number): void;
 }
@@ -76,6 +79,8 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
   /** Joins made during this run: which shape now rides on which. */
   let links = new Map<string, { parentId: string; attach: Attachment }>();
   let joins: Join[] = [];
+  /** Where each stored item was when the run started: shape id -> bin id. */
+  let storedAtStart = new Map<string, string>();
   const listeners: ((belts: readonly Conveyor[]) => void)[] = [];
 
   // Shapes stand on whichever belt is under them, and can be placed onto one.
@@ -151,9 +156,11 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     links = new Map();
     joins = [];
     line?.stations.reset();
-    // Shapes joined onto another ride on it: only the ones standing on their own get a body.
+    storedAtStart = new Map(shapes.shapes.filter((s) => s.binId && !s.attachedTo).map((s) => [s.id, s.binId!]));
+    // Shapes joined onto another ride on it, and stored ones are in their bins: only the ones
+    // standing on their own get a body.
     for (const s of shapes.shapes) {
-      if (s.attachedTo) continue;
+      if (s.attachedTo || s.binId) continue;
       bodies.set(s.id, {
         id: s.id, x: s.position.x, z: s.position.z, y: supportHeight(belts, s.position.x, s.position.z),
         vx: 0, vy: 0, vz: 0, size: Math.max(s.size.x, s.size.z),
@@ -171,27 +178,35 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     // Shapes joined during the run are saved where they ended up too, so if the assembly is
     // refused (not enough stock), they're left at the machine rather than back at the start.
     const where = currentPoses();
+    const storedNow = new Map(line?.stations.stored() ?? []);
     for (const [id, from] of started) {
       const p = where.get(id);
-      if (!p) continue;
+      if (!p || storedNow.has(id)) continue; // ended up in a bin: its position doesn't matter
       // Millimeters are plenty, and the API keeps whatever we send.
       const x = Math.round(p.x * 1000) / 1000;
       const z = Math.round(p.z * 1000) / 1000;
       if (Math.hypot(x - from.x, z - from.z) >= 0.001) moves.push({ id, x, z });
     }
+    // What changed in the bins: items that left one (saved with where they ended up), and items now in one.
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    const releases = [...storedAtStart].filter(([id, bin]) => storedNow.get(id) !== bin && where.has(id))
+      .map(([shapeId, binId]) => ({ binId, shapeId, x: round(where.get(shapeId)!.x), z: round(where.get(shapeId)!.z) }));
+    const catches = [...storedNow].filter(([id, bin]) => storedAtStart.get(id) !== bin).map(([shapeId, binId]) => ({ binId, shapeId }));
     const made = joins;
     bodies = null;
     joins = [];
     line?.stations.reset();
     line?.frame(0); // lights back to idle
     shapes.setRunning(false);
-    if (moves.length === 0 && made.length === 0) message = { text: "Nothing moved. Shapes ride a belt when placed on top of it.", error: false };
+    if (moves.length === 0 && made.length === 0 && !releases.length && !catches.length) message = { text: "Nothing moved. Shapes ride a belt when placed on top of it.", error: false };
     render();
+    // Releases first (they put items back on the floor), joins next, catches last (an item can
+    // be joined and then caught as one assembly in the same run).
+    if (releases.length && line) await line.saveReleases(releases);
     await shapes.saveMoves(moves);
-    if (made.length && line) {
-      await line.saveJoins(made);
-      await shapes.reload();
-    }
+    if (made.length && line) await line.saveJoins(made);
+    if (catches.length && line) await line.saveCatches(catches);
+    if (line && (releases.length || made.length || catches.length)) await shapes.reload();
   }
 
   /** Where every shape is now: bodies for the free ones, and joined ones riding on them. */
@@ -223,8 +238,15 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
         links.set(j.attachedId, { parentId: j.baseId, attach: j.attach });
         joins.push(j);
       }
+      const bins = st?.binStep(h, bodies);
+      for (const c of bins?.caught ?? []) bodies.delete(c.shapeId);
+      for (const r of bins?.released ?? []) bodies.set(r.body.id!, r.body);
     }
-    for (const [id, p] of currentPoses()) shapes.layer.poseCenter(id, p);
+    const stored = st?.stored() ?? new Map();
+    for (const [id, p] of currentPoses()) {
+      shapes.layer.poseCenter(id, p);
+      shapes.layer.setVisible(id, !stored.has(rootOf(id, shapes.shapes, links)));
+    }
     line?.frame(dt);
   }
 

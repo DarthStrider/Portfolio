@@ -8,7 +8,9 @@
  * which uses up the parts from stock (all or nothing, in the API).
  */
 import * as THREE from "three";
-import { conveyorsApi, lineApi, splittersApi, ShapesApiError } from "../shapes/api";
+import { binsApi, conveyorsApi, lineApi, splittersApi, ShapesApiError } from "../shapes/api";
+import { BinLayer } from "./BinLayer";
+import { createBinPanel, lookOf } from "./BinPanel";
 import type { createShapes } from "../shapes/controller";
 import type { createConveyors } from "../conveyors/controller";
 import { fromBelt, toBelt } from "../conveyors/transport";
@@ -19,7 +21,7 @@ import { pointsFor } from "./joints";
 import { LineLayer } from "./LineLayer";
 import { createPointEditor } from "./PointEditor";
 import { createStations, type Join, type MachineStatus } from "./stations";
-import type { Assembly, Connectors, Machine, Merger, MergerKind, Owner, Priority } from "./types";
+import type { Assembly, Bin, Connectors, Machine, Merger, MergerKind, Owner, Priority } from "./types";
 
 const POLL_MS = 4000;
 const DEG = Math.PI / 180;
@@ -28,6 +30,8 @@ const PRIORITY_LABEL: Record<Priority, string> = { main: "Main belt first", feed
 
 interface Options {
   root: HTMLElement;
+  /** The Bins tab's panel. */
+  binsRoot: HTMLElement;
   scene: THREE.Scene;
   camera: THREE.Camera;
   canvas: HTMLCanvasElement;
@@ -35,9 +39,12 @@ interface Options {
   conveyors: ReturnType<typeof createConveyors>;
 }
 
-export function createLine({ root, scene, camera, canvas, shapes, conveyors }: Options) {
+export function createLine({ root, binsRoot, scene, camera, canvas, shapes, conveyors }: Options) {
   const layer = new LineLayer();
   scene.add(layer.root);
+  const binLayer = new BinLayer();
+  scene.add(binLayer.root);
+  let bins: Bin[] = [];
 
   let mergers: Merger[] = [];
   let machines: Machine[] = [];
@@ -52,16 +59,27 @@ export function createLine({ root, scene, camera, canvas, shapes, conveyors }: O
   const kDraft = { belt: "", along: 100, name: "", baseOwner: "kind:box" as Owner, basePoint: "top", attachOwner: "kind:cylinder" as Owner, attachPoint: "bottom", cycle: 1.5 };
 
   const belts = () => conveyors.belts;
-  const stations = createStations(() => ({ belts: belts(), mergers, machines, shapes: shapes.shapes, connectors }));
+  const stations = createStations(() => ({ belts: belts(), mergers, machines, shapes: shapes.shapes, connectors, bins, parts }));
   const points = createPointEditor({ shapes, camera, canvas, connectors: () => connectors, reload: load });
+
+  const binPanel = createBinPanel({
+    root: binsRoot, layer: binLayer, camera, canvas,
+    bins: () => bins, belts, machines: () => machines, parts: () => parts,
+    running: () => conveyors.running, reload: load,
+  });
 
   let statusTimer = 0;
   conveyors.setLine({
     stations,
     saveJoins,
+    saveReleases,
+    saveCatches,
     frame(dt) {
       const snap = stations.snapshot();
       layer.show(snap.mergers, snap.machines);
+      const counts = stations.binCounts();
+      binLayer.fill(counts, bins);
+      binPanel.showCounts(counts);
       statusTimer += dt;
       if (statusTimer > 0.25) {
         statusTimer = 0;
@@ -77,19 +95,21 @@ export function createLine({ root, scene, camera, canvas, shapes, conveyors }: O
   function syncLayer() {
     layer.sync(mergers, machines, belts(), (m) => stations.mergePoint(m));
     layer.show(new Map(), new Map());
+    binLayer.sync(bins, belts(), machines, (b) => lookOf(b.holds[0], parts)?.color ?? "#64748b");
   }
 
   // ---- API ----
 
   async function load() {
     try {
-      const [ms, ks, cs, as, ps] = await Promise.all([
-        lineApi.mergers(), lineApi.machines(), lineApi.connectors(), lineApi.assemblies(), splittersApi.parts(),
+      const [ms, ks, cs, as, ps, bs] = await Promise.all([
+        lineApi.mergers(), lineApi.machines(), lineApi.connectors(), lineApi.assemblies(), splittersApi.parts(), binsApi.list(),
       ]);
       online = true;
-      [mergers, machines, connectors, assemblies, parts] = [ms, ks, cs.connectors, as, ps];
+      [mergers, machines, connectors, assemblies, parts, bins] = [ms, ks, cs.connectors, as, ps, bs];
       syncLayer();
       points.refresh();
+      binPanel.render();
       if (message?.error && message.text.startsWith("Can't reach")) message = null;
     } catch (err) {
       online = false;
@@ -139,6 +159,33 @@ export function createLine({ root, scene, camera, canvas, shapes, conveyors }: O
       }
     }
     message = { text: `Saved ${made} assembl${made === 1 ? "y" : "ies"}.${lines.length ? " " + lines.join(". ") + "." : ""}`, error: made < joins.length };
+    await load();
+  }
+
+  /** After a run: items that came out of bins go back on the floor where they ended up. */
+  async function saveReleases(items: readonly { binId: string; shapeId: string; x: number; z: number }[]) {
+    for (const it of items) {
+      try {
+        await binsApi.release(it.binId, it.shapeId, { x: it.x, z: it.z });
+      } catch (err) {
+        message = { text: `Couldn't take an item out of its bin: ${(err as Error).message}`, error: true };
+      }
+    }
+  }
+
+  /** After a run: items that ended up in bins. The API takes parts from stock as they go in, and may refuse. */
+  async function saveCatches(items: readonly { binId: string; shapeId: string }[]) {
+    const refused: string[] = [];
+    for (const it of items) {
+      try {
+        await binsApi.catch(it.binId, it.shapeId);
+      } catch (err) {
+        const name = shapes.shapes.find((s) => s.id === it.shapeId)?.name ?? "An item";
+        refused.push(`${name} wasn't stored: ${(err as Error).message}`);
+      }
+    }
+    const caught = items.length - refused.length;
+    message = { text: `${caught} item${caught === 1 ? "" : "s"} stored in bins.${refused.length ? " " + refused.join(". ") + "." : ""}`, error: refused.length > 0 };
     await load();
   }
 
@@ -428,9 +475,10 @@ export function createLine({ root, scene, camera, canvas, shapes, conveyors }: O
 
   return {
     layer, points,
-    handleClick: (e: PointerEvent) => points.handleClick(e),
-    handleHover: () => points.handleHover(),
-    isActive: () => points.isActive(),
+    handleClick: (e: PointerEvent) => points.handleClick(e) || binPanel.handleClick(e),
+    handleHover: (e: PointerEvent) => points.handleHover() || binPanel.handleHover(e),
+    handleKey: (e: KeyboardEvent) => binPanel.handleKey(e),
+    isActive: () => points.isActive() || binPanel.isActive(),
     /** Rebuild the 3D models after a run (Stop) so lights go back to idle. */
     idle: () => layer.show(new Map(), new Map()),
   };

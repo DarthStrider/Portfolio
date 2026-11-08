@@ -32,6 +32,7 @@ import type {
   AssembleResult, Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner,
 } from "../domain/assembly.ts";
 import { consumption } from "./memory.ts";
+import { stockNeeded, type Bin, type BinPatch, type BinResult, type LoadLine, type NewBin } from "../domain/bins.ts";
 
 interface PartDoc {
   _id: string; // the SKU
@@ -49,6 +50,7 @@ interface ShapeDoc extends Omit<Shape, "id" | "createdAt" | "updatedAt"> { _id: 
 interface ConveyorDoc extends Omit<Conveyor, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 /** A splitter's rules are nested lists of objects: a document holds them as they are. */
 interface SplitterDoc extends Omit<Splitter, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
+interface BinDoc extends Omit<Bin, "id" | "count" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 interface ConnectorsDoc { _id: Owner; points: ConnectionPoint[]; updatedAt: Date }
 interface MergerDoc extends Omit<Merger, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 interface MachineDoc extends Omit<Machine, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
@@ -72,6 +74,7 @@ export class MongoRepo implements InventoryRepo {
   private readonly mergers: Collection<MergerDoc>;
   private readonly machines: Collection<MachineDoc>;
   private readonly assemblies: Collection<AssemblyDoc>;
+  private readonly bins: Collection<BinDoc>;
 
   constructor(url: string, dbName = "inventory") {
     this.client = new MongoClient(url, { serverSelectionTimeoutMS: 5000 });
@@ -87,6 +90,7 @@ export class MongoRepo implements InventoryRepo {
     this.mergers = this.db.collection<MergerDoc>("mergers");
     this.machines = this.db.collection<MachineDoc>("machines");
     this.assemblies = this.db.collection<AssemblyDoc>("assemblies");
+    this.bins = this.db.collection<BinDoc>("bins");
   }
 
   async init(): Promise<void> {
@@ -237,7 +241,7 @@ export class MongoRepo implements InventoryRepo {
 
   async createShape(s: NewShape): Promise<Shape> {
     const now = new Date();
-    const doc: ShapeDoc = { ...s, attachedTo: null, attach: null, _id: randomUUID(), createdAt: now, updatedAt: now };
+    const doc: ShapeDoc = { ...s, attachedTo: null, attach: null, binId: null, stockTaken: false, _id: randomUUID(), createdAt: now, updatedAt: now };
     await this.shapes.insertOne(doc);
     return toShape(doc);
   }
@@ -385,6 +389,7 @@ export class MongoRepo implements InventoryRepo {
       });
       return { ok: false, reason: "short", shortages };
     }
+    await this.shapes.updateMany({ _id: { $in: [base._id, attached._id] }, sku: { $ne: null } }, { $set: { stockTaken: true } });
     const doc: AssemblyDoc = {
       _id: randomUUID(), name: a.name, baseShapeId: base._id, attachedShapeId: attached._id,
       basePoint: a.basePoint, attachedPoint: a.attachedPoint, consumed: need, createdAt: new Date(),
@@ -392,6 +397,123 @@ export class MongoRepo implements InventoryRepo {
     await this.assemblies.insertOne(doc);
     if (need.length) await this.log(need.map(({ sku, qty }) => ({ sku, kind: "consume" as const, qty, note: `Assembly ${a.name} (${doc._id})`, reservationId: null })));
     return { ok: true, assembly: fromDoc<Assembly>(doc) };
+  }
+
+  async listBins(): Promise<Bin[]> {
+    const docs = await this.bins.find({}).sort({ createdAt: 1, _id: 1 }).toArray();
+    return Promise.all(docs.map(async (d) => ({ ...fromDoc<Omit<Bin, "count">>(d), count: await this.shapes.countDocuments({ binId: d._id }) })));
+  }
+
+  async createBin(b: NewBin): Promise<Bin> {
+    const now = new Date();
+    const doc: BinDoc = { ...b, _id: randomUUID(), createdAt: now, updatedAt: now };
+    await this.bins.insertOne(doc);
+    return { ...fromDoc<Omit<Bin, "count">>(doc), count: 0 };
+  }
+
+  async updateBin(id: string, patch: BinPatch): Promise<Bin> {
+    const doc = await this.bins.findOneAndUpdate({ _id: id }, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
+    if (!doc) throw new NotFoundError(`No bin ${id}`);
+    return { ...fromDoc<Omit<Bin, "count">>(doc), count: await this.shapes.countDocuments({ binId: id }) };
+  }
+
+  async deleteBin(id: string): Promise<void> {
+    if (await this.shapes.countDocuments({ binId: id })) throw new ConflictError("Empty the bin before deleting it");
+    if ((await this.bins.deleteOne({ _id: id })).deletedCount !== 1) throw new NotFoundError(`No bin ${id}`);
+  }
+
+  /**
+   * Like reserve(): use up each part with a conditional update (it can't go below what's
+   * available), giving back what was taken if a later one is short; then create the items.
+   * Capacity is checked first, without a lock, so two loads at the same instant could overfill a
+   * bin slightly; Postgres locks the bin and can't.
+   */
+  async loadBin(id: string, lines: readonly LoadLine[], addToHolds: boolean): Promise<BinResult<{ count: number; holds: Owner[] }>> {
+    const bin = await this.bins.findOne({ _id: id });
+    if (!bin) return { ok: false, reason: "not_found" };
+    const missing = lines.map((l) => l.owner).filter((o) => !bin.holds.includes(o));
+    if (missing.length && !addToHolds) return { ok: false, reason: "wrong_kind", detail: `${bin.name} doesn't hold ${missing.join(", ")}` };
+    const count = await this.shapes.countDocuments({ binId: id });
+    const total = lines.reduce((n, l) => n + l.qty, 0);
+    if (count + total > bin.capacity) return { ok: false, reason: "full", detail: `${bin.name} has room for ${bin.capacity - count} more` };
+    const taken: { sku: string; qty: number }[] = [];
+    for (const n of stockNeeded(lines)) {
+      const r = await this.parts.updateOne({ _id: n.sku, ...atLeastAvailable(n.qty) }, { $inc: { onHand: -n.qty }, $set: { updatedAt: new Date() } });
+      if (r.modifiedCount === 1) {
+        taken.push(n);
+        continue;
+      }
+      for (const t of taken) await this.parts.updateOne({ _id: t.sku }, { $inc: { onHand: t.qty } });
+      const [p] = await this.getParts([n.sku]);
+      return { ok: false, reason: "short", detail: `${p?.available ?? 0} of ${n.sku} available` };
+    }
+    if (taken.length) await this.log(taken.map(({ sku, qty }) => ({ sku, kind: "consume" as const, qty, note: `Loaded into bin ${bin.name}`, reservationId: null })));
+    const holds = missing.length ? [...bin.holds, ...missing] : bin.holds;
+    if (missing.length) await this.bins.updateOne({ _id: id }, { $set: { holds, updatedAt: new Date() } });
+    const now = new Date();
+    await this.shapes.insertMany(lines.flatMap((l) => {
+      const sku = l.owner.startsWith("part:") ? l.owner.slice(5) : null;
+      const kind = sku ? l.look.kind : (l.owner.slice(5) as ShapeDoc["kind"]);
+      return Array.from({ length: l.qty }, () => ({
+        _id: randomUUID(), name: l.look.name, kind, size: l.look.size, color: l.look.color, position: { ...bin.position }, rotationY: 0,
+        sku, attachedTo: null, attach: null, binId: id, stockTaken: !!sku, createdAt: now, updatedAt: now,
+      }));
+    }));
+    return { ok: true, value: { count: count + total, holds } };
+  }
+
+  async unloadBin(id: string, qty: number): Promise<BinResult<{ unloaded: number }>> {
+    const bin = await this.bins.findOne({ _id: id });
+    if (!bin) return { ok: false, reason: "not_found" };
+    const stored = await this.shapes.find({ binId: id }).sort({ createdAt: 1, _id: 1 }).toArray();
+    let unloaded = 0;
+    for (const s of stored) {
+      if (unloaded >= qty) break;
+      if (await this.shapes.countDocuments({ attachedTo: s._id })) continue; // assemblies leave by being released
+      // Claim it by deleting it; only one unload can.
+      if ((await this.shapes.deleteOne({ _id: s._id, binId: id })).deletedCount !== 1) continue;
+      unloaded++;
+      if (s.sku && s.stockTaken) {
+        await this.parts.updateOne({ _id: s.sku }, { $inc: { onHand: 1 }, $set: { updatedAt: new Date() } });
+        await this.log([{ sku: s.sku, kind: "receive", qty: 1, note: `Unloaded from bin ${bin.name}`, reservationId: null }]);
+      }
+    }
+    return { ok: true, value: { unloaded } };
+  }
+
+  /** Claim the shape for the bin with a conditional update, then take its parts; undo the claim if they're short. */
+  async catchIntoBin(id: string, shapeId: string): Promise<BinResult> {
+    const [bin, s] = await Promise.all([this.bins.findOne({ _id: id }), this.shapes.findOne({ _id: shapeId })]);
+    if (!bin || !s || s.attachedTo || s.binId) return { ok: false, reason: "not_found" };
+    if (!bin.holds.includes(s.sku ? `part:${s.sku}` : `kind:${s.kind}`)) return { ok: false, reason: "wrong_kind" };
+    if ((await this.shapes.countDocuments({ binId: id })) >= bin.capacity) return { ok: false, reason: "full" };
+    const claim = await this.shapes.updateOne({ _id: shapeId, binId: null, attachedTo: null }, { $set: { binId: id, updatedAt: new Date() } });
+    if (claim.modifiedCount !== 1) return { ok: false, reason: "not_found" };
+    const tree: ShapeDoc[] = [];
+    for (let level = [s]; level.length && tree.length < 500; ) {
+      tree.push(...level);
+      level = await this.shapes.find({ attachedTo: { $in: level.map((x) => x._id) } }).toArray();
+    }
+    const need = consumption(tree.map(toShape), () => false);
+    const taken: typeof need = [];
+    for (const n of need) {
+      const r = await this.parts.updateOne({ _id: n.sku, ...atLeastAvailable(n.qty) }, { $inc: { onHand: -n.qty }, $set: { updatedAt: new Date() } });
+      if (r.modifiedCount === 1) {
+        taken.push(n);
+        continue;
+      }
+      for (const t of taken) await this.parts.updateOne({ _id: t.sku }, { $inc: { onHand: t.qty } });
+      await this.shapes.updateOne({ _id: shapeId }, { $set: { binId: null } });
+      return { ok: false, reason: "short", detail: `Not enough ${n.sku} in stock` };
+    }
+    if (need.length) await this.log(need.map(({ sku, qty }) => ({ sku, kind: "consume" as const, qty, note: `Caught in bin ${bin.name}`, reservationId: null })));
+    await this.shapes.updateMany({ _id: { $in: tree.map((x) => x._id) }, sku: { $ne: null } }, { $set: { stockTaken: true } });
+    return { ok: true, value: undefined };
+  }
+
+  async releaseFromBin(id: string, shapeId: string, at: { x: number; z: number }): Promise<BinResult> {
+    const r = await this.shapes.updateOne({ _id: shapeId, binId: id }, { $set: { binId: null, position: { ...at }, updatedAt: new Date() } });
+    return r.modifiedCount === 1 ? { ok: true, value: undefined } : { ok: false, reason: "not_in_bin" };
   }
 
   async listAssemblies(limit: number): Promise<Assembly[]> {
@@ -421,7 +543,7 @@ export class MongoRepo implements InventoryRepo {
   }
 
   async reset(): Promise<void> {
-    await Promise.all([this.assemblies.deleteMany({}), this.machines.deleteMany({}), this.mergers.deleteMany({}), this.connectors.deleteMany({}), this.splitters.deleteMany({}), this.conveyors.deleteMany({}), this.shapes.deleteMany({}), this.parts.deleteMany({}), this.moves.deleteMany({}), this.res.deleteMany({}), this.counters.deleteMany({})]);
+    await Promise.all([this.bins.deleteMany({}), this.assemblies.deleteMany({}), this.machines.deleteMany({}), this.mergers.deleteMany({}), this.connectors.deleteMany({}), this.splitters.deleteMany({}), this.conveyors.deleteMany({}), this.shapes.deleteMany({}), this.parts.deleteMany({}), this.moves.deleteMany({}), this.res.deleteMany({}), this.counters.deleteMany({})]);
   }
 
   /**
@@ -495,6 +617,7 @@ function toShape(d: ShapeDoc): Shape {
     id: d._id, name: d.name, kind: d.kind, size: d.size, color: d.color, position: d.position, rotationY: d.rotationY,
     sku: d.sku ?? null, // shapes saved before parts could be placed have no sku field
     attachedTo: d.attachedTo ?? null, attach: d.attach ?? null, // nor did shapes saved before assemblies
+    binId: d.binId ?? null, stockTaken: d.stockTaken ?? false, // or before bins
     createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
   };
 }

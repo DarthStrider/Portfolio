@@ -24,6 +24,7 @@ repository interface and pass the same contract tests.
 - [x] Splitters on those belts: ordered sorting rules (on the shape, or on the inventory part it stands for) stored as data, editable from the arm app, the API or the database
 - [x] Mergers and joining machines for those belts, and connection points per kind of object (part or shape kind)
 - [x] Assemblies: joining two shapes uses up their parts from stock, all or nothing, with a ledger entry; safe when two joins race for the same shape
+- [x] Bins: hold the kinds of object you list; loading takes parts from stock, unloading gives them back; items caught off the line are stored, and a part is never taken from stock twice
 - [x] Edit a part's name, category, location or reorder level (stock only changes through receive and consume, so the ledger stays complete)
 - [x] Conveyor belts for the same scene: size, speed (forward or reversed), position and angle, so a line layout is saved with the parts it uses
 - [x] Switchable storage: `DB=postgres`, `DB=mongo`, or `DB=memory` (no database at all)
@@ -163,6 +164,12 @@ replica set, the same steps could run inside a multi-document transaction instea
 | PATCH / DELETE | `/api/machines/{id}` | `name`, `along`, `base`, `attach` or `cycleSeconds` | Updated machine / `{ "deleted": id }` |
 | GET | `/api/assemblies?limit=50` | | Assemblies, newest first, with the parts each used |
 | POST | `/api/assemblies` | `{ "name", "baseShapeId", "attachedShapeId", "basePoint", "attachedPoint", "attachment": { "x", "y", "z", "rotationY" } }` | 201 + assembly. 409 if the shape is already joined, the join would loop, or stock is short (with `shortages`); 404 if a shape is missing |
+| GET / POST | `/api/bins` | `{ "name", "holds": ["part:PL-200", "kind:cylinder"], "accept": [conditions], "capacity": 50, "position": { "x", "z" }, "rotationY", "feed": { "type": "none" } \| { "type": "belt", "conveyorId", "along", "mode": "steady"\|"demand" } \| { "type": "machine", "machineId" } }` | List (each with its `count`), or 201 + bin |
+| PATCH / DELETE | `/api/bins/{id}` | `name`, `holds`, `accept`, `capacity`, `position`, `rotationY` or `feed` | Updated bin / deleted (409 while it holds anything) |
+| POST | `/api/bins/{id}/load` | `{ "qty": 10, "owner": "part:PL-200", "look": { "kind", "size", "color", "name" } }` | `{ count }`. One of the bin's kinds; takes parts from stock, all or nothing; 409 if short, full or not a kind it holds |
+| POST | `/api/bins/{id}/unload` | `{ "qty": 10 }` | `{ unloaded }`: plain items out, parts back into stock |
+| POST | `/api/bins/{id}/catch` | `{ "shapeId" }` | Stores a free shape (and anything joined to it); its parts are taken from stock if they haven't been. 409 if wrong kind, full or short |
+| POST | `/api/bins/{id}/release` | `{ "shapeId", "position": { "x", "z" } }` | Puts a stored shape back on the floor |
 | PATCH | `/api/parts/{sku}` | `name`, `category`, `location` or `reorderLevel` | Updated part. Stock fields are refused: use receive/consume |
 
 Rule fields: `kind`, `color`, `name`, `sku`, `width`, `height`, `depth` (meters), `isPart`, `part.category`, `part.location`,
@@ -176,7 +183,7 @@ arm's dev server uses it. Set `CORS_ORIGINS` to a comma-separated list to allow 
 
 ## Testing
 
-- **Contract tests** (`tests/contract.ts`, 26 tests) run against every implementation: filtering, the
+- **Contract tests** (`tests/contract.ts`, 27 tests) run against every implementation: filtering, the
   ledger, all-or-nothing reservations, consuming around reservations, closing exactly once, and
   concurrency (8 simultaneous reservations for 3 actuators: exactly 3 succeed).
   The in-memory run is part of `npm test`; Postgres and MongoDB run with `--profile test`.
