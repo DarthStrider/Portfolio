@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conveyor Physics</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <canvas id="scene" aria-label="3D conveyor dropping boxes into a bin"></canvas>
+
+    <aside class="panel">
+      <header>
+        <h1>Conveyor + Physics</h1>
+        <p class="sub">Custom AABB engine vs cannon-es</p>
+      </header>
+
+      <section>
+        <canvas id="graph" class="graph" width="264" height="56" aria-label="Frame time, last 120 frames"></canvas>
+        <dl class="stats">
+          <dt>FPS</dt><dd id="st-fps">–</dd>
+          <dt>Frame</dt><dd id="st-frame">–</dd>
+          <dt>Physics / frame</dt><dd id="st-physics">–</dd>
+          <dt>Steps / frame</dt><dd id="st-steps">–</dd>
+          <dt>Boxes</dt><dd id="st-boxes">–</dd>
+          <dt>Awake</dt><dd id="st-awake">–</dd>
+          <dt>Draw calls</dt><dd id="st-calls">–</dd>
+          <dt>Pairs tested</dt><dd id="st-pairs">–</dd>
+          <dt>Contacts</dt><dd id="st-contacts">–</dd>
+        </dl>
+        <p id="status" class="status" role="status"></p>
+      </section>
+
+      <section>
+        <h2>Engine</h2>
+        <div class="segmented">
+          <button type="button" data-engine="custom" aria-pressed="true">Custom AABB</button>
+          <button type="button" data-engine="cannon" aria-pressed="false">cannon-es</button>
+        </div>
+        <label class="check"><input id="opt-hash" type="checkbox" checked /> Spatial hash broad phase</label>
+      </section>
+
+      <section>
+        <h2>Rendering</h2>
+        <label class="check"><input id="opt-instancing" type="checkbox" checked /> Instancing (one draw call)</label>
+        <label class="check"><input id="opt-sleeping" type="checkbox" /> Tint sleeping boxes</label>
+      </section>
+
+      <section>
+        <h2>Boxes</h2>
+        <label class="range">
+          <span>Max boxes</span><output id="ctl-target-value"></output>
+          <input id="ctl-target" type="range" min="0" max="4000" step="50" value="200" />
+        </label>
+        <label class="range">
+          <span>Spawn rate</span><output id="ctl-rate-value"></output>
+          <input id="ctl-rate" type="range" min="0" max="40" step="1" value="6" />
+        </label>
+        <label class="range">
+          <span>Belt speed</span><output id="ctl-belt-value"></output>
+          <input id="ctl-belt" type="range" min="0" max="2" step="0.1" value="0.8" />
+        </label>
+        <div class="buttons">
+          <button type="button" id="btn-burst" class="primary">Drop 500</button>
+          <button type="button" id="btn-clear">Clear</button>
+        </div>
+      </section>
+    </aside>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

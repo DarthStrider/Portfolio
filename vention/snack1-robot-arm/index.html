@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Robot Arm</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <canvas id="scene" aria-label="3D robot arm"></canvas>
+
+    <aside class="panel">
+      <header>
+        <h1>Robot Arm</h1>
+        <p class="sub">Three.js · TypeScript · glTF</p>
+      </header>
+
+      <section>
+        <h2>Joints</h2>
+        <ol id="joints" class="joints"></ol>
+        <div class="jog">
+          <button type="button" data-jog="-1" aria-label="Rotate selected joint negative">◀</button>
+          <span id="selected-name" class="selected-name"></span>
+          <button type="button" data-jog="1" aria-label="Rotate selected joint positive">▶</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Tool center point (m)</h2>
+        <div class="tcp">
+          <span></span><span class="head">Scene graph</span><span class="head">FK by hand</span>
+          <span class="axis">x</span><span id="scene-x"></span><span id="fk-x"></span>
+          <span class="axis">y</span><span id="scene-y"></span><span id="fk-y"></span>
+          <span class="axis">z</span><span id="scene-z"></span><span id="fk-z"></span>
+        </div>
+        <p class="diff">Difference: <span id="fk-diff"></span></p>
+      </section>
+
+      <div class="toggles">
+        <button type="button" id="btn-demo" aria-pressed="true">Demo</button>
+        <button type="button" id="btn-gripper" aria-pressed="true">Gripper open</button>
+        <button type="button" id="btn-trail" aria-pressed="true">Trail</button>
+        <button type="button" id="btn-reset">Reset</button>
+      </div>
+
+      <details class="help">
+        <summary>Controls</summary>
+        <ul>
+          <li><kbd>1</kbd>–<kbd>4</kbd> or click a blue joint: select</li>
+          <li><kbd>←</kbd> <kbd>→</kbd> (or <kbd>A</kbd> <kbd>D</kbd>): rotate selected joint</li>
+          <li><kbd>↑</kbd> <kbd>↓</kbd>: previous / next joint</li>
+          <li><kbd>G</kbd> gripper · <kbd>Space</kbd> demo · <kbd>T</kbd> trail · <kbd>R</kbd> reset</li>
+          <li>Drag to orbit, scroll to zoom, right-drag to pan</li>
+        </ul>
+      </details>
+
+      <p id="status" class="status" role="status" hidden></p>
+    </aside>
+
+    <aside class="panel shapes-panel" id="shapes-panel" aria-label="Shapes"></aside>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

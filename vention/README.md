@@ -4,10 +4,11 @@ A set of small projects mirroring Vention's stack: browser-based 3D design and r
 
 | # | Project | Stack | Effort | Status |
 |---|---|---|---|---|
-| 1 | [Robot Arm in the Browser](snack1-robot-arm/) | Three.js, TypeScript, glTF | ~1.5 days | Not started |
-| 2 | [React Control Panel](snack2-control-panel/) | React, react-three-fiber or Three.js | ~1 day | Not started |
-| 3 | [Conveyor + Physics](snack3-conveyor-physics/) | Three.js, custom physics, Rapier / cannon-es | ~1.5 days | Not started |
-| 4 | [Legacy Refactor Kata](snack4-refactor-kata/) | TypeScript, unit tests | ~0.5 day | Not started |
+| 1 | [Robot Arm in the Browser](snack1-robot-arm/) | Three.js, TypeScript, glTF | ~1.5 days | Built |
+| 2 | [React Control Panel](snack2-control-panel/) | React, TypeScript, Three.js | ~1 day | Built |
+| 3 | [Conveyor + Physics](snack3-conveyor-physics/) | Three.js, custom physics, cannon-es | ~1.5 days | Built |
+| 4 | [Legacy Refactor Kata](snack4-refactor-kata/) | TypeScript, unit tests | ~0.5 day | Built |
+| 5 | [Parts Inventory](snack5-inventory/) | Node.js, React, PostgreSQL or MongoDB, Docker, Kubernetes | ~1 day | Built |
 
 ---
 
@@ -42,3 +43,12 @@ A set of small projects mirroring Vention's stack: browser-based 3D design and r
 - Add tests first, then refactor step by step with small commits
 
 **Talking point:** the posting's "modernise legacy code" line, and the PlayFab save-system refactor.
+
+## Snack 5 — Parts inventory (PostgreSQL or MongoDB)
+
+- Stock of the parts the other snacks use, with low-stock alerts and a ledger of every movement
+- Check a machine design (Snack 4's format) against stock, including how many 3 m bars a cut list needs, and reserve it for a quote, all or nothing
+- One repository interface, implemented for PostgreSQL (transactions, row locks, CHECK constraints) and MongoDB (atomic conditional updates); the same contract tests run on both
+- Docker Compose profile per database, Kubernetes overlays, two API replicas
+
+**Talking point:** the same business rules on a relational and a document database, and what each one guarantees under concurrent requests.
