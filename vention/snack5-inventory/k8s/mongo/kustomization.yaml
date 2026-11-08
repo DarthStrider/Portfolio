@@ -1,0 +1,23 @@
+# kubectl apply -k k8s/mongo
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: inventory
+resources:
+  - ../base
+  - mongo.yaml
+configMapGenerator:
+  - name: api-config
+    literals:
+      - DB=mongo
+      - MONGO_HOST=mongo
+      - MONGO_DB=inventory
+secretGenerator:
+  # Demo credentials. In a real cluster these come from a secret manager, not the repo.
+  - name: api-db-credentials
+    literals:
+      - MONGO_USER=inventory
+      - MONGO_PASSWORD=inventory-dev-password
+  - name: mongo-credentials
+    literals:
+      - MONGO_INITDB_ROOT_USERNAME=inventory
+      - MONGO_INITDB_ROOT_PASSWORD=inventory-dev-password

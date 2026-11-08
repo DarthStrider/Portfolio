@@ -1,0 +1,55 @@
+# Headless service gives the database a stable DNS name: "mongo".
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+spec:
+  clusterIP: None
+  selector:
+    app: mongo
+  ports:
+    - port: 27017
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  serviceName: mongo
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:8
+          ports:
+            - containerPort: 27017
+          envFrom:
+            - secretRef:
+                name: mongo-credentials
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 768Mi }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

@@ -1,0 +1,24 @@
+# kubectl apply -k k8s/postgres
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: inventory
+resources:
+  - ../base
+  - postgres.yaml
+configMapGenerator:
+  - name: api-config
+    literals:
+      - DB=postgres
+      - PGHOST=postgres
+      - PGDATABASE=inventory
+secretGenerator:
+  # Demo credentials. In a real cluster these come from a secret manager, not the repo.
+  - name: api-db-credentials
+    literals:
+      - PGUSER=inventory
+      - PGPASSWORD=inventory-dev-password
+  - name: postgres-credentials
+    literals:
+      - POSTGRES_USER=inventory
+      - POSTGRES_PASSWORD=inventory-dev-password
+      - POSTGRES_DB=inventory

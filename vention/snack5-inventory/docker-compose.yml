@@ -1,0 +1,126 @@
+# Runs the inventory app with one database or the other: http://localhost:8081
+#
+#   docker compose --profile postgres up --build     # PostgreSQL 17
+#   docker compose --profile mongo up --build        # MongoDB 8
+#
+# The API and web images are the same either way; only the API's DB setting changes.
+# Run the repository contract tests against BOTH databases (throwaway containers, no volumes):
+#
+#   docker compose --profile test run --rm --build api-test
+#   docker compose --profile test down
+name: inventory
+
+x-api: &api
+  build: ./api
+  image: inventory-api:1.0
+  networks:
+    default:
+      aliases: [api] # nginx forwards /api to "api", whichever database is behind it
+
+services:
+  postgres:
+    profiles: [postgres]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: inventory
+      POSTGRES_PASSWORD: inventory-dev-password
+      POSTGRES_DB: inventory
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory -d inventory"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mongo:
+    profiles: [mongo]
+    image: mongo:8
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: inventory
+      MONGO_INITDB_ROOT_PASSWORD: inventory-dev-password
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api-postgres:
+    <<: *api
+    profiles: [postgres]
+    environment:
+      DB: postgres
+      PGHOST: postgres
+      PGUSER: inventory
+      PGPASSWORD: inventory-dev-password
+      PGDATABASE: inventory
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api-mongo:
+    <<: *api
+    profiles: [mongo]
+    environment:
+      DB: mongo
+      MONGO_HOST: mongo
+      MONGO_USER: inventory
+      MONGO_PASSWORD: inventory-dev-password
+      MONGO_DB: inventory
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  web:
+    profiles: [postgres, mongo]
+    build: ./web
+    image: inventory-web:1.0
+    ports:
+      - "8081:80"
+
+  # ---- tests: fresh databases in memory (tmpfs), so your app data is never touched ----
+  postgres-test:
+    profiles: [test]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: inventory
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: inventory_test
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory -d inventory_test"]
+      interval: 2s
+      retries: 30
+
+  mongo-test:
+    profiles: [test]
+    image: mongo:8
+    tmpfs: [/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 2s
+      retries: 30
+
+  api-test:
+    profiles: [test]
+    image: inventory-api:1.0
+    build: ./api
+    command: ["node", "--test", "tests/**/*.test.ts"]
+    environment:
+      LOG_REQUESTS: "0"
+      PGHOST: postgres-test
+      PGUSER: inventory
+      PGPASSWORD: test
+      PGDATABASE: inventory_test
+      MONGO_URL: mongodb://mongo-test:27017
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      mongo-test:
+        condition: service_healthy
+
+volumes:
+  pg-data:
+  mongo-data:

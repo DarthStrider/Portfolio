@@ -1,0 +1,161 @@
+/** The HTTP API end to end, on the in-memory database and a random port. */
+import { after, before, test } from "node:test";
+import assert from "node:assert/strict";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { createApp } from "../src/app.ts";
+import { MemoryRepo } from "../src/db/memory.ts";
+import { SEED_PARTS } from "../src/domain/seed.ts";
+
+process.env.LOG_REQUESTS = "0";
+let server: Server;
+let base = "";
+
+before(async () => {
+  const repo = new MemoryRepo();
+  await repo.seedIfEmpty(SEED_PARTS);
+  server = createServer(createApp(repo));
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+after(() => server.close());
+
+async function call(method: string, path: string, body?: unknown) {
+  const res = await fetch(base + path, {
+    method,
+    headers: body === undefined ? {} : { "content-type": "application/json" },
+    body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
+  });
+  return { status: res.status, body: (await res.json()) as any };
+}
+
+const DEMO = {
+  items: [
+    { type: "extrusion", sku: "EX-4040", profile: "40x40", length: 1200, qty: 4 },
+    { type: "extrusion", sku: "EX-4080", profile: "40x80", length: 2400, qty: 2, finish: "black" },
+    { type: "plate", sku: "PL-200", qty: 4 },
+    { type: "fastener", sku: "M6-BOLT", qty: 120 },
+    { type: "actuator", sku: "LA-300", qty: 2 },
+    { type: "controller", sku: "MC-1", qty: 1 },
+  ],
+};
+
+test("health and info", async () => {
+  assert.deepEqual((await call("GET", "/api/health/live")).body, { ok: true });
+  assert.deepEqual((await call("GET", "/api/health/ready")).body, { ok: true, db: "memory" });
+  assert.equal((await call("GET", "/api/info")).body.db, "memory");
+});
+
+test("lists, searches and filters parts", async () => {
+  assert.ok((await call("GET", "/api/parts")).body.length >= SEED_PARTS.length);
+  assert.deepEqual((await call("GET", "/api/parts?search=actuator")).body.map((p: any) => p.sku), ["LA-300"]);
+  const low = (await call("GET", "/api/parts?low=true")).body.map((p: any) => p.sku);
+  assert.deepEqual(low, ["BAR-4040-BLK", "M5-BOLT", "PL-300"]);
+  assert.equal((await call("GET", "/api/parts/PL-200")).body.onHand, 45);
+  assert.equal((await call("GET", "/api/parts/NOPE-1")).status, 404);
+});
+
+test("receive and consume, with validation", async () => {
+  assert.equal((await call("POST", "/api/parts/BR-90/receive", { qty: 10, note: "PO-77" })).body.onHand, 150);
+  assert.equal((await call("POST", "/api/parts/BR-90/consume", { qty: 50 })).body.onHand, 100);
+  assert.equal((await call("POST", "/api/parts/BR-90/consume", { qty: 1000 })).status, 409);
+  const bad = await call("POST", "/api/parts/BR-90/receive", { qty: 1.5 });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.problems[0], /qty/);
+  assert.equal((await call("POST", "/api/parts/BR-90/receive", "{not json")).status, 400);
+  assert.equal((await call("POST", "/api/parts/br 90/receive", { qty: 1 })).status, 400);
+  const [m] = (await call("GET", "/api/movements?sku=BR-90&limit=1")).body;
+  assert.equal(m.kind, "consume");
+});
+
+test("adds a part, refuses duplicates, and explains invalid input", async () => {
+  const created = await call("POST", "/api/parts", { sku: "pl-400 ", name: " Mounting plate, 400 mm", category: "plate", unit: "plate", onHand: 10, reorderLevel: 4, location: "B-01-4" });
+  assert.equal(created.status, 201);
+  assert.deepEqual([created.body.sku, created.body.name, created.body.available], ["PL-400", "Mounting plate, 400 mm", 10]);
+  assert.equal((await call("GET", "/api/parts/PL-400")).body.location, "B-01-4");
+  assert.equal((await call("POST", "/api/parts", { sku: "PL-400", name: "Again", category: "plate", unit: "plate" })).status, 409);
+  const bad = await call("POST", "/api/parts", { sku: "no spaces", name: "", category: "widget", unit: "piece", onHand: -1 });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.problems.length, 4); // sku, name, category, onHand
+});
+
+test("checks a design against stock", async () => {
+  const { status, body } = await call("POST", "/api/check", { design: DEMO });
+  assert.equal(status, 200);
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.lines.map((l: any) => [l.sku, l.qty]), [
+    ["BAR-4040-CLR", 2], ["BAR-4080-BLK", 2], ["LA-300", 2], ["M6-BOLT", 3], ["MC-1", 1], ["PL-200", 4],
+  ]);
+  const bigger = { items: [...DEMO.items, { type: "actuator", sku: "LA-300", qty: 10 }, { type: "gripper", sku: "GR-9", qty: 1 }] };
+  const short = (await call("POST", "/api/check", { design: bigger })).body;
+  assert.equal(short.ok, false);
+  assert.deepEqual(short.lines.filter((l: any) => l.short > 0).map((l: any) => [l.sku, l.short]), [["GR-9", 1], ["LA-300", 6]]);
+  assert.equal((await call("POST", "/api/check", { design: { items: [] } })).status, 400);
+});
+
+test("reserves a design, refuses one that doesn't fit, then releases and fulfils", async () => {
+  const first = await call("POST", "/api/reservations", { quoteRef: "Q-1001", design: DEMO });
+  assert.equal(first.status, 201);
+  const id = first.body.reservation.id;
+  assert.equal((await call("GET", "/api/parts/LA-300")).body.available, 4);
+
+  const tooMuch = { items: [{ type: "actuator", sku: "LA-300", qty: 5 }, { type: "plate", sku: "PL-200", qty: 1 }] };
+  const refused = await call("POST", "/api/reservations", { quoteRef: "Q-1002", design: tooMuch });
+  assert.equal(refused.status, 409);
+  assert.deepEqual(refused.body.shortages, [{ sku: "LA-300", need: 5, available: 4, known: true }]);
+  assert.equal((await call("GET", "/api/parts/PL-200")).body.reserved, 4); // only Q-1001's plates
+
+  assert.equal((await call("POST", "/api/reservations", { quoteRef: "bad ref!", design: DEMO })).status, 400);
+
+  assert.equal((await call("POST", `/api/reservations/${id}/fulfil`)).body.status, "fulfilled");
+  assert.equal((await call("POST", `/api/reservations/${id}/release`)).status, 409);
+  const la = (await call("GET", "/api/parts/LA-300")).body;
+  assert.deepEqual([la.onHand, la.reserved], [4, 0]);
+  assert.equal((await call("GET", "/api/reservations")).body[0].quoteRef, "Q-1001");
+});
+
+test("shapes: create, validate, move, delete", async () => {
+  const made = await call("POST", "/api/shapes", { name: "Ball", kind: "sphere", size: { x: 0.2 }, color: "#E11D48", position: { x: 0.5, z: 0 } });
+  assert.equal(made.status, 201);
+  assert.deepEqual([made.body.size, made.body.color, made.body.rotationY], [{ x: 0.2, y: 0.2, z: 0.2 }, "#e11d48", 0]);
+  const cyl = await call("POST", "/api/shapes", { name: "Post", kind: "cylinder", size: { x: 0.08, y: 0.6, z: 1.5 }, color: "#64748b", position: { x: -0.5, z: 0.5 } });
+  assert.deepEqual(cyl.body.size, { x: 0.08, y: 0.6, z: 0.08 }); // round: depth follows the diameter
+
+  const bad = await call("POST", "/api/shapes", { name: "", kind: "pyramid", color: "red", position: { x: 9, z: 0 } });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.problems.length, 4); // kind, name, color, position
+
+  const moved = await call("PATCH", `/api/shapes/${made.body.id}`, { position: { x: 0.4, z: 0.3 } });
+  assert.deepEqual(moved.body.position, { x: 0.4, z: 0.3 });
+  assert.equal((await call("PATCH", `/api/shapes/${made.body.id}`, { kind: "box" })).status, 400);
+  assert.equal((await call("PATCH", `/api/shapes/${made.body.id}`, {})).status, 400);
+
+  assert.equal((await call("DELETE", `/api/shapes/${cyl.body.id}`)).status, 200);
+  assert.equal((await call("DELETE", `/api/shapes/${cyl.body.id}`)).status, 404);
+  assert.deepEqual((await call("GET", "/api/shapes")).body.map((s: any) => s.name), ["Ball"]);
+
+  // Shapes can stand for inventory parts, which must exist.
+  const part = await call("POST", "/api/shapes", { name: "Plate", kind: "box", size: { x: 0.2, y: 0.01, z: 0.2 }, color: "#9aa3af", position: { x: 0.5, z: 0.2 }, sku: "PL-200" });
+  assert.deepEqual([part.status, part.body.sku], [201, "PL-200"]);
+  const ghost = await call("POST", "/api/shapes", { name: "Nope", kind: "box", size: { x: 0.2, y: 0.2, z: 0.2 }, color: "#9aa3af", position: { x: 0.5, z: 0.2 }, sku: "NOPE-1" });
+  assert.equal(ghost.status, 400);
+  assert.match(ghost.body.problems[0], /No part NOPE-1/);
+});
+
+test("CORS: pages on localhost may call the API; other sites may not", async () => {
+  const pre = await fetch(base + "/api/shapes", { method: "OPTIONS", headers: { origin: "http://localhost:5173", "access-control-request-method": "POST" } });
+  assert.equal(pre.status, 204);
+  assert.equal(pre.headers.get("access-control-allow-origin"), "http://localhost:5173");
+  assert.match(pre.headers.get("access-control-allow-methods")!, /PATCH/);
+  const get = await fetch(base + "/api/shapes", { headers: { origin: "http://localhost:5173" } });
+  assert.equal(get.headers.get("access-control-allow-origin"), "http://localhost:5173");
+  const evil = await fetch(base + "/api/shapes", { method: "OPTIONS", headers: { origin: "https://evil.example" } });
+  assert.equal(evil.status, 403);
+  assert.equal((await fetch(base + "/api/shapes", { headers: { origin: "https://evil.example" } })).headers.get("access-control-allow-origin"), null);
+});
+
+test("unknown routes and methods", async () => {
+  assert.equal((await call("GET", "/api/nope")).status, 404);
+  assert.equal((await call("DELETE", "/api/parts")).status, 405);
+  assert.equal((await call("GET", "/api/parts/%E0")).status, 400);
+});

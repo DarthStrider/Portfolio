@@ -1,0 +1,25 @@
+{
+  "name": "inventory-api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Parts inventory API with switchable PostgreSQL / MongoDB storage",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "dev": "node --watch src/server.ts",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mongodb": "^6.16.0",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.15.0",
+    "typescript": "^5.8.0"
+  }
+}

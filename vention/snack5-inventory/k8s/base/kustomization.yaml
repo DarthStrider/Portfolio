@@ -1,0 +1,7 @@
+# Shared by both databases. Don't apply this directly: apply k8s/postgres or k8s/mongo.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - api.yaml
+  - web.yaml
