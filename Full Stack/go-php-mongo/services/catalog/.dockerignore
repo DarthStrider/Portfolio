@@ -1,0 +1,5 @@
+vendor
+.env
+storage/app/uploads/*
+storage/logs/*
+*.md

@@ -1,0 +1,127 @@
+# Northline shop: Go + PHP microservices, MongoDB, RabbitMQ, React.
+#   docker compose up --build      then open http://localhost:8090
+# Every setting has a working default; copy .env.example to .env to change them.
+
+x-go-env: &go-env
+  MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+  RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  INTERNAL_TOKEN: ${INTERNAL_TOKEN:-dev-internal-token-change-me}
+  SMTP_ADDR: mailpit:1025
+  APP_URL: ${APP_URL:-http://localhost:8090}
+  SECURE_COOKIES: "false"
+
+x-php-env: &php-env
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_KEY: ${APP_KEY:-base64:iYJgeupz+gPeK57QkLLqN8Lc/OIjcKDK7zadaIb1mPA=}
+  LOG_CHANNEL: stderr
+  CACHE_STORE: array
+  SESSION_DRIVER: array
+  MONGO_URI: mongodb://mongo:27017/?replicaSet=rs0
+  MONGO_DB: catalog_db
+  RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+  JWT_PUBLIC_KEY: /keys/jwt_public.pem
+
+services:
+  # One MongoDB replica set member. A replica set (even of one) is what enables
+  # multi-document transactions; the healthcheck initiates it on first start.
+  mongo:
+    image: mongo:8.0
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes: [mongo-data:/data/db]
+    ports: ["27018:27017"] # for MongoDB Compass: mongodb://localhost:27018/?directConnection=true
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval",
+             "try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]}).ok }"]
+      interval: 5s
+      timeout: 10s
+      start_period: 10s
+      retries: 20
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    ports: ["15672:15672"] # management UI, guest / guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    restart: unless-stopped
+
+  # Catches every email the shop sends; read them at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["8025:8025"]
+    restart: unless-stopped
+
+  auth:
+    build: { context: ./services/go, args: { SERVICE: auth } }
+    environment:
+      <<: *go-env
+      MONGO_DB: auth_db
+      JWT_KEY_DIR: /keys
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@northline.test}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-northline-admin}
+    volumes: [jwt-keys:/keys]
+    depends_on:
+      mongo: { condition: service_healthy }
+    restart: unless-stopped
+
+  order:
+    build: { context: ./services/go, args: { SERVICE: order } }
+    environment:
+      <<: *go-env
+      MONGO_DB: orders_db
+    volumes: [jwt-keys:/keys:ro]
+    depends_on:
+      auth: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  payment:
+    build: { context: ./services/go, args: { SERVICE: payment } }
+    environment:
+      <<: *go-env
+      MONGO_DB: payments_db
+      ORDER_SERVICE_URL: http://order:8080
+      # Leave empty for the built-in test provider. For Stripe test mode, set these in .env.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+    volumes: [jwt-keys:/keys:ro]
+    depends_on:
+      auth: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  catalog:
+    build: { context: ./services/catalog }
+    environment: *php-env
+    volumes: [jwt-keys:/keys:ro, uploads:/app/storage/app/uploads]
+    depends_on:
+      auth: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+    restart: unless-stopped
+
+  catalog-worker:
+    build: { context: ./services/catalog }
+    command: ["php", "artisan", "events:work"]
+    init: true # forwards `docker stop` to PHP, which otherwise ignores it as PID 1
+    environment: *php-env
+    healthcheck: { disable: true }
+    depends_on:
+      catalog: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  gateway:
+    build: { context: ., dockerfile: gateway/Dockerfile }
+    ports: ["8090:80"]
+    depends_on: [auth, order, payment, catalog]
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  jwt-keys:
+  uploads:
