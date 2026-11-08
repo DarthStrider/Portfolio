@@ -12,6 +12,8 @@ import type {
 } from "../domain/types.ts";
 import type { NewShape, Shape, ShapePatch } from "../domain/shapes.ts";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
+import type { NewSplitter, Splitter, SplitterPatch } from "../domain/splitters.ts";
+import type { PartPatch } from "../domain/newPart.ts";
 
 interface PartRow { sku: string; name: string; category: Part["category"]; unit: string; onHand: number; reserved: number; reorderLevel: number; location: string; updatedAt: string }
 
@@ -23,6 +25,7 @@ export class MemoryRepo implements InventoryRepo {
   private seq = 0;
   private shapes = new Map<string, Shape>();
   private conveyors = new Map<string, Conveyor>();
+  private splitters = new Map<string, Splitter>();
 
   async init(): Promise<void> {}
   async ping(): Promise<void> {}
@@ -53,6 +56,13 @@ export class MemoryRepo implements InventoryRepo {
     const p: PartRow = { ...s, reserved: 0, updatedAt: new Date().toISOString() };
     this.parts.set(s.sku, p);
     if (s.onHand > 0) this.log(s.sku, "receive", s.onHand, "Initial stock", null);
+    return out(p);
+  }
+
+  async updatePart(sku: string, patch: PartPatch): Promise<Part> {
+    const p = this.row(sku);
+    Object.assign(p, patch);
+    this.touch(p);
     return out(p);
   }
 
@@ -156,9 +166,34 @@ export class MemoryRepo implements InventoryRepo {
 
   async deleteConveyor(id: string): Promise<void> {
     if (!this.conveyors.delete(id)) throw new NotFoundError(`No conveyor ${id}`);
+    // Like the foreign key's ON DELETE CASCADE in Postgres.
+    for (const [sid, s] of this.splitters) if (s.conveyorId === id) this.splitters.delete(sid);
+  }
+
+  async listSplitters(): Promise<Splitter[]> {
+    return [...this.splitters.values()].map((s) => structuredClone(s));
+  }
+
+  async createSplitter(input: NewSplitter): Promise<Splitter> {
+    const now = new Date().toISOString();
+    const s: Splitter = { ...structuredClone(input), id: randomUUID(), createdAt: now, updatedAt: now };
+    this.splitters.set(s.id, s);
+    return structuredClone(s);
+  }
+
+  async updateSplitter(id: string, patch: SplitterPatch): Promise<Splitter> {
+    const s = this.splitters.get(id);
+    if (!s) throw new NotFoundError(`No splitter ${id}`);
+    Object.assign(s, structuredClone(patch), { updatedAt: new Date().toISOString() });
+    return structuredClone(s);
+  }
+
+  async deleteSplitter(id: string): Promise<void> {
+    if (!this.splitters.delete(id)) throw new NotFoundError(`No splitter ${id}`);
   }
 
   async reset(): Promise<void> {
+    this.splitters.clear();
     this.conveyors.clear();
     this.shapes.clear();
     this.parts.clear();

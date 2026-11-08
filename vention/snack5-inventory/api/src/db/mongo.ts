@@ -26,6 +26,8 @@ import type {
 } from "../domain/types.ts";
 import type { NewShape, Shape, ShapePatch } from "../domain/shapes.ts";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
+import type { NewSplitter, Splitter, SplitterPatch } from "../domain/splitters.ts";
+import type { PartPatch } from "../domain/newPart.ts";
 
 interface PartDoc {
   _id: string; // the SKU
@@ -38,8 +40,11 @@ interface ReservationDoc {
 }
 interface CounterDoc { _id: string; value: number }
 /** A shape is stored almost exactly as the API returns it: documents fit nested data like size and position. */
-interface ConveyorDoc extends Omit<Conveyor, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 interface ShapeDoc extends Omit<Shape, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
+/** Conveyors too: the nested position stays nested. */
+interface ConveyorDoc extends Omit<Conveyor, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
+/** A splitter's rules are nested lists of objects: a document holds them as they are. */
+interface SplitterDoc extends Omit<Splitter, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 
 /** `onHand - reserved >= qty`, as a query filter. */
 const atLeastAvailable = (qty: number) => ({ $expr: { $gte: [{ $subtract: ["$onHand", "$reserved"] }, qty] } });
@@ -54,6 +59,7 @@ export class MongoRepo implements InventoryRepo {
   private readonly counters: Collection<CounterDoc>;
   private readonly shapes: Collection<ShapeDoc>;
   private readonly conveyors: Collection<ConveyorDoc>;
+  private readonly splitters: Collection<SplitterDoc>;
 
   constructor(url: string, dbName = "inventory") {
     this.client = new MongoClient(url, { serverSelectionTimeoutMS: 5000 });
@@ -64,6 +70,7 @@ export class MongoRepo implements InventoryRepo {
     this.counters = this.db.collection<CounterDoc>("counters");
     this.shapes = this.db.collection<ShapeDoc>("shapes");
     this.conveyors = this.db.collection<ConveyorDoc>("conveyors");
+    this.splitters = this.db.collection<SplitterDoc>("splitters");
   }
 
   async init(): Promise<void> {
@@ -127,6 +134,12 @@ export class MongoRepo implements InventoryRepo {
       throw err;
     }
     if (s.onHand > 0) await this.log([{ sku: s.sku, kind: "receive", qty: s.onHand, note: "Initial stock", reservationId: null }]);
+    return toPart(doc);
+  }
+
+  async updatePart(sku: string, patch: PartPatch): Promise<Part> {
+    const doc = await this.parts.findOneAndUpdate({ _id: sku }, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
+    if (!doc) throw new NotFoundError(`No part ${sku}`);
     return toPart(doc);
   }
 
@@ -248,10 +261,36 @@ export class MongoRepo implements InventoryRepo {
   async deleteConveyor(id: string): Promise<void> {
     const r = await this.conveyors.deleteOne({ _id: id });
     if (r.deletedCount !== 1) throw new NotFoundError(`No conveyor ${id}`);
+    // No foreign keys here: delete the belt's splitters ourselves. A splitter created for this
+    // belt in the instant between the two deletes would be left pointing at nothing; the arm
+    // app ignores splitters whose belt is gone, and Postgres's foreign key rules it out.
+    await this.splitters.deleteMany({ conveyorId: id });
+  }
+
+  async listSplitters(): Promise<Splitter[]> {
+    return (await this.splitters.find({}).sort({ createdAt: 1, _id: 1 }).toArray()).map(toSplitter);
+  }
+
+  async createSplitter(s: NewSplitter): Promise<Splitter> {
+    const now = new Date();
+    const doc: SplitterDoc = { ...s, _id: randomUUID(), createdAt: now, updatedAt: now };
+    await this.splitters.insertOne(doc);
+    return toSplitter(doc);
+  }
+
+  async updateSplitter(id: string, patch: SplitterPatch): Promise<Splitter> {
+    const doc = await this.splitters.findOneAndUpdate({ _id: id }, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
+    if (!doc) throw new NotFoundError(`No splitter ${id}`);
+    return toSplitter(doc);
+  }
+
+  async deleteSplitter(id: string): Promise<void> {
+    const r = await this.splitters.deleteOne({ _id: id });
+    if (r.deletedCount !== 1) throw new NotFoundError(`No splitter ${id}`);
   }
 
   async reset(): Promise<void> {
-    await Promise.all([this.conveyors.deleteMany({}), this.shapes.deleteMany({}), this.parts.deleteMany({}), this.moves.deleteMany({}), this.res.deleteMany({}), this.counters.deleteMany({})]);
+    await Promise.all([this.splitters.deleteMany({}), this.conveyors.deleteMany({}), this.shapes.deleteMany({}), this.parts.deleteMany({}), this.moves.deleteMany({}), this.res.deleteMany({}), this.counters.deleteMany({})]);
   }
 
   /**
@@ -332,6 +371,13 @@ function toConveyor(d: ConveyorDoc): Conveyor {
   return {
     id: d._id, name: d.name, length: d.length, width: d.width, height: d.height, speed: d.speed,
     position: d.position, rotationY: d.rotationY,
+    createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
+  };
+}
+
+function toSplitter(d: SplitterDoc): Splitter {
+  return {
+    id: d._id, name: d.name, conveyorId: d.conveyorId, along: d.along, rules: d.rules, otherwise: d.otherwise,
     createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
   };
 }

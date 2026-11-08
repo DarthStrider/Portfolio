@@ -5,6 +5,8 @@
 import type { InventoryPart } from "./fromPart";
 import type { NewShape, Shape, ShapePatch } from "./types";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../conveyors/types";
+import type { NewSplitter, Splitter, SplitterPatch } from "../splitters/types";
+import type { Part } from "../splitters/rules";
 
 /** Override with VITE_INVENTORY_API, e.g. http://localhost:8080 for the API without Docker. */
 export const API_BASE: string = (import.meta.env.VITE_INVENTORY_API as string | undefined) ?? "http://localhost:8081";
@@ -47,4 +49,13 @@ export const conveyorsApi = {
   create: (belt: NewConveyor) => call<Conveyor>("POST", "/conveyors", belt),
   update: (id: string, patch: ConveyorPatch) => call<Conveyor>("PATCH", `/conveyors/${id}`, patch),
   remove: (id: string) => call<{ deleted: string }>("DELETE", `/conveyors/${id}`),
+};
+
+export const splittersApi = {
+  list: () => call<Splitter[]>("GET", "/splitters"),
+  create: (s: NewSplitter) => call<Splitter>("POST", "/splitters", s),
+  update: (id: string, patch: SplitterPatch) => call<Splitter>("PATCH", `/splitters/${id}`, patch),
+  remove: (id: string) => call<{ deleted: string }>("DELETE", `/splitters/${id}`),
+  /** Parts with every field the rules can test (location, stock, low). */
+  parts: () => call<Part[]>("GET", "/parts"),
 };

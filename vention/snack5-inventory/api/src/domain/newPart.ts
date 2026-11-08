@@ -41,3 +41,37 @@ export function parseNewPart(input: unknown): SeedPart {
   if (problems.length) throw new ValidationError(problems);
   return { sku, name, category, unit, onHand, reorderLevel, location };
 }
+
+/** What can change about an existing part. Stock changes go through receive and consume, so the ledger explains them. */
+export type PartPatch = Partial<Pick<SeedPart, "name" | "category" | "location" | "reorderLevel">>;
+
+export function parsePartPatch(input: unknown): PartPatch {
+  const b = (input && typeof input === "object" && !Array.isArray(input) ? input : {}) as Record<string, unknown>;
+  const problems: string[] = [];
+  const patch: PartPatch = {};
+  if (b.name !== undefined) {
+    if (typeof b.name !== "string" || b.name.trim() === "" || b.name.trim().length > 80) problems.push("name must be text up to 80 characters");
+    else patch.name = b.name.trim();
+  }
+  if (b.category !== undefined) {
+    if (!CATEGORIES.includes(b.category as Category)) problems.push(`category must be one of ${CATEGORIES.join(", ")}`);
+    else patch.category = b.category as Category;
+  }
+  if (b.location !== undefined) {
+    if (typeof b.location !== "string" || b.location.trim().length > 20) problems.push("location must be text up to 20 characters");
+    else patch.location = b.location.trim();
+  }
+  if (b.reorderLevel !== undefined) {
+    const v = b.reorderLevel;
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v > MAX_QTY) problems.push(`reorderLevel must be a whole number from 0 to ${MAX_QTY}`);
+    else patch.reorderLevel = v;
+  }
+  const unknown = Object.keys(b).filter((k) => !["name", "category", "location", "reorderLevel"].includes(k));
+  if (unknown.length) {
+    const stock = unknown.filter((k) => ["onHand", "reserved", "available"].includes(k));
+    problems.push(stock.length ? "stock changes go through receive and consume, so the ledger records them" : `can't change ${unknown.join(", ")}`);
+  }
+  if (!problems.length && Object.keys(patch).length === 0) problems.push("nothing to change: send name, category, location or reorderLevel");
+  if (problems.length) throw new ValidationError(problems);
+  return patch;
+}

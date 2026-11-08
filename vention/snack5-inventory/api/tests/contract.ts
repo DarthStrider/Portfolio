@@ -224,6 +224,32 @@ export function contractTests(name: string, makeRepo: () => Promise<InventoryRep
       await assert.rejects(repo.updateConveyor("00000000-0000-4000-8000-000000000000", { speed: 0 }), NotFoundError);
     });
 
+    test("splitters: rules stored as written, updated whole, deleted with their belt", async () => {
+      const belt = await repo.createConveyor({ name: "Sorter", length: 2, width: 0.4, height: 0.3, speed: 0.3, position: { x: 0.8, z: 0 }, rotationY: 0 });
+      const rules = [
+        { conditions: [{ field: "part.category" as const, op: "eq" as const, value: "plate" }], exit: "left" as const },
+        { conditions: [{ field: "kind" as const, op: "in" as const, value: ["sphere", "cylinder"] }, { field: "height" as const, op: "gt" as const, value: 0.1 }], exit: "right" as const },
+      ];
+      const s = await repo.createSplitter({ name: "Gate 1", conveyorId: belt.id, along: 1.2, rules, otherwise: "straight" });
+      assert.deepEqual([s.conveyorId, s.along, s.rules, s.otherwise], [belt.id, 1.2, rules, "straight"]);
+      // Reordering is a whole-list update; other fields stay.
+      const swapped = await repo.updateSplitter(s.id, { rules: [rules[1], rules[0]], otherwise: "left" });
+      assert.deepEqual([swapped.rules.map((r) => r.exit), swapped.otherwise, swapped.along, swapped.name], [["right", "left"], "left", 1.2, "Gate 1"]);
+      assert.deepEqual((await repo.listSplitters()).map((x) => x.id), [s.id]);
+      await repo.deleteConveyor(belt.id);
+      assert.deepEqual(await repo.listSplitters(), []);
+      await assert.rejects(repo.updateSplitter(s.id, { name: "x" }), NotFoundError);
+      await assert.rejects(repo.deleteSplitter(s.id), NotFoundError);
+    });
+
+    test("updatePart changes details but never stock", async () => {
+      const before = (await repo.getParts(["PL-200"]))[0];
+      const p = await repo.updatePart("PL-200", { category: "gripper", location: "Z-9" });
+      assert.deepEqual([p.category, p.location, p.name, p.onHand, p.reorderLevel], ["gripper", "Z-9", before.name, before.onHand, before.reorderLevel]);
+      assert.equal((await repo.getParts(["PL-200"]))[0].category, "gripper");
+      await assert.rejects(repo.updatePart("NOPE-1", { location: "A" }), NotFoundError);
+    });
+
     test("reservations and movements come newest first, with a limit", async () => {
       for (const q of ["Q-1", "Q-2", "Q-3"]) assert.ok((await repo.reserve(q, [{ sku: "PL-200", qty: 1 }])).ok);
       assert.deepEqual((await repo.reservations(2)).map((r) => r.quoteRef), ["Q-3", "Q-2"]);

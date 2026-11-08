@@ -16,6 +16,7 @@ checked against each other every frame.
 - [x] Demo mode, a trail of the tool's path, click-to-select joints, keyboard and touch controls
 - [x] Shapes: create boxes, cylinders, spheres and cones, place and move them on the floor with the mouse, and see which ones the arm can reach. They're saved in the inventory database (Snack 5), PostgreSQL or MongoDB
 - [x] Conveyor belts: build your own (length, width, height, speed, angle), place them with the mouse, then **Run** them: shapes on a belt ride along, fall off the end, and can land on another belt. Stop saves where everything ended up
+- [x] Splitters: diverter gates on a belt that send each item left, right or straight on by rules you write (shape kind, color, size, name, SKU, or the inventory part's category, location and stock). Rules are stored in the database, and inventory changes apply to the next item through the gate
 
 ## How to run
 
@@ -62,6 +63,18 @@ The **Conveyors** tab, next to Shapes, builds belts.
 
 The model is simple on purpose: shapes don't collide with each other or with a belt's side rails.
 
+### Splitters (rules saved by Snack 5's API)
+
+The **Splitters** tab puts diverter gates on belts and decides what each one separates.
+
+- Pick a belt and a distance **along** it (cm from the belt's start), then **Add on belt**. Or use **Click a belt** and click the spot.
+- Select a splitter to edit its **rules**. Each rule is one or more conditions (all must hold) and an exit: **← left**, **↑ straight** or **right →**, as seen facing the way the belt runs. The first rule that matches wins, so use ↑ ↓ to order them; **Anything else goes** catches the rest.
+- Conditions can test the shape (kind, color, name, SKU, width/height/depth in cm, whether it's an inventory part) or its inventory part (category, location, name, on hand, available, low on stock).
+- **Items in the scene at this gate** previews where every shape would go under the rules you're editing, before you save.
+- While the belts run, the gate's flap swings across to guide items out, and the panel shows the last decision.
+
+Rules live in the database, so you can change them from the API (`PATCH /api/splitters/{id}`) or straight in PostgreSQL/MongoDB. Part fields are read live: change a part's category (`PATCH /api/parts/{sku}`) or its stock, and the next item of that part through a gate follows the new value. The tab re-reads splitters and parts every 3 s, even while the line runs.
+
 ### Controls
 
 | Input | Action |
@@ -91,14 +104,20 @@ src/
 │   ├── reach.ts         can the gripper reach a shape's top? (pure math, unit-tested)
 │   ├── ShapeLayer.ts    meshes for the stored shapes, the placement preview, the reach ring
 │   └── controller.ts    the Shapes panel and mouse placement
-└── conveyors/
-    ├── types.ts         a belt as the API stores it
-    ├── transport.ts     what a belt does to a shape: ride, fall, land (pure math, unit-tested)
-    ├── ConveyorLayer.ts belt models, the scrolling chevron texture, the placement preview
-    └── controller.ts    the Conveyors tab, Run / Stop, saving positions after a run
+├── conveyors/
+│   ├── types.ts         a belt as the API stores it
+│   ├── transport.ts     what a belt does to a shape: ride, fall, land (pure math, unit-tested)
+│   ├── ConveyorLayer.ts belt models, the scrolling chevron texture, the placement preview
+│   └── controller.ts    the Conveyors tab, Run / Stop, saving positions after a run
+└── splitters/
+    ├── types.ts         a splitter and its rules, as the API stores them
+    ├── rules.ts         which exit a rule list picks for a shape and its part (pure, unit-tested)
+    ├── SplitterLayer.ts the gate model: gantry and swinging flaps
+    └── controller.ts    the Splitters tab: placing gates, the rule editor, the live preview
 tests/kinematics.test.ts FK tests (node:test)
 tests/reach.test.ts      reach tests
 tests/transport.test.ts  belt tests: riding, falling off, hand-over between belts, gravity timing
+tests/splitters.test.ts  rule matching, and gates sending items left, right or straight
 scripts/build-gripper.ts writes the gripper .glb with no dependencies
 ```
 

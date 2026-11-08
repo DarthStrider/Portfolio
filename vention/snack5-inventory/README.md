@@ -21,6 +21,8 @@ repository interface and pass the same contract tests.
 - [x] Reserve a design's stock for a quote, all or nothing; release it, or ship it
 - [x] Concurrency-safe on both databases: stock never goes negative and is never promised twice
 - [x] Shapes for the robot arm's scene (Snack 1): boxes, cylinders, spheres and cones with size, color, position and rotation, stored with the inventory
+- [x] Splitters on those belts: ordered sorting rules (on the shape, or on the inventory part it stands for) stored as data, editable from the arm app, the API or the database
+- [x] Edit a part's name, category, location or reorder level (stock only changes through receive and consume, so the ledger stays complete)
 - [x] Conveyor belts for the same scene: size, speed (forward or reversed), position and angle, so a line layout is saved with the parts it uses
 - [x] Switchable storage: `DB=postgres`, `DB=mongo`, or `DB=memory` (no database at all)
 - [x] Docker Compose profiles and Kubernetes overlays for each database
@@ -146,6 +148,16 @@ replica set, the same steps could run inside a multi-document transaction instea
 | POST | `/api/conveyors` | `{ "name": "Infeed", "length": 1.5, "width": 0.3, "height": 0.3, "speed": 0.2, "position": { "x": 0.7, "z": -0.6 }, "rotationY": 0 }` | 201 + belt (meters, m/s, degrees; speed defaults to 0.2, rotationY to 0) |
 | PATCH | `/api/conveyors/{id}` | `name`, `position`, `rotationY` or `speed` | Updated belt (size can't change: make a new belt) |
 | DELETE | `/api/conveyors/{id}` | | `{ "deleted": id }`, or 404 |
+| GET | `/api/splitters` | | Splitters (diverter gates on belts) with their rules, oldest first |
+| POST | `/api/splitters` | `{ "name": "Sort gate", "conveyorId": "…", "along": 1.2, "rules": [{ "conditions": [{ "field": "part.category", "op": "eq", "value": "plate" }], "exit": "left" }], "otherwise": "straight" }` | 201 + splitter (`along` in meters from the belt's start, at most its length) |
+| PATCH | `/api/splitters/{id}` | `name`, `along`, `rules` (the whole list, in order) or `otherwise` | Updated splitter |
+| DELETE | `/api/splitters/{id}` | | `{ "deleted": id }`, or 404. Deleting a belt deletes its splitters |
+| PATCH | `/api/parts/{sku}` | `name`, `category`, `location` or `reorderLevel` | Updated part. Stock fields are refused: use receive/consume |
+
+Rule fields: `kind`, `color`, `name`, `sku`, `width`, `height`, `depth` (meters), `isPart`, `part.category`, `part.location`,
+`part.name`, `part.onHand`, `part.available`, `part.low`. Operators: `eq`, `ne`, `in` (a list), `contains` for text;
+`eq`, `ne`, `lt`, `lte`, `gt`, `gte` for numbers; `eq` for true/false. Text is compared ignoring case. Up to 20 rules of up
+to 5 conditions each; the first rule whose conditions all hold picks the exit (`left`, `straight`, `right`).
 | GET | `/api/health/live`, `/api/health/ready`, `/api/info` | | Liveness, database reachable, which database and pod |
 
 Browsers on other `http://localhost:<port>` pages may call the API (CORS), which is how the robot
@@ -153,7 +165,7 @@ arm's dev server uses it. Set `CORS_ORIGINS` to a comma-separated list to allow 
 
 ## Testing
 
-- **Contract tests** (`tests/contract.ts`, 21 tests) run against every implementation: filtering, the
+- **Contract tests** (`tests/contract.ts`, 23 tests) run against every implementation: filtering, the
   ledger, all-or-nothing reservations, consuming around reservations, closing exactly once, and
   concurrency (8 simultaneous reservations for 3 actuators: exactly 3 succeed).
   The in-memory run is part of `npm test`; Postgres and MongoDB run with `--profile test`.

@@ -10,7 +10,7 @@ import * as THREE from "three";
 import { conveyorsApi, ShapesApiError } from "../shapes/api";
 import type { createShapes } from "../shapes/controller";
 import { ConveyorLayer } from "./ConveyorLayer";
-import { step, supportHeight, type Body } from "./transport";
+import { step, supportHeight, type Body, type Exit, type Gate } from "./transport";
 import type { Conveyor, NewConveyor } from "./types";
 
 type Shapes = ReturnType<typeof createShapes>;
@@ -20,6 +20,13 @@ const POLL_MS = 4000;
 const FLOOR_LIMIT = 3;
 /** Physics steps are at most this long, however slow the frame. */
 const MAX_STEP = 1 / 120;
+
+/** What the splitters tell the running line: where their gates are, and where each item goes. */
+export interface Gates {
+  list(): readonly Gate[];
+  /** Asked once when a shape reaches a gate. */
+  route(shapeId: string, gate: Gate): Exit;
+}
 
 interface Draft {
   /** centimeters (speed in cm/s), as typed */
@@ -52,6 +59,8 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
   /** Set while running: one body per shape, keyed by shape id. */
   let bodies: Map<string, Body> | null = null;
   let started: Map<string, { x: number; z: number }> = new Map();
+  let gates: Gates = { list: () => [], route: () => "straight" };
+  const listeners: ((belts: readonly Conveyor[]) => void)[] = [];
 
   // Shapes stand on whichever belt is under them, and can be placed onto one.
   shapes.setSurface({
@@ -67,6 +76,7 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
       online = true;
       layer.sync(belts);
       shapes.refresh();
+      for (const fn of listeners) fn(belts);
       if (message?.error && message.text.startsWith("Can't reach")) message = null;
     } catch (err) {
       online = false;
@@ -123,7 +133,7 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     bodies = new Map();
     started = new Map();
     for (const s of shapes.shapes) {
-      bodies.set(s.id, { x: s.position.x, z: s.position.z, y: supportHeight(belts, s.position.x, s.position.z), vx: 0, vy: 0, vz: 0 });
+      bodies.set(s.id, { id: s.id, x: s.position.x, z: s.position.z, y: supportHeight(belts, s.position.x, s.position.z), vx: 0, vy: 0, vz: 0 });
       started.set(s.id, { ...s.position });
     }
     shapes.setRunning(true);
@@ -152,7 +162,8 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
   function update(dt: number) {
     if (!bodies) return;
     layer.animate(dt);
-    for (let left = dt; left > 1e-9; left -= MAX_STEP) step(bodies.values(), belts, Math.min(MAX_STEP, left));
+    const options = { gates: gates.list(), route: (b: Body, g: Gate) => gates.route(b.id!, g) };
+    for (let left = dt; left > 1e-9; left -= MAX_STEP) step(bodies.values(), belts, Math.min(MAX_STEP, left), options);
     for (const [id, b] of bodies) shapes.layer.pose(id, b.x, b.y, b.z);
   }
 
@@ -397,6 +408,18 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     layer, update, isActive, handleClick, handleHover, handlePick, hoversBelt, handleKey,
     get running() {
       return !!bodies;
+    },
+    /** The belts as last loaded. */
+    get belts(): readonly Conveyor[] {
+      return belts;
+    },
+    /** Called with the new list whenever the belts are (re)loaded. */
+    onBeltsChange(fn: (belts: readonly Conveyor[]) => void) {
+      listeners.push(fn);
+    },
+    /** The splitters plug in here. */
+    setGates(next: Gates) {
+      gates = next;
     },
     /** main.ts passes a function that switches the side panel to this tab. */
     onShowTab(fn: () => void) {

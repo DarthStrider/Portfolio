@@ -18,6 +18,8 @@ import type {
 } from "../domain/types.ts";
 import type { NewShape, Shape, ShapeKind, ShapePatch } from "../domain/shapes.ts";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
+import type { Exit, NewSplitter, Rule, Splitter, SplitterPatch } from "../domain/splitters.ts";
+import type { PartPatch } from "../domain/newPart.ts";
 
 
 interface PartRow {
@@ -35,6 +37,10 @@ interface ShapeRow {
 interface ConveyorRow {
   id: string; name: string; length: number; width: number; height: number; speed: number;
   x: number; z: number; rotation_y: number; created_at: Date; updated_at: Date;
+}
+
+interface SplitterRow {
+  id: string; name: string; conveyor_id: string; along: number; rules: Rule[]; otherwise: Exit; created_at: Date; updated_at: Date;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -94,6 +100,12 @@ export class PostgresRepo implements InventoryRepo {
     const { rows } = await this.pool.query<PartRow>(Q.createPart, [s.sku, s.name, s.category, s.unit, s.onHand, s.reorderLevel, s.location]);
     // ON CONFLICT DO NOTHING returns no row when the SKU is taken, even if two requests race.
     if (!rows[0]) throw new ConflictError(`Part ${s.sku} already exists`);
+    return toPart(rows[0]);
+  }
+
+  async updatePart(sku: string, p: PartPatch): Promise<Part> {
+    const { rows } = await this.pool.query<PartRow>(Q.updatePart, [sku, p.name ?? null, p.category ?? null, p.location ?? null, p.reorderLevel ?? null]);
+    if (!rows[0]) throw new NotFoundError(`No part ${sku}`);
     return toPart(rows[0]);
   }
 
@@ -196,6 +208,32 @@ export class PostgresRepo implements InventoryRepo {
     if (!rowCount) throw new NotFoundError(`No conveyor ${id}`);
   }
 
+  async listSplitters(): Promise<Splitter[]> {
+    const { rows } = await this.pool.query<SplitterRow>(Q.listSplitters);
+    return rows.map(toSplitter);
+  }
+
+  async createSplitter(s: NewSplitter): Promise<Splitter> {
+    // The driver turns jsonb into objects on the way out; on the way in it needs a JSON string.
+    const { rows } = await this.pool.query<SplitterRow>(Q.createSplitter, [s.name, s.conveyorId, s.along, JSON.stringify(s.rules), s.otherwise]);
+    return toSplitter(rows[0]);
+  }
+
+  async updateSplitter(id: string, p: SplitterPatch): Promise<Splitter> {
+    if (!UUID.test(id)) throw new NotFoundError(`No splitter ${id}`);
+    const { rows } = await this.pool.query<SplitterRow>(Q.updateSplitter, [
+      id, p.name ?? null, p.along ?? null, p.rules ? JSON.stringify(p.rules) : null, p.otherwise ?? null,
+    ]);
+    if (!rows[0]) throw new NotFoundError(`No splitter ${id}`);
+    return toSplitter(rows[0]);
+  }
+
+  async deleteSplitter(id: string): Promise<void> {
+    if (!UUID.test(id)) throw new NotFoundError(`No splitter ${id}`);
+    const { rowCount } = await this.pool.query(Q.deleteSplitter, [id]);
+    if (!rowCount) throw new NotFoundError(`No splitter ${id}`);
+  }
+
   async reset(): Promise<void> {
     await this.pool.query(Q.reset);
   }
@@ -247,6 +285,13 @@ function toConveyor(r: ConveyorRow): Conveyor {
   return {
     id: r.id, name: r.name, length: r.length, width: r.width, height: r.height, speed: r.speed,
     position: { x: r.x, z: r.z }, rotationY: r.rotation_y,
+    createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
+  };
+}
+
+function toSplitter(r: SplitterRow): Splitter {
+  return {
+    id: r.id, name: r.name, conveyorId: r.conveyor_id, along: r.along, rules: r.rules, otherwise: r.otherwise,
     createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
   };
 }

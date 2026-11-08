@@ -1,5 +1,7 @@
 import type { NewShape, Shape, ShapePatch } from "./shapes.ts";
 import type { Conveyor, ConveyorPatch, NewConveyor } from "./conveyors.ts";
+import type { NewSplitter, Splitter, SplitterPatch } from "./splitters.ts";
+import type { PartPatch } from "./newPart.ts";
 
 /**
  * The inventory's data model and the one interface every database implements.
@@ -113,6 +115,8 @@ export interface InventoryRepo {
    * ledger still explains every unit. Throws ConflictError if the SKU already exists.
    */
   createPart(part: SeedPart): Promise<Part>;
+  /** Changes name, category, location or reorder level; never stock. Throws NotFoundError for an unknown SKU. */
+  updatePart(sku: string, patch: PartPatch): Promise<Part>;
   /** Adds stock. Throws NotFoundError for an unknown SKU. */
   receive(sku: string, qty: number, note: string): Promise<Part>;
   /** Removes available stock. Throws NotFoundError, or ConflictError if not enough is available. */
@@ -144,6 +148,15 @@ export interface InventoryRepo {
   updateConveyor(id: string, patch: ConveyorPatch): Promise<Conveyor>;
   /** Throws NotFoundError for an unknown id. */
   deleteConveyor(id: string): Promise<void>;
+
+  /** Splitters (diverter gates on belts), oldest first. Deleting a belt deletes its splitters. */
+  listSplitters(): Promise<Splitter[]>;
+  /** The caller checks the belt exists and `along` fits on it. */
+  createSplitter(splitter: NewSplitter): Promise<Splitter>;
+  /** Throws NotFoundError for an unknown id. */
+  updateSplitter(id: string, patch: SplitterPatch): Promise<Splitter>;
+  /** Throws NotFoundError for an unknown id. */
+  deleteSplitter(id: string): Promise<void>;
 
   /** Deletes everything. Tests only. */
   reset(): Promise<void>;

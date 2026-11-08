@@ -79,6 +79,22 @@ CREATE TABLE IF NOT EXISTS conveyors (
   updated_at  timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 
+-- Splitters: diverter gates on a belt, with their sorting rules. The rules are a list of
+-- objects that the API validates and only the arm app interprets, so they're stored as one
+-- jsonb value rather than spread over rule and condition tables. Deleting a belt deletes its
+-- splitters (ON DELETE CASCADE).
+CREATE TABLE IF NOT EXISTS splitters (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         text NOT NULL CHECK (length(name) BETWEEN 1 AND 40),
+  conveyor_id  uuid NOT NULL REFERENCES conveyors (id) ON DELETE CASCADE,
+  along        double precision NOT NULL CHECK (along BETWEEN 0 AND 4),
+  rules        jsonb NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(rules) = 'array' AND jsonb_array_length(rules) <= 20),
+  otherwise    text NOT NULL DEFAULT 'straight' CHECK (otherwise IN ('left', 'straight', 'right')),
+  created_at   timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at   timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX IF NOT EXISTS splitters_conveyor ON splitters (conveyor_id);
+
 -- Reserve every line of a quote, or nothing.
 --   p_lines: [{"sku": "PL-200", "qty": 4}, ...]
 --   returns {"ok": true, "id": "<uuid>"} or {"ok": false, "shortages": [...]}

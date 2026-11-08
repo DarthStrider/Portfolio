@@ -22,6 +22,12 @@ export const Q = {
       INSERT INTO movements (sku, kind, qty, note) SELECT sku, 'receive', on_hand, 'Initial stock' FROM p WHERE on_hand > 0
     )
     SELECT * FROM p`,
+  updatePart: `
+    UPDATE parts
+       SET name = coalesce($2, name), category = coalesce($3, category),
+           location = coalesce($4, location), reorder_level = coalesce($5, reorder_level), updated_at = now()
+     WHERE sku = $1
+    RETURNING sku, name, category, unit, on_hand, reserved, reorder_level, location, updated_at`,
   receive: `
     WITH p AS (
       UPDATE parts SET on_hand = on_hand + $2, updated_at = now() WHERE sku = $1
@@ -84,9 +90,24 @@ export const Q = {
      WHERE id = $1
     RETURNING id, name, length, width, height, speed, x, z, rotation_y, created_at, updated_at`,
   deleteConveyor: `DELETE FROM conveyors WHERE id = $1 RETURNING id`,
+  listSplitters: `
+    SELECT id, name, conveyor_id, along, rules, otherwise, created_at, updated_at
+      FROM splitters ORDER BY created_at, id`,
+  createSplitter: `
+    INSERT INTO splitters (name, conveyor_id, along, rules, otherwise)
+    VALUES ($1, $2, $3, $4::jsonb, $5)
+    RETURNING id, name, conveyor_id, along, rules, otherwise, created_at, updated_at`,
+  updateSplitter: `
+    UPDATE splitters
+       SET name = coalesce($2, name), along = coalesce($3, along),
+           rules = coalesce($4::jsonb, rules), otherwise = coalesce($5, otherwise),
+           updated_at = clock_timestamp()
+     WHERE id = $1
+    RETURNING id, name, conveyor_id, along, rules, otherwise, created_at, updated_at`,
+  deleteSplitter: `DELETE FROM splitters WHERE id = $1 RETURNING id`,
   count: `SELECT count(*)::int AS n FROM parts`,
   insertPart: `
     INSERT INTO parts (sku, name, category, unit, on_hand, reorder_level, location)
     VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (sku) DO NOTHING`,
-  reset: `TRUNCATE conveyors, shapes, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
+  reset: `TRUNCATE splitters, conveyors, shapes, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
 } as const;

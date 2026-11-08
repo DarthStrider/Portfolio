@@ -5,10 +5,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { hostname } from "node:os";
 import { isQty, isSku } from "./domain/design.ts";
-import { ValidationError } from "./domain/errors.ts";
-import { parseNewPart } from "./domain/newPart.ts";
+import { NotFoundError, ValidationError } from "./domain/errors.ts";
+import { parseNewPart, parsePartPatch } from "./domain/newPart.ts";
 import { parseNewShape, parseShapePatch } from "./domain/shapes.ts";
 import { parseConveyorPatch, parseNewConveyor } from "./domain/conveyors.ts";
+import { parseNewSplitter, parseSplitterPatch } from "./domain/splitters.ts";
 import type { InventoryRepo } from "./domain/types.ts";
 import { checkDesign, reserveDesign } from "./service.ts";
 
@@ -43,6 +44,7 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
     const [part] = await repo.getParts([sku(params.sku)]);
     return part ? [200, part] : [404, { error: `No part ${params.sku}` }];
   });
+  route("PATCH", "/api/parts/:sku", async ({ params, body }) => [200, await repo.updatePart(sku(params.sku), parsePartPatch(body))]);
   route("POST", "/api/parts/:sku/receive", async ({ params, body }) => {
     const { qty, note } = adjustment(body);
     return [200, await repo.receive(sku(params.sku), qty, note)];
@@ -90,6 +92,33 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
   route("PATCH", "/api/conveyors/:id", async ({ params, body }) => [200, await repo.updateConveyor(params.id, parseConveyorPatch(body))]);
   route("DELETE", "/api/conveyors/:id", async ({ params }) => {
     await repo.deleteConveyor(params.id);
+    return [200, { deleted: params.id }];
+  });
+
+  // ---- Splitters: diverter gates on belts, with their sorting rules ----
+  /** The gate has to be on its belt: between the belt's start (0) and its length. */
+  async function checkFits(conveyorId: string, along: number) {
+    const belt = (await repo.listConveyors()).find((c) => c.id === conveyorId);
+    if (!belt) throw new ValidationError([`No conveyor ${conveyorId}`]);
+    if (along > belt.length) throw new ValidationError([`along must be at most ${belt.length} m, the length of ${belt.name}`]);
+  }
+  route("GET", "/api/splitters", async () => [200, await repo.listSplitters()]);
+  route("POST", "/api/splitters", async ({ body }) => {
+    const s = parseNewSplitter(body);
+    await checkFits(s.conveyorId, s.along);
+    return [201, await repo.createSplitter(s)];
+  });
+  route("PATCH", "/api/splitters/:id", async ({ params, body }) => {
+    const patch = parseSplitterPatch(body);
+    if (patch.along !== undefined) {
+      const current = (await repo.listSplitters()).find((s) => s.id === params.id);
+      if (!current) throw new NotFoundError(`No splitter ${params.id}`);
+      await checkFits(current.conveyorId, patch.along);
+    }
+    return [200, await repo.updateSplitter(params.id, patch)];
+  });
+  route("DELETE", "/api/splitters/:id", async ({ params }) => {
+    await repo.deleteSplitter(params.id);
     return [200, { deleted: params.id }];
   });
 

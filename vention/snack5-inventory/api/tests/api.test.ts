@@ -156,6 +156,40 @@ test("conveyors: create with defaults, validate, patch, delete", async () => {
   assert.deepEqual((await call("GET", "/api/conveyors")).body, []);
 });
 
+test("splitters: validate rules, fit on the belt, patch, delete", async () => {
+  const belt = (await call("POST", "/api/conveyors", { name: "Sort belt", length: 1.6, width: 0.4, height: 0.3, position: { x: 0.8, z: 0 } })).body;
+  const rule = { conditions: [{ field: "color", op: "eq", value: " #E11D48 " }], exit: "left" };
+  const made = await call("POST", "/api/splitters", { name: "Reds", conveyorId: belt.id, along: 1, rules: [rule] });
+  assert.equal(made.status, 201);
+  assert.deepEqual([made.body.rules[0].conditions[0].value, made.body.otherwise], ["#e11d48", "straight"]); // trimmed, lowercased; default exit
+
+  const bad = await call("POST", "/api/splitters", { name: "Bad", conveyorId: belt.id, along: 1, rules: [
+    { conditions: [{ field: "weight", op: "eq", value: 1 }], exit: "left" },
+    { conditions: [{ field: "kind", op: "gt", value: "box" }], exit: "up" },
+    { conditions: [], exit: "right" },
+  ] });
+  assert.equal(bad.status, 400);
+  assert.deepEqual(bad.body.problems.map((p: string) => p.split(":")[0]), ["rule 1, condition 1", "rule 2", "rule 2, condition 1", "rule 3"]);
+  const tooFar = await call("POST", "/api/splitters", { name: "Off the end", conveyorId: belt.id, along: 2, rules: [] });
+  assert.match(tooFar.body.problems[0], /at most 1.6 m/);
+  assert.equal((await call("PATCH", `/api/splitters/${made.body.id}`, { along: 1.7 })).status, 400);
+  assert.equal((await call("PATCH", `/api/splitters/${made.body.id}`, { conveyorId: belt.id })).status, 400);
+  const moved = await call("PATCH", `/api/splitters/${made.body.id}`, { along: 0.5, otherwise: "right", rules: [] });
+  assert.deepEqual([moved.body.along, moved.body.otherwise, moved.body.rules], [0.5, "right", []]);
+  assert.equal((await call("DELETE", `/api/splitters/${made.body.id}`)).status, 200);
+  assert.equal((await call("DELETE", `/api/conveyors/${belt.id}`)).status, 200);
+});
+
+test("parts: change details, not stock", async () => {
+  const p = await call("PATCH", "/api/parts/MC-1", { category: "motor", location: "C-01-1" });
+  assert.deepEqual([p.status, p.body.category, p.body.location], [200, "motor", "C-01-1"]);
+  const stock = await call("PATCH", "/api/parts/MC-1", { onHand: 99 });
+  assert.equal(stock.status, 400);
+  assert.match(stock.body.problems[0], /receive and consume/);
+  assert.equal((await call("PATCH", "/api/parts/MC-1", { category: "widget" })).status, 400);
+  assert.equal((await call("PATCH", "/api/parts/NOPE-1", { location: "A" })).status, 404);
+});
+
 test("CORS: pages on localhost may call the API; other sites may not", async () => {
   const pre = await fetch(base + "/api/shapes", { method: "OPTIONS", headers: { origin: "http://localhost:5173", "access-control-request-method": "POST" } });
   assert.equal(pre.status, 204);
