@@ -79,6 +79,12 @@ services:
     image: inventory-web:1.0
     ports:
       - "8081:80"
+    # nginx resolves the name "api" when it starts and exits if it can't, so start after the API.
+    # Only the API for the active profile exists; required: false skips the other one.
+    depends_on:
+      api-postgres: { condition: service_started, required: false }
+      api-mongo: { condition: service_started, required: false }
+    restart: on-failure
 
   # ---- tests: fresh databases in memory (tmpfs), so your app data is never touched ----
   postgres-test:
