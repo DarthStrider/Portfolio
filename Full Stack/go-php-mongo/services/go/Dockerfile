@@ -4,11 +4,12 @@
 FROM golang:1.24-alpine AS build
 WORKDIR /src
 ENV CGO_ENABLED=0
-COPY go.mod go.sum* ./
-# go.sum is created on the first build if the repository doesn't have one yet.
-RUN go mod download || true
+# go.sum pins every dependency by checksum. Copying it before the source lets Docker
+# cache the download layer until the dependencies actually change.
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
 COPY . .
-RUN go mod tidy && go test ./...
+RUN go test ./...
 ARG SERVICE
 RUN go build -trimpath -ldflags="-s -w" -o /out/app ./cmd/${SERVICE}
 

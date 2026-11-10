@@ -15,13 +15,15 @@ WORKDIR /app
 # Test stage: dev dependencies + PHPUnit. The final stage copies a file from here,
 # which forces the tests to run (and pass) on every image build.
 FROM base AS test
-COPY composer.json ./
+# `composer install` with a lock file installs exactly the locked versions. The lock is
+# resolved for PHP 8.3 because composer.json's config.platform says so.
+COPY composer.json composer.lock ./
 RUN composer install --no-scripts --no-interaction --prefer-dist
 COPY . .
 RUN composer dump-autoload && vendor/bin/phpunit && touch /tmp/tests-passed
 
 FROM base AS app
-COPY composer.json ./
+COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist
 COPY . .
 COPY --from=test /tmp/tests-passed /tmp/tests-passed

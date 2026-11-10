@@ -2,8 +2,10 @@
 # Build context is the project root, so this file can reach web/.
 FROM node:22-alpine AS web
 WORKDIR /web
-COPY web/package.json web/package-lock.json* ./
-RUN npm install --no-audit --no-fund
+# npm ci installs exactly what package-lock.json says, and fails if it no longer
+# matches package.json, instead of quietly updating it the way npm install would.
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 COPY web/ ./
 # Type errors are reported by `npm run typecheck`; the image build only needs the bundle.
 RUN npx vite build

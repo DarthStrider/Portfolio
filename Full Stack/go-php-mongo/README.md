@@ -136,7 +136,10 @@ walkthrough/              the line-by-line walkthrough PDF
 - Built for local demonstration. For production: HTTPS with `SECURE_COOKIES=true`, real secrets in
   `.env`, php-fpm or FrankenPHP instead of `artisan serve`, a managed MongoDB replica set, and a real
   mail provider in place of Mailpit.
-- `go.sum` and the npm/Composer lock files are generated on the first build; commit them after the
-  first `docker compose build` to pin exact dependency versions.
+- Dependency versions are pinned by `services/go/go.sum`, `web/package-lock.json` and
+  `services/catalog/composer.lock`, and the Docker builds install exactly those. To update the
+  Composer lock without PHP installed, run this in this folder (it resolves for PHP 8.3 because
+  `composer.json` sets `config.platform`):
+  `docker run --rm -v "$PWD/services/catalog:/app" -w /app composer:2 composer update --no-install`
 - Shipping is Canada-only; tax rates are a table in `pricing.go` and should come from configuration
   or a tax service in a real store.
