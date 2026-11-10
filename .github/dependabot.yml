@@ -1,0 +1,27 @@
+# Dependabot opens pull requests for dependency updates; the snack1 workflow tests each one.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /vention/snack1-robot-arm
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "snack1"
+    groups:
+      # @types/three is versioned to match three, so they always move together.
+      # Below 1.0.0 a minor bump (0.170 → 0.171) can break, which is why CI must pass first.
+      three:
+        patterns: ["three", "@types/three"]
+      # Minor and patch updates to the build and test tools come as one pull request.
+      # Major updates (e.g. Vite 6 → 7) still get a pull request each.
+      tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

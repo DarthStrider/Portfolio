@@ -3,11 +3,17 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "test": "tsx --test \"tests/**/*.test.ts\"",
+    "test:coverage": "tsx --test --experimental-test-coverage --test-coverage-include=\"src/**\" \"tests/**/*.test.ts\"",
+    "check": "npm run typecheck && npm test",
     "build:gripper": "tsx scripts/build-gripper.ts"
   },
   "dependencies": {

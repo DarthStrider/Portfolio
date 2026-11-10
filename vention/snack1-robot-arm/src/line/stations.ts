@@ -293,7 +293,7 @@ export function createStations(world: () => World) {
    * feed the line. Returns the ids caught (the caller removes their bodies) and the new bodies.
    */
   function binStep(dt: number, current: Map<string, Body>): { caught: { binId: string; shapeId: string }[]; released: { binId: string; body: Body }[] } {
-    const { bins = [], shapes, parts = [], machines, belts } = world();
+    const { bins = [], shapes, parts = [], machines } = world();
     const caught: { binId: string; shapeId: string }[] = [];
     const released: { binId: string; body: Body }[] = [];
     const shapeOf = (id: string) => shapes.find((s) => s.id === id);

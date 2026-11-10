@@ -24,17 +24,38 @@ checked against each other every frame.
 
 ## How to run
 
-Requires Node.js 20 or newer.
+Requires Node.js 22 or newer (`.nvmrc` pins 22, so `nvm use` picks it up).
 
 ```powershell
 cd vention/snack1-robot-arm
-npm install
+npm ci             # install exactly what package-lock.json records
 npm run dev        # http://localhost:5173
-npm test           # forward-kinematics unit tests
+npm test           # unit tests (kinematics, reach, belts, splitters, stations, dependencies)
+npm run check      # type-check + tests: run this before pushing
 npm run build      # type-check + production build into dist/
 ```
 
+`npm run test:coverage` prints line and branch coverage for `src/`.
 `npm run build:gripper` regenerates `public/models/gripper.glb` from `scripts/build-gripper.ts`.
+
+### Dependencies, versions and CI
+
+- **Installing.** Use `npm ci` for a clean, repeatable install from `package-lock.json`. Use
+  `npm install <pkg>` only when you mean to add or change a dependency, then commit both
+  `package.json` and `package-lock.json`.
+- **Version ranges.** `three` is below 1.0.0, so `^0.170.0` only accepts `0.170.x`: under SemVer a
+  0.x minor bump may break. `@types/three` must stay on the same release as `three`;
+  `tests/dependencies.test.ts` fails if they drift, if the lock file is stale, or if `.nvmrc`
+  and `engines` disagree.
+- **Releases.** The version in `package.json` follows SemVer and changes are logged in
+  [CHANGELOG.md](CHANGELOG.md). To release, move the *Unreleased* notes under a new heading, then
+  run `npm version major|minor|patch --no-git-tag-version` (updates both JSON files), commit, and
+  tag it, e.g. `git tag snack1-v2.0.0`.
+- **CI.** `.github/workflows/snack1-robot-arm.yml` (at the repository root) runs on every push
+  and pull request that touches this folder: `npm ci`, type-check, tests with coverage and a
+  production build on Node 22 and 24, and `npm audit` of the runtime dependencies.
+- **Updates.** `.github/dependabot.yml` opens weekly update pull requests, with `three` and
+  `@types/three` in one, and minor/patch tool updates in another. CI tests each before you merge.
 
 ### Shapes (needs Snack 5's API)
 
@@ -164,6 +185,7 @@ tests/reach.test.ts      reach tests
 tests/transport.test.ts  belt tests: riding, falling off, hand-over between belts, gravity timing
 tests/splitters.test.ts  rule matching, and gates sending items left, right or straight
 tests/stations.test.ts   mergers (gaps, queues, priorities, a Y taking turns), joining geometry, machines, bins (catching, feeding)
+tests/dependencies.test.ts lock file in sync, versions inside their ranges, three/@types/three matched, Node pin
 scripts/build-gripper.ts writes the gripper .glb with no dependencies
 ```
 
