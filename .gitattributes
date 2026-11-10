@@ -1,0 +1,15 @@
+# Store text files with LF in the repository and check them out with LF everywhere.
+* text=auto eol=lf
+
+# Windows-only files that expect CRLF
+*.sln  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binary files: never touch
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.glb  binary
+*.bundle binary
