@@ -1,17 +1,11 @@
 # CI for vention/snack1-robot-arm: type-check, unit tests with coverage, production build,
-# and an audit of the runtime dependencies. Runs only when the arm (or this file) changes.
+# and an audit of the runtime dependencies. Runs on every push to any branch and on every
+# pull request, whatever it changes, so the required checks on main always report.
 name: snack1 robot arm
 
 on:
   push:
-    branches: [main, master]
-    paths:
-      - "vention/snack1-robot-arm/**"
-      - ".github/workflows/snack1-robot-arm.yml"
   pull_request:
-    paths:
-      - "vention/snack1-robot-arm/**"
-      - ".github/workflows/snack1-robot-arm.yml"
   workflow_dispatch:
 
 permissions:

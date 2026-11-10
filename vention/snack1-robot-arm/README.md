@@ -52,7 +52,7 @@ npm run build      # type-check + production build into dist/
   run `npm version major|minor|patch --no-git-tag-version` (updates both JSON files), commit, and
   tag it, e.g. `git tag snack1-v2.0.0`.
 - **CI.** `.github/workflows/snack1-robot-arm.yml` (at the repository root) runs on every push
-  and pull request that touches this folder: `npm ci`, type-check, tests with coverage and a
+  to any branch and every pull request: `npm ci`, type-check, tests with coverage and a
   production build on Node 22 and 24, and `npm audit` of the runtime dependencies.
 - **Updates.** `.github/dependabot.yml` opens weekly update pull requests, with `three` and
   `@types/three` in one, and minor/patch tool updates in another. CI tests each before you merge.
