@@ -41,9 +41,9 @@ jobs:
       - run: dotnet build TaskApi.slnx --no-restore -c Release -warnaserror
       # Without a server the HTTP tests must skip, not fail: that's how they behave on a laptop.
       - name: Tests without a database (HTTP tests skip)
-        run: dotnet test TaskApi.slnx --no-build -c Release
+        run: dotnet test --solution TaskApi.slnx --no-build -c Release
       - name: Tests against SQL Server
-        run: dotnet test TaskApi.slnx --no-build -c Release
+        run: dotnet test --solution TaskApi.slnx --no-build -c Release
         env:
           TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=Tasks-ci-Passw0rd;TrustServerCertificate=True
       - name: Vulnerable packages

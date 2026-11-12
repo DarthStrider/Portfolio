@@ -29,7 +29,7 @@ jobs:
       # --locked-mode: restore exactly what the packages.lock.json files record, or fail.
       - run: dotnet restore Genetec.slnx --locked-mode
       - run: dotnet build Genetec.slnx --no-restore -c Release -warnaserror
-      - run: dotnet test Genetec.slnx --no-build -c Release
+      - run: dotnet test --solution Genetec.slnx --no-build -c Release
       - name: Vulnerable packages
         shell: bash
         run: |
