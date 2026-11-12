@@ -4,4 +4,9 @@
     <Project Path="snack1-camera-status-monitor/src/CameraMonitor.App/CameraMonitor.App.csproj" />
     <Project Path="snack1-camera-status-monitor/tests/CameraMonitor.Tests/CameraMonitor.Tests.csproj" />
   </Folder>
+  <Folder Name="/snack2-access-event-log/">
+    <Project Path="snack2-access-event-log/src/AccessLog.Core/AccessLog.Core.csproj" />
+    <Project Path="snack2-access-event-log/src/AccessLog.App/AccessLog.App.csproj" />
+    <Project Path="snack2-access-event-log/tests/AccessLog.Tests/AccessLog.Tests.csproj" />
+  </Folder>
 </Solution>

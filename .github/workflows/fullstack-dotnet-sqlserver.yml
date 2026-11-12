@@ -36,6 +36,16 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: Full Stack/dotnet-sqlserver/global.json
+      # --locked-mode only enforces a lock file that exists, so check every project has one.
+      - name: Every project has a committed lock file
+        shell: bash
+        run: |
+          missing=0
+          for proj in $(git ls-files '*.csproj'); do
+            lock="$(dirname "$proj")/packages.lock.json"
+            git ls-files --error-unmatch "$lock" > /dev/null 2>&1 || { echo "::error file=$proj::no committed $lock"; missing=1; }
+          done
+          exit $missing
       # --locked-mode: restore exactly what the packages.lock.json files record, or fail.
       - run: dotnet restore TaskApi.slnx --locked-mode
       - run: dotnet build TaskApi.slnx --no-restore -c Release -warnaserror
