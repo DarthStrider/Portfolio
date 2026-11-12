@@ -17,6 +17,9 @@ runs or uses the project, MINOR for new features, PATCH for fixes.
   versions of development tools only, so nothing changes for anyone using the app.
 - CI runs on every push to any branch and every pull request, not only on changes to this folder.
 - New shapes default to 10 cm instead of 20 cm, so a new box fits in the gripper.
+- **In reach** now means the arm can pick the shape up from above, with the gripper pointing
+  straight down. That's less far than before (about 0.8 m instead of 1.05 m at floor level), which
+  assumed the whole arm stretched out with the gripper at any angle. The blue ring shrinks to match.
 - Five joints in the panel, so keys <kbd>1</kbd>–<kbd>5</kbd> select them.
 
 ### Added

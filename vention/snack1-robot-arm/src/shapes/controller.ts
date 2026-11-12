@@ -13,7 +13,8 @@ import { reachOf, reachRadiusAt, REACH_LABEL, type Reach } from "./reach";
 import { ShapeLayer } from "./ShapeLayer";
 import { lookFor, placedBySku, type InventoryPart } from "./fromPart";
 import { SHAPE_KINDS, type NewShape, type Shape, type ShapeKind, type Size } from "./types";
-import { graspFor } from "../pick/grasp";
+import { graspFor, gripHeight } from "../pick/grasp";
+import { CLEARANCE } from "../pick/clearance";
 import type { PickRequest } from "../pick/program";
 
 const POLL_MS = 4000;
@@ -62,7 +63,8 @@ interface Options {
 }
 
 export function createShapes({ root, scene, camera, canvas, arm }: Options) {
-  const layer = new ShapeLayer(reachRadiusAt(0, arm));
+  // The ring: how far out the arm can pick up something small from the floor.
+  const layer = new ShapeLayer(Math.min(reachRadiusAt(gripHeight(0), arm), reachRadiusAt(gripHeight(0) + CLEARANCE, arm)));
   scene.add(layer.root);
 
   let shapes: Shape[] = [];

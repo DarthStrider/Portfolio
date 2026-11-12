@@ -21,6 +21,9 @@ import { GAP_OPEN } from "../arm/gripperSpec";
 import { reachOf, type Reach } from "../shapes/reach";
 import type { Shape } from "../shapes/types";
 import { graspFor } from "./grasp";
+import { CLEARANCE } from "./clearance";
+
+export { CLEARANCE };
 
 export type Step =
   | { kind: "moveJ"; label: string; to: Vec3; roll: number; duration: number }
@@ -28,8 +31,6 @@ export type Step =
   | { kind: "gripper"; label: string; gap: number; duration: number; grab?: boolean; release?: boolean }
   | { kind: "home"; label: string; duration: number };
 
-/** Carry height: the shape's bottom passes this far above the higher of the two surfaces. */
-export const CLEARANCE = 0.1;
 /** Let go a couple of millimeters above the surface, so the shape settles onto it. */
 export const RELEASE_DROP = 0.002;
 /** How finely the straight moves are checked for reach before running (meters). */

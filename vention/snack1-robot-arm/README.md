@@ -80,7 +80,7 @@ app with `$env:VITE_INVENTORY_API="http://localhost:8080"; npm run dev`.
 - **Add at X, Z** places the shape at the typed position (centimeters from the arm's base).
 - **Place with mouse** shows a see-through preview that follows the pointer; click the floor to drop it. <kbd>Esc</kbd> cancels.
 - **Move** on a shape, then click the floor to move it there. Click a shape in the scene or list to select it; <kbd>Delete</kbd> removes it.
-- Each shape shows **in reach**, **out of reach**, **too close** or **hits the base**. The blue ring on the floor is how far the gripper reaches at floor level.
+- Each shape shows **in reach**, **out of reach**, **too close** or **hits the base**. In reach means the arm can pick it up from above, with the gripper pointing straight down; the blue ring on the floor is how far out that is for something small on the floor.
 - **Pick** on a shape, then click the floor (or a belt) where the robot should put it. A see-through copy follows the mouse; <kbd>Q</kbd> and <kbd>E</kbd> turn it 15° at a time, and the robot turns the shape by that much on the way. The arm panel shows each step; **Stop**, or any manual control, ends it early and the shape goes back to where it was. When it's done, the new position and turn are saved.
 - The gripper opens to 12.6 cm. A box is gripped across whichever pair of sides fits (the roll joint turns the fingers to face them); round shapes from any side. **Pick** is greyed out, with the reason as its tooltip, for shapes it can't reach or hold.
 - Changes from another browser show up within a few seconds (the panel re-reads the list every 4 s).

@@ -36,14 +36,20 @@ export type Grasp =
 
 type Graspable = Pick<Shape, "kind" | "size" | "rotationY">;
 
+/**
+ * Height of the TCP above a shape's base when gripping it: halfway up, unless that would
+ * push the palm into the top, and never so low that the fingertips touch the floor.
+ */
+export function gripHeight(h: number): number {
+  return Math.max(h / 2, h - PALM_ABOVE_TCP + PALM_CLEARANCE, FINGERTIP_BELOW_TCP + FLOOR_CLEARANCE);
+}
+
 const cm = (m: number) => `${Math.round(m * 100)} cm`;
 
 export function graspFor(shape: Graspable): Grasp {
   const { x: w, y: h, z: d } = shape.size;
 
-  // Grip as low as the palm allows: halfway up, unless that would push the palm into the
-  // top, and never so low that the fingertips touch the floor.
-  const height = Math.max(h / 2, h - PALM_ABOVE_TCP + PALM_CLEARANCE, FINGERTIP_BELOW_TCP + FLOOR_CLEARANCE);
+  const height = gripHeight(h);
   const tooWide = (width: string) => ({ ok: false as const, reason: `Too wide to grip: ${width}, and the gripper opens to ${cm(GAP_OPEN)}.` });
   const tooThin = { ok: false as const, reason: "Too thin to grip: it would slip between the closed fingers." };
 
