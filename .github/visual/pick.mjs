@@ -36,7 +36,7 @@ let target = null;
 for (let y = 380; y <= 720 && !target; y += 30) {
   for (let x = 380; x <= 1100 && !target; x += 40) {
     await page.mouse.move(x, y);
-    const hint = await page.locator("p.hint").textContent();
+    const hint = await page.locator("#shapes-panel p.hint").textContent();
     const m = /x (-?\d+) cm, z (-?\d+) cm · in reach/.exec(hint ?? "");
     if (m && Number(m[2]) < -10 && Math.hypot(Number(m[1]), Number(m[2])) > 40) target = { x, y, hint };
   }
@@ -45,7 +45,7 @@ console.log("target", JSON.stringify(target));
 for (let i = 0; i < 3; i++) await page.keyboard.press("q");
 await page.mouse.move(target.x, target.y);
 await page.waitForTimeout(200);
-console.log("hint after Q x3:", await page.locator("p.hint").textContent());
+console.log("hint after Q x3:", await page.locator("#shapes-panel p.hint").textContent());
 await shot(page, "02-choosing-spot");
 await page.mouse.click(target.x, target.y);
 
@@ -55,7 +55,7 @@ for (const [ms, name] of [[1800, "03-above"], [3300, "04-gripped"], [5200, "05-c
   console.log(name, "program:", await page.locator("#program").isVisible() ? await page.locator("#program-label").textContent() : "(hidden)");
   await shot(page, name);
 }
-console.log("status:", await page.locator("p.shapes-status").textContent());
+console.log("status:", await page.locator("#shapes-panel p.shapes-status").textContent());
 const after = (await (await fetch(`${API}/shapes`)).json()).find((s) => s.id === created.id);
 console.log("saved", JSON.stringify({ position: after.position, rotationY: after.rotationY }));
 console.log("errors", JSON.stringify(errors));
