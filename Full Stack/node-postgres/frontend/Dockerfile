@@ -1,5 +1,5 @@
 # ---- build stage: compile the React app to static files ----
-FROM node:22-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 # npm ci installs exactly what package-lock.json records.
