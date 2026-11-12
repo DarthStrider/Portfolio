@@ -73,3 +73,21 @@ jobs:
       - run: dotnet restore snack2-access-event-log/tests/AccessLog.Tests --locked-mode
       - run: dotnet build snack2-access-event-log/tests/AccessLog.Tests --no-restore -c Release -warnaserror
       - run: dotnet test --project snack2-access-event-log/tests/AccessLog.Tests --no-build -c Release
+
+  web:
+    name: snack 4 web page
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: genetec/snack4-web-dashboard/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: genetec/snack4-web-dashboard/web/.nvmrc
+          cache: npm
+          cache-dependency-path: genetec/snack4-web-dashboard/web/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high

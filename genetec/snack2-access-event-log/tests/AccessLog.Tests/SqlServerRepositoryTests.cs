@@ -65,7 +65,7 @@ public sealed class SqlServerRepositoryTests : RepositoryContract
         // Ask SQL Server for the estimated plan of the "denied by door" query and check it uses
         // the index the schema creates for exactly this purpose.
         await using var connection = new SqlConnection(ConnectionString);
-        await connection.OpenAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
         await connection.ExecuteAsync("SET SHOWPLAN_XML ON;");
         var plan = await connection.ExecuteScalarAsync<string>("""
             SELECT d.Id, COUNT(*) FROM dbo.AccessEvents e JOIN dbo.Devices d ON d.Id = e.DeviceId

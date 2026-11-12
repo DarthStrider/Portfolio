@@ -17,4 +17,8 @@
     <Project Path="snack3-plugin-framework/modules/AfterHoursAutoLock/AfterHoursAutoLock.csproj" />
     <Project Path="snack3-plugin-framework/tests/SolutionFramework.Tests/SolutionFramework.Tests.csproj" />
   </Folder>
+  <Folder Name="/snack4-web-dashboard/">
+    <Project Path="snack4-web-dashboard/api/Dashboard.Api/Dashboard.Api.csproj" />
+    <Project Path="snack4-web-dashboard/tests/Dashboard.Api.Tests/Dashboard.Api.Tests.csproj" />
+  </Folder>
 </Solution>
