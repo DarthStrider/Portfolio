@@ -13,7 +13,7 @@ RUN go test ./...
 ARG SERVICE
 RUN go build -trimpath -ldflags="-s -w" -o /out/app ./cmd/${SERVICE}
 
-FROM alpine:3.21
+FROM alpine:3.24
 # /keys belongs to the app user so auth-service can write the JWT key pair into the
 # shared volume (a new named volume copies this directory's ownership).
 RUN apk add --no-cache ca-certificates && adduser -D -u 10001 app && mkdir /keys && chown app /keys
