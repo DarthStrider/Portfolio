@@ -1,0 +1,99 @@
+# CI for Full Stack/node-postgres: the API's tests (including against a real PostgreSQL), the
+# React front end, and both Docker images. Runs on every push and pull request.
+name: full stack node-postgres
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: api (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    defaults:
+      run:
+        working-directory: Full Stack/node-postgres/api
+    # A throwaway PostgreSQL for the contract tests. The database name ends in _test, which is
+    # what tests/postgres.test.ts requires before it will empty a table.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tasks
+          POSTGRES_PASSWORD: tasks-ci-password
+          POSTGRES_DB: tasks_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tasks -d tasks_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: tasks
+      PGPASSWORD: tasks-ci-password
+      PGDATABASE: tasks_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: Full Stack/node-postgres/api/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Full Stack/node-postgres/frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: Full Stack/node-postgres/frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: Full Stack/node-postgres/frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  images:
+    name: docker images
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Full Stack/node-postgres
+    steps:
+      - uses: actions/checkout@v7
+      # The same build docker compose runs locally, so a broken Dockerfile shows up here.
+      - run: docker compose build
+
+  audit:
+    name: audit runtime dependencies
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [api, frontend]
+    defaults:
+      run:
+        working-directory: Full Stack/node-postgres/${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm audit --omit=dev --audit-level=high

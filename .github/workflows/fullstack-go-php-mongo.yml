@@ -1,0 +1,81 @@
+# CI for Full Stack/go-php-mongo (Northline): the Go services, the Laravel catalog, the React
+# storefront, and every Docker image. Runs on every push and pull request.
+name: full stack go-php-mongo
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: go services
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Full Stack/go-php-mongo/services/go
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: Full Stack/go-php-mongo/services/go/go.mod
+          cache-dependency-path: Full Stack/go-php-mongo/services/go/go.sum
+      # go.sum pins every module by checksum; verify fails if anything downloaded doesn't match.
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  catalog:
+    name: php catalog
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Full Stack/go-php-mongo/services/catalog
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mongodb, sockets
+          tools: composer:v2
+      # With a lock file, composer install installs exactly the locked versions.
+      - run: composer validate --no-check-publish
+      - run: composer install --no-scripts --no-interaction --prefer-dist
+      - run: vendor/bin/phpunit
+      - run: composer audit --locked --no-dev
+
+  web:
+    name: react storefront
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Full Stack/go-php-mongo/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Full Stack/go-php-mongo/web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  images:
+    name: docker images
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Full Stack/go-php-mongo
+    steps:
+      - uses: actions/checkout@v7
+      # compose reads .env for some settings; the example values are fine for a build.
+      - run: cp .env.example .env
+      - run: docker compose build
