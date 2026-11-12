@@ -18,7 +18,7 @@ public sealed class TasksApiTests : IAsyncLifetime
 
     public ValueTask InitializeAsync()
     {
-        Assert.SkipWhen(SqlServerApiFactory.Server is null,
+        Assert.SkipWhen(SqlServerApiFactory.SqlServer is null,
             "Set TEST_SQLSERVER to a SQL Server connection string (no database name) to run the HTTP tests.");
         _factory = new SqlServerApiFactory();
         _client = _factory.CreateClient();

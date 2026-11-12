@@ -12,12 +12,12 @@ namespace TaskApi.Tests;
 /// </summary>
 public sealed class SqlServerApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    public static readonly string? Server = Environment.GetEnvironmentVariable("TEST_SQLSERVER");
+    public static readonly string? SqlServer = Environment.GetEnvironmentVariable("TEST_SQLSERVER");
 
     private readonly string _database = $"TaskDb_Test_{Guid.NewGuid():N}";
 
     private string ConnectionString =>
-        new SqlConnectionStringBuilder(Server) { InitialCatalog = _database }.ConnectionString;
+        new SqlConnectionStringBuilder(SqlServer) { InitialCatalog = _database }.ConnectionString;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -30,11 +30,11 @@ public sealed class SqlServerApiFactory : WebApplicationFactory<Program>, IAsync
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
-        if (Server is null) return;
+        if (SqlServer is null) return;
 
         // Drop the throwaway database. SINGLE_USER closes pooled connections still holding it open.
         SqlConnection.ClearAllPools();
-        await using var connection = new SqlConnection(Server);
+        await using var connection = new SqlConnection(SqlServer);
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText = $"""
