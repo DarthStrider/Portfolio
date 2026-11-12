@@ -131,14 +131,15 @@ public sealed class InMemoryAccessEventRepository : IAccessEventRepository
         }
     }
 
+    public const string ShapeRule = "A badge swipe needs a cardholder and a decision; a status change has neither.";
+
     /// <summary>Same rule as the CHECK constraint in schema.sql.</summary>
     private static void CheckShape(AccessEvent e)
     {
         var ok = e.Kind == EventKind.BadgeSwipe
             ? e.CardholderId is not null && e.Granted is not null
             : e.CardholderId is null && e.Granted is null;
-        if (!ok)
-            throw new InvalidOperationException("A badge swipe needs a cardholder and a decision; a status change has neither.");
+        if (!ok) throw new InvalidOperationException(ShapeRule);
     }
 
     private IEnumerable<AccessEventView> Views() =>

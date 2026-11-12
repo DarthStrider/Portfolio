@@ -51,26 +51,28 @@ public sealed class SqlServerRepositoryTests : RepositoryContract
     }
 
     [Fact]
-    public async Task The_check_constraint_refuses_a_badge_swipe_without_a_cardholder()
-    {
-        await Assert.ThrowsAsync<SqlException>(() => Repo.RecordAsync(new AccessEvent
-        {
-            OccurredAtUtc = Now, DeviceId = MainDoor.Id, Kind = EventKind.BadgeSwipe, Granted = true,
-        }));
-    }
-
-    [Fact]
     public async Task The_reports_are_answered_from_the_time_index()
     {
-        // Ask SQL Server for the estimated plan of the "denied by door" query and check it uses
-        // the index the schema creates for exactly this purpose.
+        // On a nearly empty table, reading everything is cheapest and SQL Server rightly ignores
+        // indexes. So first give it a realistic table: 20,000 events over 60 days.
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await connection.ExecuteAsync("""
+            INSERT INTO dbo.AccessEvents (OccurredAtUtc, DeviceId, CardholderId, Kind, Granted)
+            SELECT TOP (20000)
+                   DATEADD(MINUTE, -ABS(CHECKSUM(NEWID())) % (60 * 24 * 60), SYSUTCDATETIME()),
+                   @door, @alice, 0, CASE WHEN ABS(CHECKSUM(NEWID())) % 10 = 0 THEN 0 ELSE 1 END
+              FROM sys.all_objects a CROSS JOIN sys.all_objects b;
+            UPDATE STATISTICS dbo.AccessEvents;
+            """, new { door = ServerRoom.Id, alice = Alice.Id });
+
+        // Ask for the estimated plan of the "denied by door" query instead of running it, and check
+        // it uses the index the schema creates for exactly this purpose.
         await connection.ExecuteAsync("SET SHOWPLAN_XML ON;");
         var plan = await connection.ExecuteScalarAsync<string>("""
-            SELECT d.Id, COUNT(*) FROM dbo.AccessEvents e JOIN dbo.Devices d ON d.Id = e.DeviceId
+            SELECT d.Id, d.Name, d.Location, COUNT(*) FROM dbo.AccessEvents e JOIN dbo.Devices d ON d.Id = e.DeviceId
              WHERE e.OccurredAtUtc >= DATEADD(HOUR, -24, SYSUTCDATETIME()) AND e.Kind = 0 AND e.Granted = 0
-             GROUP BY d.Id;
+             GROUP BY d.Id, d.Name, d.Location;
             """);
         await connection.ExecuteAsync("SET SHOWPLAN_XML OFF;");
 

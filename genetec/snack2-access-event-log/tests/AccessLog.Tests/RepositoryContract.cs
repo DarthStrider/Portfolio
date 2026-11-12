@@ -104,6 +104,18 @@ public abstract class RepositoryContract : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_badge_swipe_without_a_cardholder_is_refused()
+    {
+        // In SQL Server this is the CHECK constraint; in memory, the same rule in code.
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Repo.RecordAsync(new AccessEvent
+        {
+            OccurredAtUtc = Now, DeviceId = MainDoor.Id, Kind = EventKind.BadgeSwipe, Granted = true,
+        }));
+        Assert.Contains("needs a cardholder", error.Message);
+        Assert.Empty(await Repo.SearchAsync(new EventQuery()));
+    }
+
+    [Fact]
     public async Task Search_lists_newest_first_and_respects_the_limit()
     {
         for (var i = 0; i < 5; i++) await Swipe(MainDoor, Alice, true, Now.AddMinutes(i));

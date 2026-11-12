@@ -15,8 +15,8 @@ namespace AccessLog.Core.Data;
 /// </summary>
 public sealed class SqlServerAccessEventRepository(string connectionString) : IAccessEventRepository
 {
-    // SQL Server error numbers for constraint violations.
-    private const int ForeignKeyViolation = 547;
+    // SQL Server's error number for a statement that conflicts with a constraint.
+    private const int ConstraintViolation = 547;
 
     private SqlConnection Open() => new(connectionString);
 
@@ -117,9 +117,14 @@ public sealed class SqlServerAccessEventRepository(string connectionString) : IA
                     accessEvent.Detail,
                 });
         }
-        catch (SqlException e) when (e.Number == ForeignKeyViolation)
+        // SQL Server uses error 547 for every constraint conflict, foreign key or CHECK; the message says which.
+        catch (SqlException e) when (e.Number == ConstraintViolation && e.Message.Contains("FOREIGN KEY"))
         {
             throw new UnknownReferenceException($"No device {accessEvent.DeviceId} or cardholder {accessEvent.CardholderId}.");
+        }
+        catch (SqlException e) when (e.Number == ConstraintViolation && e.Message.Contains("CK_AccessEvents_Shape"))
+        {
+            throw new InvalidOperationException(InMemoryAccessEventRepository.ShapeRule, e);
         }
         return accessEvent.Id;
     }
