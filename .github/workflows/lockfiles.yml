@@ -54,7 +54,7 @@ jobs:
           git ls-files --others --modified --exclude-standard | grep -E "(package-lock\.json|packages\.lock\.json)$" > "$out/changed.txt" || true
           cat "$out/changed.txt"
           tar -czf "$out/locks.tar.gz" -T "$out/changed.txt"
-          echo "LOCKS-BEGIN"; base64 -w0 "$out/locks.tar.gz"; echo; echo "LOCKS-END"
+          echo "LOCKS-BEGIN"; base64 -w 76 "$out/locks.tar.gz"; echo "LOCKS-END"
 
       - uses: actions/upload-artifact@v4
         with:
