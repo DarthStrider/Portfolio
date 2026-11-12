@@ -16,9 +16,21 @@ runs or uses the project, MINOR for new features, PATCH for fixes.
 - Build tools upgraded through Dependabot: Vite 6 → 8 and TypeScript 5.9 → 7.0. Both are major
   versions of development tools only, so nothing changes for anyone using the app.
 - CI runs on every push to any branch and every pull request, not only on changes to this folder.
+- New shapes default to 10 cm instead of 20 cm, so a new box fits in the gripper.
+- Five joints in the panel, so keys <kbd>1</kbd>–<kbd>5</kbd> select them.
 
 ### Added
 
+- Pick and place. **Pick** on a shape, click where it should go, and the arm does it: inverse
+  kinematics (from Snack 2) for a gripper pointing straight down, a plan checked for reach and
+  joint limits before anything moves, then descend, grip, lift, carry, lower, let go and return
+  home. The new position is saved. <kbd>Q</kbd> / <kbd>E</kbd> turn the shape on the way.
+- A fifth joint, **Roll**, turning the gripper about its own axis. It lines the fingers up with a
+  box's sides and turns what's being carried. It doesn't move the tool center point, so forward
+  kinematics is unchanged.
+- The gripper can be set to an exact gap (it closes on the shape it's picking) and opens wider:
+  12.6 cm between the pads (was 9.6 cm).
+- `tests/ik.test.ts` and `tests/pick.test.ts`.
 - `npm start`: starts the inventory database and API (Snack 5) in Docker, waits until they're
   ready, then the arm. `npm run start:mongo` does the same with MongoDB, and `npm run db:down`
   stops the containers.

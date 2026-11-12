@@ -4,14 +4,16 @@
 **Effort:** ~1.5 days  
 **Status:** Built
 
-A 4-joint robot arm rendered in the browser, with live forward kinematics computed two ways and
-checked against each other every frame.
+A 5-joint robot arm rendered in the browser, with live forward kinematics computed two ways and
+checked against each other every frame. It picks up the shapes in the scene and puts them where you
+click, turning them on the way if you ask.
 
 ## Features
 
-- [x] 4-joint arm (base yaw, shoulder, elbow, wrist) built as an `Object3D` hierarchy; each joint rotates on its own axis, within its limits
+- [x] 5-joint arm (base yaw, shoulder, elbow, wrist, and a roll that turns the gripper about its own axis) built as an `Object3D` hierarchy; each joint rotates on its own axis, within its limits
 - [x] Forward kinematics: the tool center point's world position shown live, from the scene graph **and** from a hand-written FK function, with the difference between them
-- [x] Gripper loaded as glTF; its finger nodes are found by name and animated open/closed
+- [x] Gripper loaded as glTF; its finger nodes are found by name and slid open and closed, or to an exact gap
+- [x] Pick and place: **Pick** a shape, click where it should go (<kbd>Q</kbd> <kbd>E</kbd> turn it), and the arm plans the move with inverse kinematics, checks it can reach every point, then grips, carries, places and saves the new position. The roll joint lines the fingers up with a box's sides
 - [x] Orbit camera, grid floor, soft shadows, hemisphere + directional lighting
 - [x] Demo mode, a trail of the tool's path, click-to-select joints, keyboard and touch controls
 - [x] Shapes: create boxes, cylinders, spheres and cones, place and move them on the floor with the mouse, and see which ones the arm can reach. They're saved in the inventory database (Snack 5), PostgreSQL or MongoDB
@@ -79,6 +81,8 @@ app with `$env:VITE_INVENTORY_API="http://localhost:8080"; npm run dev`.
 - **Place with mouse** shows a see-through preview that follows the pointer; click the floor to drop it. <kbd>Esc</kbd> cancels.
 - **Move** on a shape, then click the floor to move it there. Click a shape in the scene or list to select it; <kbd>Delete</kbd> removes it.
 - Each shape shows **in reach**, **out of reach**, **too close** or **hits the base**. The blue ring on the floor is how far the gripper reaches at floor level.
+- **Pick** on a shape, then click the floor (or a belt) where the robot should put it. A see-through copy follows the mouse; <kbd>Q</kbd> and <kbd>E</kbd> turn it 15° at a time, and the robot turns the shape by that much on the way. The arm panel shows each step; **Stop**, or any manual control, ends it early and the shape goes back to where it was. When it's done, the new position and turn are saved.
+- The gripper opens to 12.6 cm. A box is gripped across whichever pair of sides fits (the roll joint turns the fingers to face them); round shapes from any side. **Pick** is greyed out, with the reason as its tooltip, for shapes it can't reach or hold.
 - Changes from another browser show up within a few seconds (the panel re-reads the list every 4 s).
 
 ### Conveyors (also saved by Snack 5's API)
@@ -141,10 +145,11 @@ PL-200 plate shares them, as does every plain cylinder. Until you change them, e
 
 | Input | Action |
 |---|---|
-| <kbd>1</kbd>–<kbd>4</kbd>, or click a blue joint | Select a joint |
+| <kbd>1</kbd>–<kbd>5</kbd>, or click a blue joint | Select a joint |
 | <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> (hold), or the ◀ ▶ buttons | Rotate the selected joint |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Previous / next joint |
 | <kbd>G</kbd> / <kbd>Space</kbd> / <kbd>T</kbd> / <kbd>R</kbd> | Gripper, demo, trail, reset |
+| **Pick**, then click the floor; <kbd>Q</kbd> / <kbd>E</kbd> while choosing | Pick and place a shape; turn it 15° |
 | Drag / scroll / right-drag | Orbit / zoom / pan |
 
 ## How it's built
@@ -155,8 +160,13 @@ src/
 ├── arm/
 │   ├── jointSpecs.ts    link lengths, joint axes/limits/home pose, demo motion (pure data)
 │   ├── kinematics.ts    hand-written forward kinematics (no Three.js import)
+│   ├── ik.ts            inverse kinematics for a top-down grasp, and which way the fingers face (pure)
 │   ├── RobotArm.ts      builds the Object3D hierarchy from the specs
+│   ├── gripperSpec.ts   the gripper's measurements (pure data)
 │   └── Gripper.ts       loads gripper.glb, drives the finger nodes
+├── pick/
+│   ├── grasp.ts         how to hold each kind of shape: width, height, finger direction (pure)
+│   └── program.ts       plans a pick and place as robot steps, and plays them (pure, unit-tested)
 ├── scene/
 │   ├── stage.ts         renderer, camera, OrbitControls, lights, floor
 │   └── Trail.ts         tool-path line on a preallocated buffer
@@ -186,6 +196,8 @@ src/
     ├── BinPanel.ts      the Bins tab
     └── controller.ts    the Machines tab, and saving assemblies after a run
 tests/kinematics.test.ts FK tests (node:test)
+tests/ik.test.ts         IK, and the finger direction checked against a rotation-matrix chain
+tests/pick.test.ts       grasp rules, planning and refusals, a whole program run
 tests/reach.test.ts      reach tests
 tests/transport.test.ts  belt tests: riding, falling off, hand-over between belts, gravity timing
 tests/splitters.test.ts  rule matching, and gates sending items left, right or straight
@@ -199,8 +211,8 @@ placed at the end of its parent link, and rotating it carries everything below i
 
 ```
 root ─ pedestal
-     └ Joint1 (Y) ─ Joint2 (Z) ─ Joint3 (Z) ─ Joint4 (Z) ─ toolMount ─ gripper.glb
-                                                                   └ tcp
+     └ Joint1 (Y) ─ Joint2 (Z) ─ Joint3 (Z) ─ Joint4 (Z) ─ Joint5 (Y) ─ toolMount ─ gripper.glb
+                                                                                └ tcp
 ```
 
 ## Design decisions
