@@ -29,6 +29,7 @@ jobs:
         working-directory: .github/visual
         run: |
           npm init -y > /dev/null
-          npm install playwright@1.56.1 > /dev/null
-          npx playwright install --with-deps chromium > /dev/null
+          npm install playwright@latest > /dev/null
+          npx playwright --version
+          npx playwright install --with-deps chromium > /dev/null || npx playwright install chromium > /dev/null
           node pick.mjs
