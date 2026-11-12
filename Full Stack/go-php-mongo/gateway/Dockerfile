@@ -10,7 +10,7 @@ COPY web/ ./
 # Type errors are reported by `npm run typecheck`; the image build only needs the bundle.
 RUN npx vite build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 COPY gateway/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=web /web/dist /usr/share/nginx/html
 EXPOSE 80
