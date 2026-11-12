@@ -1,6 +1,6 @@
 # Builds the React app, then serves it from nginx alongside the API routes.
 # Build context is the project root, so this file can reach web/.
-FROM node:25-alpine AS web
+FROM node:22-alpine AS web
 WORKDIR /web
 # npm ci installs exactly what package-lock.json says, and fails if it no longer
 # matches package.json, instead of quietly updating it the way npm install would.

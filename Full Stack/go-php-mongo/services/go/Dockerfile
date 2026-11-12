@@ -1,7 +1,7 @@
 # One image definition for all three Go services; SERVICE picks which command to build.
 # Multi-stage: the Go toolchain stays in the build stage, the final image is just the
 # static binary on a minimal base (about 15 MB).
-FROM golang:1.24-alpine AS build
+FROM golang:1.25-alpine AS build
 WORKDIR /src
 ENV CGO_ENABLED=0
 # go.sum pins every dependency by checksum. Copying it before the source lets Docker
