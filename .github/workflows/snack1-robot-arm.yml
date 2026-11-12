@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version-file: vention/snack1-robot-arm/.nvmrc
       # Only what ships to the browser (three); dev tools never reach users.
