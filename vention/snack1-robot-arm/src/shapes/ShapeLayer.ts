@@ -17,6 +17,8 @@ export class ShapeLayer {
   private readonly ghost: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
   private ghostKey = "";
   private selectedId: string | null = null;
+  /** Shapes in the gripper's hand: their meshes belong to the gripper until let go. */
+  private readonly held = new Set<string>();
 
   /**
    * What a shape at (x, z) stands on: the floor (0) unless a conveyor is there. Set by the
@@ -50,7 +52,8 @@ export class ShapeLayer {
     const keep = new Set(shapes.map((s) => s.id));
     for (const [id, mesh] of this.meshes) {
       if (!keep.has(id)) {
-        this.root.remove(mesh);
+        mesh.removeFromParent(); // usually this.root, but the gripper while it's held
+        this.held.delete(id);
         mesh.geometry.dispose();
         mesh.material.dispose();
         this.meshes.delete(id);
@@ -93,13 +96,13 @@ export class ShapeLayer {
    */
   pose(id: string, x: number, y: number, z: number): void {
     const mesh = this.meshes.get(id);
-    if (mesh) mesh.position.set(x, y + (mesh.userData.halfHeight as number), z);
+    if (mesh && !this.held.has(id)) mesh.position.set(x, y + (mesh.userData.halfHeight as number), z);
   }
 
   /** Places a shape's center exactly: used for shapes riding on others. */
   poseCenter(id: string, p: Pose): void {
     const mesh = this.meshes.get(id);
-    if (!mesh) return;
+    if (!mesh || this.held.has(id)) return; // a held shape goes where the gripper takes it
     mesh.position.set(p.x, p.y, p.z);
     mesh.rotation.y = p.rotationY * DEG;
   }
@@ -107,6 +110,26 @@ export class ShapeLayer {
   setVisible(id: string, visible: boolean): void {
     const mesh = this.meshes.get(id);
     if (mesh) mesh.visible = visible;
+  }
+
+  /**
+   * The gripper takes hold: the shape's mesh becomes a child of `hand`, so it moves and turns
+   * with it. attach() keeps where the mesh is in the world while changing its parent (in
+   * Unity: transform.SetParent(hand, true)).
+   */
+  hold(id: string, hand: THREE.Object3D): void {
+    const mesh = this.meshes.get(id);
+    if (!mesh) return;
+    hand.attach(mesh);
+    this.held.add(id);
+  }
+
+  /** The gripper lets go: the mesh comes back into the scene, wherever the gripper left it. */
+  release(id: string): void {
+    const mesh = this.meshes.get(id);
+    if (!mesh || !this.held.has(id)) return;
+    this.root.attach(mesh);
+    this.held.delete(id);
   }
 
   /** The mesh drawing a shape, so connection point markers can be added to it. */

@@ -1,21 +1,24 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { GAP_CLOSED, GAP_OPEN, PAD_INSET } from "./gripperSpec";
 
-const CLOSED_X = 0.025;
-const OPEN_X = 0.07;
-const SPEED = 2.5; // full open/close strokes per second
+const SPEED = 2.5 * (GAP_OPEN - GAP_CLOSED); // a full stroke takes 0.4 s
 
 /**
  * Parallel two-finger gripper loaded from glTF. The model's finger nodes are
  * found by name and slid along X, so the asset stays a plain static file with
  * no animation clips baked in.
+ *
+ * Two ways to drive it: setOpen() for the G key and the demo (the fingers travel at
+ * a fixed speed), or setGap() for a robot program, which decides the gap every frame
+ * and closes it exactly on the part it's picking.
  */
 export class Gripper {
   readonly object: THREE.Object3D;
   private readonly left: THREE.Object3D;
   private readonly right: THREE.Object3D;
-  private openness = 1; // 0 = closed, 1 = open
-  private target = 1;
+  private current = GAP_OPEN;
+  private target = GAP_OPEN;
 
   private constructor(object: THREE.Object3D, left: THREE.Object3D, right: THREE.Object3D) {
     this.object = object;
@@ -60,26 +63,38 @@ export class Gripper {
     return new Gripper(root, left, right);
   }
 
+  /** True once it's been told to open, even if the fingers are still moving. */
   get isOpen(): boolean {
-    return this.target === 1;
+    return this.target > GAP_CLOSED;
+  }
+
+  /** The gap between the pads right now, in meters. */
+  get gap(): number {
+    return this.current;
   }
 
   setOpen(open: boolean): void {
-    this.target = open ? 1 : 0;
+    this.target = open ? GAP_OPEN : GAP_CLOSED;
+  }
+
+  /** Puts the pads exactly `gap` meters apart, now. */
+  setGap(gap: number): void {
+    this.current = this.target = Math.min(GAP_OPEN, Math.max(GAP_CLOSED, gap));
+    this.apply();
   }
 
   update(dt: number): void {
-    if (this.openness === this.target) return;
+    if (this.current === this.target) return;
     const step = SPEED * dt;
-    this.openness =
-      this.openness < this.target
-        ? Math.min(this.target, this.openness + step)
-        : Math.max(this.target, this.openness - step);
+    this.current =
+      this.current < this.target
+        ? Math.min(this.target, this.current + step)
+        : Math.max(this.target, this.current - step);
     this.apply();
   }
 
   private apply(): void {
-    const x = CLOSED_X + (OPEN_X - CLOSED_X) * this.openness;
+    const x = this.current / 2 + PAD_INSET;
     this.left.position.x = -x;
     this.right.position.x = x;
   }

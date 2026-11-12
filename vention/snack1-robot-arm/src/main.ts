@@ -10,6 +10,7 @@ import { createShapes } from "./shapes/controller";
 import { createConveyors } from "./conveyors/controller";
 import { createSplitters } from "./splitters/controller";
 import { createLine } from "./line/controller";
+import { planPickPlace, ProgramPlayer, type ArmState } from "./pick/program";
 
 const JOG_SPEED = 60; // degrees per second while a key or jog button is held
 const DEMO_SMOOTHING = 3; // higher = joints follow the demo path more tightly
@@ -75,16 +76,29 @@ const state = {
   jog: 0 as JogDirection,
 };
 
+/** The pick-and-place program running now, if any (see src/pick/program.ts). */
+let program: {
+  player: ProgramPlayer;
+  shapeId: string;
+  to: { x: number; z: number };
+  rotationY: number;
+  holding: boolean;
+} | null = null;
+
 const panel = createPanel(JOINTS, {
   onSelect: select,
   onJog: (direction) => {
     state.jog = direction;
-    if (direction !== 0) setDemo(false);
+    if (direction !== 0) {
+      stopProgram("Stopped: you took over the arm.");
+      setDemo(false);
+    }
   },
   onToggleDemo: () => setDemo(!state.demo),
   onToggleGripper: toggleGripper,
   onToggleTrail: () => setTrail(!state.trail),
   onReset: reset,
+  onStopProgram: () => stopProgram("Stopped."),
 });
 
 // ---- Gripper (glTF) ----
@@ -110,11 +124,13 @@ function select(index: number) {
 }
 
 function setDemo(on: boolean) {
+  if (on) stopProgram("Stopped for the demo.");
   state.demo = on;
   panel.setDemo(on);
 }
 
 function toggleGripper() {
+  stopProgram("Stopped: you took over the gripper.");
   setDemo(false); // otherwise the demo would immediately override it
   setGripperOpen(!(gripper?.isOpen ?? true));
 }
@@ -133,10 +149,79 @@ function setTrail(on: boolean) {
 }
 
 function reset() {
+  stopProgram("Stopped.");
   setDemo(false);
   JOINTS.forEach((spec, i) => arm.setAngle(i, spec.home));
   setGripperOpen(true);
   trail.clear();
+}
+
+// ---- Pick and place ----
+
+/** The arm's commanded state, as the program player reads and writes it. */
+function armState(): ArmState {
+  return { joints: [...arm.anglesDeg], gap: gripper?.gap ?? 0 };
+}
+
+// The Shapes panel's Pick button: plan the whole move first, and only start if it can be done.
+shapes.onPick((shapeId, request) => {
+  if (program) return "The robot is busy with another shape.";
+  if (!gripper) return "The gripper is still loading.";
+  if (shapes.running) return "Stop the belts first.";
+  const plan = planPickPlace(ARM, JOINTS, request);
+  if (!plan.ok) return plan.reason;
+  setDemo(false);
+  state.jog = 0;
+  held.clear();
+  const player = new ProgramPlayer(ARM, JOINTS, plan.steps, armState());
+  program = { player, shapeId, to: request.to, rotationY: plan.rotationY, holding: false };
+  return null;
+});
+
+/** Ends the program early: lets go of the shape, which goes back to where it's stored. */
+function stopProgram(reason: string) {
+  if (!program) return;
+  const { shapeId, holding } = program;
+  program = null;
+  if (holding) shapes.layer.release(shapeId);
+  shapes.pickFinished(shapeId, null, reason);
+  panel.setProgram(null);
+  if (gripper) panel.setGripperOpen(gripper.isOpen);
+}
+
+function runProgram(dt: number) {
+  if (!program || !gripper) return;
+  if (shapes.running) {
+    stopProgram("Stopped: the belts started.");
+    return;
+  }
+  const { player, shapeId } = program;
+  const commanded = armState();
+  const events = player.update(dt, commanded);
+  commanded.joints.forEach((angle, i) => arm.setAngle(i, angle));
+  gripper.setGap(commanded.gap);
+
+  for (const event of events) {
+    if (event === "grab") {
+      shapes.layer.hold(shapeId, gripper.object);
+      program.holding = true;
+    } else if (event === "release") {
+      shapes.layer.release(shapeId);
+      program.holding = false;
+    } else if (event === "done") {
+      const { to, rotationY } = program;
+      program = null;
+      panel.setProgram(null);
+      panel.setGripperOpen(gripper.isOpen);
+      shapes.pickFinished(shapeId, { x: to.x, z: to.z, rotationY });
+      return;
+    } else if (event === "error") {
+      stopProgram(player.error ?? "The robot stopped.");
+      return;
+    }
+  }
+  const step = player.step;
+  if (step) panel.setProgram({ label: step.label, index: player.index, count: player.steps.length, progress: player.progress });
 }
 
 // ---- Keyboard ----
@@ -159,6 +244,7 @@ window.addEventListener("keydown", (e) => {
   else if (key === "ArrowUp") select(state.selected - 1);
   else if (key === "ArrowDown") select(state.selected + 1);
   else if (key === "ArrowLeft" || key === "ArrowRight" || key === "a" || key === "d") {
+    stopProgram("Stopped: you took over the arm.");
     held.add(key);
     setDemo(false);
   } else if (key === "g" && !e.repeat) toggleGripper();
@@ -229,7 +315,9 @@ renderer.setAnimationLoop((time) => {
   const dt = Math.min((time - lastTime) / 1000, 0.05); // clamp after a hidden tab resumes
   lastTime = time;
 
-  if (state.demo) {
+  if (program) {
+    runProgram(dt);
+  } else if (state.demo) {
     state.demoTime += dt;
     // Frame-rate independent easing toward the demo path, so toggling the demo
     // on from any pose glides there instead of jumping.

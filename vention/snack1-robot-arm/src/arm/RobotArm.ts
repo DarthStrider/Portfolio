@@ -14,8 +14,9 @@ const SELECTED_GLOW = 0x60a5fa;
  *       └── Joint2 (pitch, Z)  ← shoulder housing, upper arm
  *           └── Joint3 (pitch, Z)  ← elbow housing, forearm
  *               └── Joint4 (pitch, Z)  ← wrist housing, wrist link
- *                   └── toolMount  ← gripper (glTF) attaches here
- *                       └── tcp    ← tool center point
+ *                   └── Joint5 (roll, Y)   ← roll collar, at the end of the wrist link
+ *                       └── toolMount  ← gripper (glTF) attaches here
+ *                           └── tcp    ← tool center point
  *
  * Each joint is an empty Object3D placed at the end of its parent link. Rotating
  * a joint moves everything below it, exactly like parenting Transforms in Unity.
@@ -99,9 +100,13 @@ export class RobotArm {
     this.addHousing(j4, zCylinder(0.055, 0.12));
     j4.add(along(solid(new THREE.CylinderGeometry(0.04, 0.04, d.wrist, 32), linkMat), d.wrist));
 
+    // Joint 5: roll about the wrist link's own axis. A short collar shows it turning.
+    const j5 = this.addJoint(j4, d.wrist);
+    const collar = this.addHousing(j5, new THREE.CylinderGeometry(0.052, 0.052, 0.024, 6));
+    collar.position.y = -0.012; // just below the gripper's mounting flange
+
     this.toolMount.name = "ToolMount";
-    this.toolMount.position.y = d.wrist;
-    j4.add(this.toolMount);
+    j5.add(this.toolMount);
 
     this.tcp.name = "TCP";
     this.tcp.position.y = d.tool;

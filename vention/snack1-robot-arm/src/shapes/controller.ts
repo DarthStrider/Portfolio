@@ -13,12 +13,24 @@ import { reachOf, reachRadiusAt, REACH_LABEL, type Reach } from "./reach";
 import { ShapeLayer } from "./ShapeLayer";
 import { lookFor, placedBySku, type InventoryPart } from "./fromPart";
 import { SHAPE_KINDS, type NewShape, type Shape, type ShapeKind, type Size } from "./types";
+import { graspFor } from "../pick/grasp";
+import type { PickRequest } from "../pick/program";
 
 const POLL_MS = 4000;
 const FLOOR_LIMIT = 3; // meters, same as the API
 const DEFAULT_COLORS: Record<ShapeKind, string> = { box: "#f59e0b", cylinder: "#22c55e", sphere: "#e11d48", cone: "#a855f7" };
 
-type Mode = { kind: "idle" } | { kind: "placing" } | { kind: "moving"; id: string };
+/** dropping: the robot will pick shape `id`; the next click on the floor says where it goes. */
+type Mode = { kind: "idle" } | { kind: "placing" } | { kind: "moving"; id: string } | { kind: "dropping"; id: string; turn: number };
+
+/** How much Q and E turn a shape while choosing where the robot puts it. */
+const TURN_STEP = 15;
+
+/**
+ * Asks the robot to pick a shape and put it somewhere. Returns null once it has started,
+ * or why it can't. When it's done (or stopped), the robot calls pickFinished().
+ */
+export type PickHandler = (id: string, request: PickRequest) => string | null;
 
 interface Draft {
   kind: ShapeKind;
@@ -67,9 +79,12 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
   let hover: { x: number; z: number } | null = null;
   /** True while the belts run: shapes move on their own, so editing waits until Stop. */
   let running = false;
+  /** The shape the robot is picking and placing, if any: editing waits for it too. */
+  let robotShape: string | null = null;
+  let pickHandler: PickHandler | null = null;
   let surface: Surface = { support: () => 0, pick: () => null };
   const reach = (s: Pick<Shape, "kind" | "size" | "position">) => reachOf(s, arm, surface.support(s.position.x, s.position.z));
-  const draft: Draft = { kind: "box", w: 20, h: 20, d: 20, color: DEFAULT_COLORS.box, name: "", rotationY: 0, x: 60, z: 0 };
+  const draft: Draft = { kind: "box", w: 10, h: 10, d: 10, color: DEFAULT_COLORS.box, name: "", rotationY: 0, x: 60, z: 0 };
 
   // ---- Talking to the API ----
 
@@ -145,7 +160,7 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
 
   // Poll so changes from other browsers (or the API directly) show up. Skipped mid-placement.
   setInterval(() => {
-    if (mode.kind === "idle" && !busy && !running) void load();
+    if (mode.kind === "idle" && !busy && !running && !robotShape) void load();
   }, POLL_MS);
 
   // ---- Pointer: placing and moving on the floor ----
@@ -179,10 +194,11 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
 
   function ghostSource(): { kind: ShapeKind; size: Size; color: string; rotationY: number } | null {
     if (mode.kind === "placing") return { kind: draft.kind, size: sizeOf(draft), color: draft.color, rotationY: draft.rotationY };
-    if (mode.kind === "moving") {
+    if (mode.kind === "moving" || mode.kind === "dropping") {
       const id = mode.id;
       const s = shapes.find((x) => x.id === id);
-      return s ? { kind: s.kind, size: s.size, color: s.color, rotationY: s.rotationY } : null;
+      const turn = mode.kind === "dropping" ? mode.turn : 0;
+      return s ? { kind: s.kind, size: s.size, color: s.color, rotationY: s.rotationY + turn } : null;
     }
     return null;
   }
@@ -208,6 +224,11 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
 
   /** Called on a click (not a drag). Returns true if it was used. */
   function handleClick(e: PointerEvent): boolean {
+    if (mode.kind === "dropping") {
+      const at = floorPoint(e);
+      if (at) startPick(mode.id, at, mode.turn);
+      return true;
+    }
     if (mode.kind === "placing" || mode.kind === "moving") {
       const at = floorPoint(e);
       if (!at) return true;
@@ -233,7 +254,16 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
       setMode({ kind: "idle" });
       return true;
     }
-    if ((e.key === "Delete" || e.key === "Backspace") && selected && mode.kind === "idle" && !running) {
+    if (mode.kind === "dropping" && (e.key === "q" || e.key === "Q" || e.key === "e" || e.key === "E")) {
+      // Q turns it anticlockwise seen from above (like a positive rotationY), E clockwise.
+      const turn = mode.turn + (e.key.toLowerCase() === "q" ? TURN_STEP : -TURN_STEP);
+      mode = { ...mode, turn: Math.max(-180, Math.min(180, turn)) };
+      const src = ghostSource();
+      if (src && hover) layer.showGhost(src.kind, src.size, src.color, hover.x, hover.z, src.rotationY);
+      renderHint();
+      return true;
+    }
+    if ((e.key === "Delete" || e.key === "Backspace") && selected && mode.kind === "idle" && !running && !robotShape) {
       remove(selected);
       return true;
     }
@@ -257,6 +287,54 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
     layer.select(id);
     render();
     for (const fn of selectListeners) fn(id);
+  }
+
+  // ---- Pick and place by the robot ----
+
+  /** Why the robot can't pick this shape, before even trying; null if it can try. */
+  function whyNotPick(s: Shape): string | null {
+    if (s.attachedTo) return "It's joined onto another shape: pick that one.";
+    if (shapes.some((x) => x.attachedTo === s.id)) return "Other shapes are joined onto it.";
+    const grasp = graspFor(s);
+    return grasp.ok ? null : grasp.reason;
+  }
+
+  function startPick(id: string, to: { x: number; z: number }, turn: number) {
+    const s = shapes.find((x) => x.id === id);
+    if (!s || !pickHandler) return;
+    const request: PickRequest = {
+      shape: s,
+      fromBaseY: surface.support(s.position.x, s.position.z),
+      to,
+      toBaseY: surface.support(to.x, to.z),
+      turn,
+    };
+    const problem = pickHandler(id, request);
+    if (problem) {
+      message = { text: problem, error: true }; // stay in this mode: click somewhere else
+      render();
+      return;
+    }
+    robotShape = id;
+    message = { text: `Picking up ${s.name}…`, error: false };
+    setMode({ kind: "idle" });
+  }
+
+  /**
+   * The robot finished (placed: where the shape ended up) or stopped (placed: null). Saves
+   * the new position, or puts the shape back where the database says it is.
+   */
+  function pickFinished(id: string, placed: { x: number; z: number; rotationY: number } | null, problem?: string) {
+    robotShape = null;
+    const s = shapes.find((x) => x.id === id);
+    if (!placed || !s) {
+      message = problem ? { text: problem, error: true } : null;
+      layer.sync(shapes); // back to its stored place
+      render();
+      return;
+    }
+    shapes = shapes.map((x) => (x.id === id ? { ...x, position: { x: placed.x, z: placed.z }, rotationY: placed.rotationY } : x));
+    void act(() => shapesApi.update(id, { position: { x: placed.x, z: placed.z }, rotationY: placed.rotationY }), `Placed ${s.name}.`);
   }
 
   function remove(id: string) {
@@ -328,7 +406,7 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
       source = b.dataset.source as typeof source;
       if (source === "basic") {
         partSku = null;
-        Object.assign(draft, { kind: "box", w: 20, h: 20, d: 20, color: DEFAULT_COLORS.box, name: "" });
+        Object.assign(draft, { kind: "box", w: 10, h: 10, d: 10, color: DEFAULT_COLORS.box, name: "" });
       } else if (partSku) pickPart(partSku);
       render();
     }),
@@ -369,6 +447,9 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
     else if (btn.dataset.do === "move") {
       setSelected(id);
       setMode(mode.kind === "moving" && mode.id === id ? { kind: "idle" } : { kind: "moving", id });
+    } else if (btn.dataset.do === "pick") {
+      setSelected(id);
+      setMode(mode.kind === "dropping" && mode.id === id ? { kind: "idle" } : { kind: "dropping", id, turn: 0 });
     } else setSelected(id === selected ? null : id);
   });
 
@@ -415,7 +496,8 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
 
     placeBtn.textContent = mode.kind === "placing" ? "Cancel placing" : "Place with mouse";
     placeBtn.setAttribute("aria-pressed", String(mode.kind === "placing"));
-    placeBtn.disabled = addBtn.disabled = !online || busy || running || (source === "part" && !partSku);
+    placeBtn.disabled = addBtn.disabled = !online || busy || running || !!robotShape || (source === "part" && !partSku);
+    const locked = running || !!robotShape; // shapes are moving on their own
     if (!online) dbLabel.textContent = "offline";
 
     // Items stored in bins are listed with their bin (Bins tab), not here.
@@ -435,7 +517,12 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
           const base = s.attachedTo ? shapes.find((x) => x.id === s.attachedTo) : undefined;
           const joined = base ? `<small class="joined">joined onto ${escapeHtml(base.name)}</small>` : "";
           // A joined shape moves with its base, so it has no Move of its own.
-          const moveBtn = base ? "" : `<button type="button" data-id="${s.id}" data-do="move" aria-pressed="${moving}" ${running ? "disabled" : ""} title="Click the floor to move it">${moving ? "Cancel" : "Move"}</button>`;
+          const moveBtn = base ? "" : `<button type="button" data-id="${s.id}" data-do="move" aria-pressed="${moving}" ${locked ? "disabled" : ""} title="Click the floor to move it">${moving ? "Cancel" : "Move"}</button>`;
+          // The robot can pick it if it's in reach and the gripper can hold it.
+          const dropping = mode.kind === "dropping" && mode.id === s.id;
+          const whyNot = base ? null : where === "overlaps-base" ? "It overlaps the arm's base." : where !== "reachable" ? `It's ${REACH_LABEL[where]}.` : whyNotPick(s);
+          const pickBtn = base ? "" : `<button type="button" data-id="${s.id}" data-do="pick" aria-pressed="${dropping}"
+              ${locked || !online || whyNot ? "disabled" : ""} title="${escapeHtml(whyNot ?? "The robot picks it up and puts it where you click")}">${dropping ? "Cancel" : "Pick"}</button>`;
           return `<li class="${s.id === selected ? "selected" : ""}">
             <button type="button" class="pick" data-id="${s.id}" aria-pressed="${s.id === selected}">
               <span class="swatch" style="background:${s.color}"></span>
@@ -443,8 +530,9 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
                 <span class="pill ${where}">${REACH_LABEL[where]}</span></span>
             </button>
             <span class="row-actions">
+              ${pickBtn}
               ${moveBtn}
-              <button type="button" data-id="${s.id}" data-do="delete" ${running ? "disabled" : ""} title="Delete (or press Delete)">✕</button>
+              <button type="button" data-id="${s.id}" data-do="delete" ${locked ? "disabled" : ""} title="Delete (or press Delete)">✕</button>
             </span>
           </li>`;
         }).join("");
@@ -465,12 +553,13 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
       return;
     }
     hint.hidden = false;
-    const verb = mode.kind === "placing" ? "place it" : "move it there";
-    if (!hover) hint.textContent = `Click the floor to ${verb}. Esc cancels.`;
+    const verb = mode.kind === "placing" ? "place it" : mode.kind === "dropping" ? "have the robot put it there" : "move it there";
+    const turnNote = mode.kind === "dropping" ? ` Q / E turn it (now ${mode.turn > 0 ? "+" : ""}${mode.turn}°).` : "";
+    if (!hover) hint.textContent = `Click the floor to ${verb}.${turnNote} Esc cancels.`;
     else {
       const src = ghostSource()!;
       const r = reach({ kind: src.kind, size: src.size, position: hover });
-      hint.textContent = `x ${(hover.x * 100).toFixed(0)} cm, z ${(hover.z * 100).toFixed(0)} cm · ${REACH_LABEL[r]}. Click to ${verb}.`;
+      hint.textContent = `x ${(hover.x * 100).toFixed(0)} cm, z ${(hover.z * 100).toFixed(0)} cm · ${REACH_LABEL[r]}. Click to ${verb}.${turnNote}`;
     }
   }
 
@@ -518,7 +607,15 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
   }
 
   return {
-    layer, handleClick, handleHover, handleKey, setSurface, setRunning, saveMoves, refresh, act,
+    layer, handleClick, handleHover, handleKey, setSurface, setRunning, saveMoves, refresh, act, pickFinished,
+    /** Who carries out a Pick: the robot, in main.ts. */
+    onPick(fn: PickHandler) {
+      pickHandler = fn;
+    },
+    /** True while the belts run. */
+    get running(): boolean {
+      return running;
+    },
     /** Reload from the API now (after a change made elsewhere, such as an assembly). */
     reload: load,
     /** Where the connection point editor goes. */

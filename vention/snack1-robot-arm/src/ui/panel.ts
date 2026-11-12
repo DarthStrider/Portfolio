@@ -10,6 +10,17 @@ export interface PanelHandlers {
   onToggleGripper(): void;
   onToggleTrail(): void;
   onReset(): void;
+  onStopProgram(): void;
+}
+
+/** What the pick-and-place program is doing, for the panel. */
+export interface ProgramView {
+  label: string;
+  /** 0-based step number, and how many steps there are. */
+  index: number;
+  count: number;
+  /** 0..1 through the current step. */
+  progress: number;
 }
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -73,12 +84,17 @@ export function createPanel(specs: readonly JointSpec[], handlers: PanelHandlers
   gripper.addEventListener("click", handlers.onToggleGripper);
   trail.addEventListener("click", handlers.onToggleTrail);
   byId("btn-reset").addEventListener("click", handlers.onReset);
+  byId("btn-stop-program").addEventListener("click", handlers.onStopProgram);
 
   const selectedName = byId("selected-name");
   const status = byId("status");
   const scene = [byId("scene-x"), byId("scene-y"), byId("scene-z")];
   const fk = [byId("fk-x"), byId("fk-y"), byId("fk-z")];
   const diff = byId("fk-diff");
+  const program = byId("program");
+  const programLabel = byId("program-label");
+  const programCount = byId("program-count");
+  const programProgress = byId("program-progress");
 
   return {
     update(anglesDeg: readonly number[], scenePos: Vec3, fkPos: Vec3) {
@@ -113,6 +129,15 @@ export function createPanel(specs: readonly JointSpec[], handlers: PanelHandlers
 
     setTrail(on: boolean) {
       trail.setAttribute("aria-pressed", String(on));
+    },
+
+    /** Shows the running program's step, or hides the section (null). */
+    setProgram(view: ProgramView | null) {
+      program.hidden = !view;
+      if (!view) return;
+      setText(programLabel, view.label);
+      setText(programCount, `${view.index + 1} of ${view.count}`);
+      programProgress.style.width = `${((view.index + view.progress) / view.count) * 100}%`;
     },
 
     showStatus(message: string) {
