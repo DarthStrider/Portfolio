@@ -1,0 +1,2 @@
+# Modules are copied here when they build (see modules/Directory.Build.targets).
+artifacts/

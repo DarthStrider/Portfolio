@@ -1,0 +1,75 @@
+<Window x:Class="CameraMonitor.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Camera Status Monitor" Width="900" Height="560" MinWidth="640" MinHeight="400"
+        DataContext="{Binding Main, Source={StaticResource Locator}}"
+        Background="#F6F7F9" FontSize="13">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Counts -->
+        <StackPanel Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="Camera Status Monitor" FontSize="20" FontWeight="SemiBold" Margin="0,0,24,0" />
+            <TextBlock VerticalAlignment="Center" Margin="0,0,16,0" Foreground="#2E9E4F">
+                <Run Text="● Online " /><Run Text="{Binding OnlineCount, Mode=OneWay}" FontWeight="SemiBold" />
+            </TextBlock>
+            <TextBlock VerticalAlignment="Center" Margin="0,0,16,0" Foreground="#8A939B">
+                <Run Text="● Offline " /><Run Text="{Binding OfflineCount, Mode=OneWay}" FontWeight="SemiBold" />
+            </TextBlock>
+            <TextBlock VerticalAlignment="Center" Foreground="#D63333">
+                <Run Text="● Alarm " /><Run Text="{Binding AlarmCount, Mode=OneWay}" FontWeight="SemiBold" />
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Filter and acknowledge -->
+        <DockPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,8" LastChildFill="True">
+            <Button DockPanel.Dock="Right" Padding="12,4" Margin="8,0,0,0"
+                    Content="Acknowledge alarm" Command="{Binding AcknowledgeAlarmCommand}" />
+            <Button DockPanel.Dock="Right" Padding="10,4" Margin="8,0,0,0"
+                    Content="Clear" Command="{Binding ClearFilterCommand}" />
+            <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}" Padding="6,4"
+                     ToolTip="Filter by name, location, type or status (try &quot;alarm&quot;)" />
+        </DockPanel>
+
+        <!-- Devices -->
+        <ListView Grid.Row="2" Grid.Column="0" ItemsSource="{Binding VisibleDevices}"
+                  SelectedItem="{Binding SelectedDevice}" SelectionMode="Single">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Status" Width="110">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="10" Height="10" Margin="0,0,6,0"
+                                             Fill="{Binding Status, Converter={StaticResource StatusBrush}}" />
+                                    <TextBlock Text="{Binding Status}"
+                                               Foreground="{Binding Status, Converter={StaticResource StatusBrush}}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="Name" Width="170" DisplayMemberBinding="{Binding Name}" />
+                    <GridViewColumn Header="Type" Width="80" DisplayMemberBinding="{Binding Type}" />
+                    <GridViewColumn Header="Location" Width="110" DisplayMemberBinding="{Binding Location}" />
+                    <GridViewColumn Header="Id" Width="80" DisplayMemberBinding="{Binding Id}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- Recent changes -->
+        <TextBlock Grid.Row="1" Grid.Column="2" Text="Recent changes" FontWeight="SemiBold"
+                   VerticalAlignment="Bottom" Margin="0,0,0,8" />
+        <ListBox Grid.Row="2" Grid.Column="2" ItemsSource="{Binding RecentChanges}"
+                 FontFamily="Consolas" FontSize="11" />
+    </Grid>
+</Window>

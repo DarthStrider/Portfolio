@@ -28,8 +28,11 @@ Docker Compose and Kubernetes because both resolve the name `api` through their 
 
 ```
 dotnet-sqlserver/
-├── frontend/            React app + nginx.conf + Dockerfile
+├── frontend/            React app + nginx.conf + Dockerfile (+ tests/ for the API client)
 ├── api/                 ASP.NET Core + EF Core + Dockerfile
+├── tests/TaskApi.Tests/ xUnit: the title rule, and every endpoint against a real SQL Server
+├── TaskApi.slnx         the API and its tests, for dotnet build/test and Visual Studio
+├── global.json          pins the .NET SDK (10.0, any feature band) and the test runner
 ├── docker-compose.yml   run everything locally with one command
 └── k8s/                 Kubernetes manifests (kustomize)
     ├── namespace.yaml
@@ -117,6 +120,44 @@ kubectl delete namespace tasks-dotnet
 | GET    | `/api/health/ready` | | Database reachable (readiness) |
 | GET    | `/api/info` | | Hostname of the pod that answered |
 
+## Tests
+
+```powershell
+cd dotnet-sqlserver
+dotnet test --solution TaskApi.slnx
+cd frontend; npm ci; npm test
+```
+
+| Suite | What it covers |
+|---|---|
+| `tests/TaskApi.Tests/TaskRulesTests.cs` | the title rule |
+| `tests/TaskApi.Tests/TasksApiTests.cs` | every endpoint over HTTP with `WebApplicationFactory<Program>`: the real app, EF Core and a real SQL Server database created for each test and dropped after |
+| `frontend/tests/api.test.ts` | the browser's API client against a fake `fetch` |
+
+The HTTP tests need a SQL Server. Without `TEST_SQLSERVER` they're reported as skipped. With the
+Compose database running (add `ports: ["1433:1433"]` under `db` to reach it from the host):
+
+```powershell
+$env:TEST_SQLSERVER = "Server=localhost,1433;User Id=sa;Password=Tasks-dev-Passw0rd;TrustServerCertificate=True"
+dotnet test --solution TaskApi.slnx
+```
+
+## Dependencies, versions and CI
+
+- **Locked versions.** `packages.lock.json` (api and tests) and `frontend/package-lock.json` record the exact version of every dependency, direct or
+  transitive. The Dockerfiles and CI install with `dotnet restore --locked-mode` and `npm ci`, which fail rather than
+  quietly resolve something different. Change dependencies on purpose (`npm install <pkg>`, or edit
+  the `.csproj`), then commit the lock file with it.
+- **Versioning.** The app follows [Semantic Versioning](https://semver.org/); changes are in
+  [CHANGELOG.md](CHANGELOG.md). For a web API, removing or renaming a route or a JSON field is a
+  breaking change (a new major version); adding one is a minor one.
+- **CI.** `.github/workflows/fullstack-dotnet-sqlserver.yml` runs on every push and pull request: install from
+  the lock files, type-check, all the tests (including against a real database), a production build,
+  `docker compose build`, and an audit that fails on high or critical vulnerabilities.
+- **Updates.** Dependabot (`.github/dependabot.yml`) opens weekly pull requests for npm and NuGet
+  packages and monthly ones for the Docker base images; CI tests each before you merge.
+- **Walkthrough.** [walkthrough/](walkthrough/) explains every file, line by line.
+
 ## Design decisions
 
 - **Multi-stage Dockerfiles.** Build tools (the .NET SDK, `npm` for the frontend) stay in the build
@@ -137,7 +178,6 @@ kubectl delete namespace tasks-dotnet
 - A real migrations tool instead of create-on-startup
 - An Ingress controller with a hostname instead of a LoadBalancer port
 - HorizontalPodAutoscaler on the API (needs metrics-server)
-- GitHub Actions to build and test the images on every push
 - Secrets from a secret manager instead of a committed manifest
 
 ## Troubleshooting

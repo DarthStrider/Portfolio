@@ -1,0 +1,15 @@
+<Application x:Class="CameraMonitor.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:CameraMonitor.App.Services"
+             xmlns:converters="clr-namespace:CameraMonitor.App.Converters"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <!--
+          The composition root lives in XAML: the locator builds the simulator and the ViewModel,
+          and MainWindow binds its DataContext to it. That's how the code-behind files stay empty.
+        -->
+        <services:ViewModelLocator x:Key="Locator" />
+        <converters:StatusToBrushConverter x:Key="StatusBrush" />
+    </Application.Resources>
+</Application>

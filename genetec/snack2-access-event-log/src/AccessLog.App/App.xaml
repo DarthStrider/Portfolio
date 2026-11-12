@@ -1,0 +1,13 @@
+<Application x:Class="AccessLog.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:AccessLog.App.Services"
+             xmlns:converters="clr-namespace:AccessLog.App.Converters"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <!-- Composition root: picks SQL Server or memory, seeds, and starts the live feed. -->
+        <services:ViewModelLocator x:Key="Locator" />
+        <converters:UtcToLocalConverter x:Key="UtcToLocal" />
+        <converters:OutcomeToBrushConverter x:Key="OutcomeBrush" />
+    </Application.Resources>
+</Application>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- A module's .deps.json lets the host's load context find the module's own dependencies. -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Compile against the contract, but don't copy it into the module's folder (Private=false):
+      at run time the module must use the host's copy, or ISolutionModule would be a different type.
+    -->
+    <ProjectReference Include="..\..\src\SolutionFramework.Abstractions\SolutionFramework.Abstractions.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

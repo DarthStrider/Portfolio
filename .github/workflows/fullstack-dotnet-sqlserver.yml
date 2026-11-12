@@ -1,0 +1,89 @@
+# CI for Full Stack/dotnet-sqlserver: the API's tests against a real SQL Server, the React front
+# end, and both Docker images. Runs on every push and pull request.
+name: full stack dotnet-sqlserver
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Full Stack/dotnet-sqlserver
+    # A throwaway SQL Server. Each HTTP test creates its own database on it and drops it after.
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Tasks-ci-Passw0rd
+        ports: ["1433:1433"]
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Tasks-ci-Passw0rd -C -Q 'SELECT 1' || exit 1"
+          --health-interval 10s --health-timeout 5s --health-retries 12 --health-start-period 20s
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: Full Stack/dotnet-sqlserver/global.json
+      # --locked-mode only enforces a lock file that exists, so check every project has one.
+      - name: Every project has a committed lock file
+        shell: bash
+        run: |
+          missing=0
+          for proj in $(git ls-files '*.csproj'); do
+            lock="$(dirname "$proj")/packages.lock.json"
+            git ls-files --error-unmatch "$lock" > /dev/null 2>&1 || { echo "::error file=$proj::no committed $lock"; missing=1; }
+          done
+          exit $missing
+      # --locked-mode: restore exactly what the packages.lock.json files record, or fail.
+      - run: dotnet restore TaskApi.slnx --locked-mode
+      - run: dotnet build TaskApi.slnx --no-restore -c Release -warnaserror
+      # Without a server the HTTP tests must skip, not fail: that's how they behave on a laptop.
+      - name: Tests without a database (HTTP tests skip)
+        run: dotnet test --solution TaskApi.slnx --no-build -c Release
+      - name: Tests against SQL Server
+        run: dotnet test --solution TaskApi.slnx --no-build -c Release
+        env:
+          TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=Tasks-ci-Passw0rd;TrustServerCertificate=True
+      - name: Vulnerable packages
+        run: |
+          dotnet list TaskApi.slnx package --vulnerable --include-transitive | tee vulnerable.txt
+          ! grep -q -E "High|Critical" vulnerable.txt
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Full Stack/dotnet-sqlserver/frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: Full Stack/dotnet-sqlserver/frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: Full Stack/dotnet-sqlserver/frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  images:
+    name: docker images
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Full Stack/dotnet-sqlserver
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose build

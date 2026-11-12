@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The model, the repository (SQL Server and in-memory), the simulator and the ViewModels.
+    net48 for the WPF app the README asks for; net10.0 for the tests and Snack 4's web API.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net48;net10.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.89" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <!--
+      SqlClient depends on System.Security.Cryptography.Pkcs, and the versions it asks for have
+      known vulnerabilities. Referencing a patched version directly overrides the transitive one.
+    -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
+  </ItemGroup>
+
+  <!-- Lets net48 build anywhere (including Linux CI) without the .NET Framework targeting pack. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Data\schema.sql" />
+  </ItemGroup>
+
+</Project>

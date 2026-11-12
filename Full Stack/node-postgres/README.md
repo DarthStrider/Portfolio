@@ -28,8 +28,10 @@ Docker Compose and Kubernetes because both resolve the name `api` through their 
 
 ```
 node-postgres/
-├── frontend/            React app + nginx.conf + Dockerfile
+├── frontend/            React app + nginx.conf + Dockerfile (+ tests/ for the API client)
 ├── api/                 Express + TypeScript + Dockerfile
+│   ├── src/             index (startup), app (Express), routes, validation, store (interface), db (PostgreSQL)
+│   └── tests/           validation, routes over HTTP, the store contract on memory and PostgreSQL
 ├── docker-compose.yml   run everything locally with one command
 └── k8s/                 Kubernetes manifests (kustomize)
     ├── namespace.yaml
@@ -117,6 +119,49 @@ kubectl delete namespace tasks-node
 | GET    | `/api/health/ready` | | Database reachable (readiness) |
 | GET    | `/api/info` | | Hostname of the pod that answered |
 
+## Tests
+
+```powershell
+cd node-postgres/api
+npm ci
+npm run check            # type-check (app and tests) + all tests
+```
+
+| Suite | What it covers |
+|---|---|
+| `tests/validation.test.ts` | id and title rules |
+| `tests/routes.test.ts` | every endpoint over real HTTP (Express on a random port), with an in-memory store: status codes, validation messages, 404s, the readiness probe failing when the database is down, errors becoming a generic 500 |
+| `tests/memory.test.ts`, `tests/postgres.test.ts` | one store contract (`tests/contract.ts`) run against the in-memory store and a real PostgreSQL |
+| `frontend/tests/api.test.ts` | the browser's API client against a fake `fetch` |
+
+The PostgreSQL tests empty the `tasks` table, so they only run when `PGDATABASE` ends in `_test`;
+otherwise they're skipped. To run them locally against the Compose database:
+
+```powershell
+docker compose up -d db
+docker compose exec db createdb -U tasks tasks_test
+$env:PGHOST="localhost"; $env:PGUSER="tasks"; $env:PGPASSWORD="tasks-dev-password"; $env:PGDATABASE="tasks_test"
+npm test
+```
+
+(Compose doesn't publish Postgres's port by default; add `ports: ["5432:5432"]` under `db` to reach it from the host.)
+
+## Dependencies, versions and CI
+
+- **Locked versions.** `package-lock.json` (api and frontend) record the exact version of every dependency, direct or
+  transitive. The Dockerfiles and CI install with `npm ci`, which fail rather than
+  quietly resolve something different. Change dependencies on purpose (`npm install <pkg>`, or edit
+  the `.csproj`), then commit the lock file with it.
+- **Versioning.** The app follows [Semantic Versioning](https://semver.org/); changes are in
+  [CHANGELOG.md](CHANGELOG.md). For a web API, removing or renaming a route or a JSON field is a
+  breaking change (a new major version); adding one is a minor one.
+- **CI.** `.github/workflows/fullstack-node-postgres.yml` runs on every push and pull request: install from
+  the lock files, type-check, all the tests (including against a real database), a production build,
+  `docker compose build`, and an audit that fails on high or critical vulnerabilities.
+- **Updates.** Dependabot (`.github/dependabot.yml`) opens weekly pull requests for npm
+  packages and monthly ones for the Docker base images; CI tests each before you merge.
+- **Walkthrough.** [walkthrough/](walkthrough/) explains every file, line by line.
+
 ## Design decisions
 
 - **Multi-stage Dockerfiles.** Build tools (the TypeScript compiler and dev dependencies, `npm` for the frontend) stay in the build
@@ -137,7 +182,6 @@ kubectl delete namespace tasks-node
 - A real migrations tool instead of create-on-startup
 - An Ingress controller with a hostname instead of a LoadBalancer port
 - HorizontalPodAutoscaler on the API (needs metrics-server)
-- GitHub Actions to build and test the images on every push
 - Secrets from a secret manager instead of a committed manifest
 
 ## Troubleshooting

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- A small web API over Snack 2's repository: same events, same reports, as JSON. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\snack2-access-event-log\src\AccessLog.Core\AccessLog.Core.csproj" />
+  </ItemGroup>
+
+</Project>

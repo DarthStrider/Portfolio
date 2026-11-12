@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Everything except the window: models, the simulator and the ViewModels. It targets plain
+    net10.0 (no WPF), so the tests run on any OS and the same ViewModels could back another view.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

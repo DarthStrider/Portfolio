@@ -1,0 +1,93 @@
+# CI for genetec/: builds every snack (the WPF apps need Windows) and runs all the tests.
+# Runs on every push and pull request.
+name: genetec
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: build and test (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: genetec
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: genetec/global.json
+      # --locked-mode only enforces a lock file that exists, so check every project has one.
+      - name: Every project has a committed lock file
+        shell: bash
+        run: |
+          missing=0
+          for proj in $(git ls-files '*.csproj'); do
+            lock="$(dirname "$proj")/packages.lock.json"
+            git ls-files --error-unmatch "$lock" > /dev/null 2>&1 || { echo "::error file=$proj::no committed $lock"; missing=1; }
+          done
+          exit $missing
+      # --locked-mode: restore exactly what the packages.lock.json files record, or fail.
+      - run: dotnet restore Genetec.slnx --locked-mode
+      - run: dotnet build Genetec.slnx --no-restore -c Release -warnaserror
+      - run: dotnet test --solution Genetec.slnx --no-build -c Release
+      - name: Vulnerable packages
+        shell: bash
+        run: |
+          dotnet list Genetec.slnx package --vulnerable --include-transitive | tee vulnerable.txt
+          ! grep -q -E "High|Critical" vulnerable.txt
+
+  sqlserver:
+    name: SQL Server tests (Linux)
+    # Windows runners can't run the SQL Server container, so the database tests run here.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: genetec
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Genetec-ci-Passw0rd
+        ports: ["1433:1433"]
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Genetec-ci-Passw0rd -C -Q 'SELECT 1' || exit 1"
+          --health-interval 10s --health-timeout 5s --health-retries 12 --health-start-period 20s
+    env:
+      TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=Genetec-ci-Passw0rd;TrustServerCertificate=True
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: genetec/global.json
+      - run: dotnet restore snack2-access-event-log/tests/AccessLog.Tests --locked-mode
+      - run: dotnet build snack2-access-event-log/tests/AccessLog.Tests --no-restore -c Release -warnaserror
+      - run: dotnet test --project snack2-access-event-log/tests/AccessLog.Tests --no-build -c Release
+
+  web:
+    name: snack 4 web page
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: genetec/snack4-web-dashboard/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: genetec/snack4-web-dashboard/web/.nvmrc
+          cache: npm
+          cache-dependency-path: genetec/snack4-web-dashboard/web/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high

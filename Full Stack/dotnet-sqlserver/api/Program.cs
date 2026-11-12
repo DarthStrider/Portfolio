@@ -34,7 +34,7 @@ api.MapGet("/tasks", async (AppDbContext db) =>
 
 api.MapPost("/tasks", async (CreateTaskRequest request, AppDbContext db) =>
 {
-    if (!IsValidTitle(request.Title))
+    if (!TaskRules.IsValidTitle(request.Title))
         return Results.BadRequest(new { error = "title is required (1-200 characters)" });
 
     var task = new TaskItem { Title = request.Title!.Trim() };
@@ -45,7 +45,7 @@ api.MapPost("/tasks", async (CreateTaskRequest request, AppDbContext db) =>
 
 api.MapPatch("/tasks/{id:int}", async (int id, UpdateTaskRequest request, AppDbContext db) =>
 {
-    if (request.Title is not null && !IsValidTitle(request.Title))
+    if (request.Title is not null && !TaskRules.IsValidTitle(request.Title))
         return Results.BadRequest(new { error = "title must be 1-200 characters" });
 
     var task = await db.Tasks.FindAsync(id);
@@ -65,9 +65,6 @@ api.MapDelete("/tasks/{id:int}", async (int id, AppDbContext db) =>
 });
 
 app.Run();
-
-static bool IsValidTitle(string? title) =>
-    !string.IsNullOrWhiteSpace(title) && title.Length <= 200;
 
 // Creates the database and table on first start. SQL Server takes 10-30 seconds to
 // boot, so keep retrying rather than crashing while it comes up.
@@ -90,3 +87,6 @@ static async Task EnsureDatabaseAsync(WebApplication app, int attempts = 30)
         }
     }
 }
+
+// Lets the tests start this app in memory with WebApplicationFactory<Program>.
+public partial class Program { }

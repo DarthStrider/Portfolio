@@ -125,7 +125,7 @@ def listing(path, a, b, lang):
     pre = Preformatted("\n".join(out), code)
     # Preformatted can't render markup; use XPreformatted-like Paragraph lines instead.
     paras = [Paragraph(o.replace(" ", "&nbsp;").replace("<font&nbsp;color=", "<font color="), code) for o in out]
-    tag = {"go": ("Go", GO), "php": ("PHP", PHP), "ts": ("TypeScript", REACT), "conf": ("nginx", INFRA)}[lang]
+    tag = {"go": ("Go", GO), "php": ("PHP", PHP), "ts": ("TypeScript", REACT), "conf": ("nginx", INFRA), "yaml": ("YAML", INFRA)}[lang]
     head = Paragraph(f"<font color='{tag[1].hexval().replace('0x', '#')}'><b>{tag[0]}</b></font>  "
                      f"<font color='#586b64'>{esc(path)}, lines {a}–{b}</font>", small)
     t = Table([[p] for p in paras], colWidths=[6.75 * inch])
@@ -621,6 +621,54 @@ T([["Path (under /api/v1)", "Service", "Who"],
    ["catalog/products/{id}/reviews", "catalog", "read: anyone; write: verified buyers"],
    ["admin/catalog/* · admin/content/*", "catalog", "staff (delete product: admin)"]],
   [3.9 * inch, 0.8 * inch, 2.05 * inch])
+
+
+# ======================= APPENDIX: CI =======================
+WF = "../../.github/workflows/fullstack-go-php-mongo.yml"
+story.append(PageBreak())
+story.append(Heading("Appendix: dependencies, versions and CI", h1, 0))
+P("Three languages means three package managers, and each has its own lock file. The idea is the same in all of "
+  "them: the manifest says what's allowed, the lock records exactly what was installed, and CI installs from the lock.")
+T([["", "Manifest (allowed)", "Lock (exact, with hashes)", "Install exactly"],
+   ["Go services", "go.mod", "go.sum", "go mod download, then go mod verify"],
+   ["PHP catalog", "composer.json", "composer.lock", "composer install"],
+   ["React storefront", "package.json", "package-lock.json", "npm ci"]],
+  [1.35 * inch, 1.5 * inch, 1.75 * inch, 2.15 * inch])
+H2("Go: minimum version selection")
+P("go.mod lists each module at a minimum version. Go doesn't take the newest release allowed; it takes the "
+  "<i>highest minimum</i> any module in the build asks for, so a build is reproducible even without a lock. go.sum "
+  "adds a checksum for every module, and <font face='Mono'>go mod verify</font> fails if a downloaded module doesn't "
+  "match. A major version is part of the import path (<font face='Mono'>go.mongodb.org/mongo-driver/v2</font>), so "
+  "a breaking upgrade is a deliberate code change, never a silent update.")
+H2("PHP: Composer")
+P("composer.json uses caret ranges like npm (<font face='Mono'>\"laravel/framework\": \"^12.0\"</font>: any 12.x). "
+  "With composer.lock committed, <font face='Mono'>composer install</font> ignores the ranges and installs the locked "
+  "versions; <font face='Mono'>composer update</font> is the deliberate step that moves them. "
+  "<font face='Mono'>config.platform</font> tells Composer to resolve as if PHP were 8.3.0, the oldest supported, "
+  "so a developer on a newer PHP can't lock a package that needs it.")
+H2("The workflow")
+code_block(WF, "  go:", "yaml", "- run: go test -race ./...")
+notes(WF, [("go-version-file:", "The Go version comes from go.mod's <font face='Mono'>go</font> line, so CI and "
+            "developers agree."),
+           ("- run: go vet ./...", "Static checks the compiler doesn't make: wrong printf verbs, copied locks, unreachable code."),
+           ("- run: go test -race ./...", "The race detector instruments memory access and fails a test that reads "
+            "and writes the same data from two goroutines without synchronization. The relays and consumers are "
+            "concurrent, so this matters here.")])
+code_block(WF, "  catalog:", "yaml", "- run: composer audit --locked --no-dev")
+notes(WF, [("extensions: mongodb, sockets", "PHP extensions the catalog needs: the MongoDB driver and sockets for RabbitMQ."),
+           ("- run: composer validate --no-check-publish", "Fails if composer.json is malformed or the lock is out "
+            "of date with it."),
+           ("- run: composer audit --locked --no-dev", "Known vulnerabilities in the locked runtime packages fail the job.")])
+code_block(WF, "  images:", "yaml", "- run: docker compose build")
+P("The storefront job runs <font face='Mono'>npm ci</font>, the build and <font face='Mono'>npm audit</font>, and "
+  "the images job builds every Dockerfile the way Compose does. Like the other Full Stack workflows, it runs on every "
+  "push to every branch and every pull request. Dependabot opens weekly pull requests for go.mod, composer.json and "
+  "package.json, and monthly ones for the Dockerfiles' base images; this workflow tests each one before it's merged.")
+QA("Why does Go not need ranges like ^1.10?",
+   "Minimum version selection: each module states the oldest version it works with, and the build uses the highest of "
+   "those. Nothing changes until someone raises a minimum, so builds don't drift.")
+QA("composer install vs composer update?",
+   "install follows the lock; update re-resolves the ranges and rewrites it. CI and Docker only ever install.")
 
 
 # ======================= BUILD =======================

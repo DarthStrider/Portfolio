@@ -1,4 +1,6 @@
-# Dependabot opens pull requests for dependency updates; the snack1 workflow tests each one.
+# Dependabot opens pull requests for dependency updates; the CI workflows test each one.
+# @types/node majors are ignored everywhere: the types should match the oldest Node a project
+# supports ("engines"), and move only when that does.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -19,6 +21,125 @@ updates:
       tooling:
         dependency-type: development
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  # ---- Full Stack ----
+  - package-ecosystem: npm
+    directories:
+      - "/Full Stack/node-postgres/api"
+      - "/Full Stack/node-postgres/frontend"
+      - "/Full Stack/dotnet-sqlserver/frontend"
+      - "/Full Stack/go-php-mongo/web"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "full stack"
+    groups:
+      # React and its types are released together.
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: nuget
+    directory: "/Full Stack/dotnet-sqlserver"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "full stack"
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directory: "/Full Stack/go-php-mongo/services/go"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "full stack"
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: composer
+    directory: "/Full Stack/go-php-mongo/services/catalog"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "full stack"
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # Base images in the Dockerfiles (node, nginx, the .NET SDK, golang, php...).
+  - package-ecosystem: docker
+    directories:
+      - "/Full Stack/node-postgres/api"
+      - "/Full Stack/node-postgres/frontend"
+      - "/Full Stack/dotnet-sqlserver/api"
+      - "/Full Stack/dotnet-sqlserver/frontend"
+      - "/Full Stack/go-php-mongo/gateway"
+      - "/Full Stack/go-php-mongo/services/go"
+      - "/Full Stack/go-php-mongo/services/catalog"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "full stack"
+
+  # ---- genetec ----
+  - package-ecosystem: nuget
+    directories:
+      - "/genetec/snack1-camera-status-monitor/src/CameraMonitor.App"
+      - "/genetec/snack1-camera-status-monitor/src/CameraMonitor.Core"
+      - "/genetec/snack1-camera-status-monitor/tests/CameraMonitor.Tests"
+      - "/genetec/snack2-access-event-log/src/AccessLog.App"
+      - "/genetec/snack2-access-event-log/src/AccessLog.Core"
+      - "/genetec/snack2-access-event-log/tests/AccessLog.Tests"
+      - "/genetec/snack3-plugin-framework/modules/AfterHoursAutoLock"
+      - "/genetec/snack3-plugin-framework/modules/DoorForcedEmail"
+      - "/genetec/snack3-plugin-framework/src/SolutionFramework.Abstractions"
+      - "/genetec/snack3-plugin-framework/src/SolutionFramework.Common"
+      - "/genetec/snack3-plugin-framework/src/SolutionFramework.Host"
+      - "/genetec/snack3-plugin-framework/tests/SolutionFramework.Tests"
+      - "/genetec/snack4-web-dashboard/api/Dashboard.Api"
+      - "/genetec/snack4-web-dashboard/tests/Dashboard.Api.Tests"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "genetec"
+    groups:
+      # xUnit's packages are released together.
+      xunit:
+        patterns: ["xunit*"]
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: "/genetec/snack4-web-dashboard/web"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "genetec"
+    groups:
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

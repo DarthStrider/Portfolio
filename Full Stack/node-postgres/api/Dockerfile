@@ -1,8 +1,9 @@
 # ---- build stage: compile TypeScript ----
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+# npm ci installs exactly what package-lock.json records (and fails if it disagrees with package.json).
+RUN npm ci
 COPY . .
 RUN npm run build
 
@@ -10,8 +11,8 @@ RUN npm run build
 FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app
-COPY package*.json ./
-RUN npm install --omit=dev && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 # Don't run as root.
 USER node

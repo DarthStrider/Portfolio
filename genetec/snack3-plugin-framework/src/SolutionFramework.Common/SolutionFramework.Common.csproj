@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared plumbing every solution needs and none should rewrite: logging and configuration. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SolutionFramework.Abstractions\SolutionFramework.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
