@@ -32,8 +32,13 @@ public sealed class SqlServerAccessEventRepository(string connectionString) : IA
         builder.InitialCatalog = "master";
         using (var master = new SqlConnection(builder.ConnectionString))
         {
+            // EXEC() only takes strings and variables, so build the statement first. QUOTENAME
+            // brackets the name, so it can't be used to inject SQL.
             await master.ExecuteAsync(
-                "IF DB_ID(@database) IS NULL EXEC(N'CREATE DATABASE ' + QUOTENAME(@database));",
+                """
+                DECLARE @create NVARCHAR(300) = N'CREATE DATABASE ' + QUOTENAME(@database);
+                IF DB_ID(@database) IS NULL EXEC (@create);
+                """,
                 new { database });
         }
 
