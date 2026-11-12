@@ -23,7 +23,7 @@ jobs:
         working-directory: genetec
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: genetec/global.json
       # --locked-mode only enforces a lock file that exists, so check every project has one.
@@ -67,7 +67,7 @@ jobs:
       TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=Genetec-ci-Passw0rd;TrustServerCertificate=True
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: genetec/global.json
       - run: dotnet restore snack2-access-event-log/tests/AccessLog.Tests --locked-mode
