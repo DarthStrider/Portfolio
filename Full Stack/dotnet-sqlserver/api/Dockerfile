@@ -8,7 +8,7 @@ COPY . .
 RUN dotnet publish -c Release -o /app --no-restore
 
 # ---- runtime stage: ASP.NET runtime only (no SDK) ----
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:11.0
 WORKDIR /app
 COPY --from=build /app .
 # The official image listens on 8080 and provides a non-root user.
