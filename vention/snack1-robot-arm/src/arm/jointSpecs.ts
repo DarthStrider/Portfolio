@@ -24,13 +24,23 @@ export const ARM: ArmDimensions = {
 /**
  * The arm is built from this list, so adding or re-limiting a joint is a data
  * change. Home pose: gripper pointing straight down (30 + 90 + 60 = 180 degrees).
+ *
+ * Roll turns the gripper about its own axis (the Y axis of the wrist link), which is
+ * vertical whenever the gripper points straight down. It lines the fingers up with
+ * a box's sides, and turns what the gripper is holding. The tool center point is on
+ * that axis, so roll never moves it: forward kinematics ignores it.
  */
 export const JOINTS: readonly JointSpec[] = [
   { name: "Base", axis: "y", min: -180, max: 180, home: 45 },
   { name: "Shoulder", axis: "z", min: -100, max: 100, home: 30 },
   { name: "Elbow", axis: "z", min: -140, max: 140, home: 90 },
   { name: "Wrist", axis: "z", min: -120, max: 120, home: 60 },
+  { name: "Roll", axis: "y", min: -180, max: 180, home: 0 },
 ];
+
+/** Index of each joint in JOINTS and in every angle array. */
+export const BASE = 0;
+export const ROLL = 4;
 
 /**
  * Demo motion: each joint sways around its home angle at its own frequency, so
@@ -42,6 +52,7 @@ const DEMO_MOTION = [
   { amplitude: 20, frequency: 0.11 },
   { amplitude: 18, frequency: 0.13 },
   { amplitude: 30, frequency: 0.17 },
+  { amplitude: 90, frequency: 0.05 },
 ] as const;
 
 /** Target angle in degrees for joint `index` at `time` seconds into the demo. */

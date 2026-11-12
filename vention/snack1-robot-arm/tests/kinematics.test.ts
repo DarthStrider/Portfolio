@@ -38,7 +38,8 @@ function matrixChainFK(q: number[]): Vec3 {
     translateY(ARM.shoulderHeight), rotateZ(q[1]),
     translateY(ARM.upperArm), rotateZ(q[2]),
     translateY(ARM.forearm), rotateZ(q[3]),
-    translateY(ARM.wrist + ARM.tool),
+    translateY(ARM.wrist), rotateY(q[4] ?? 0), // roll turns about the tool axis...
+    translateY(ARM.tool), // ...which the TCP is on, so it never moves the TCP
   ].reduce(multiply);
   return { x: chain[3], y: chain[7], z: chain[11] }; // translation column
 }

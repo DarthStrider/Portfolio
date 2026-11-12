@@ -36,6 +36,13 @@
         <p class="diff">Difference: <span id="fk-diff"></span></p>
       </section>
 
+      <section id="program" class="program" hidden aria-live="polite">
+        <h2>Pick and place</h2>
+        <p class="program-step"><span id="program-label"></span> <span id="program-count" class="muted"></span></p>
+        <div class="program-bar"><span id="program-progress"></span></div>
+        <button type="button" id="btn-stop-program">Stop</button>
+      </section>
+
       <div class="toggles">
         <button type="button" id="btn-demo" aria-pressed="true">Demo</button>
         <button type="button" id="btn-gripper" aria-pressed="true">Gripper open</button>
@@ -46,10 +53,11 @@
       <details class="help">
         <summary>Controls</summary>
         <ul>
-          <li><kbd>1</kbd>–<kbd>4</kbd> or click a blue joint: select</li>
+          <li><kbd>1</kbd>–<kbd>5</kbd> or click a blue joint: select</li>
           <li><kbd>←</kbd> <kbd>→</kbd> (or <kbd>A</kbd> <kbd>D</kbd>): rotate selected joint</li>
           <li><kbd>↑</kbd> <kbd>↓</kbd>: previous / next joint</li>
           <li><kbd>G</kbd> gripper · <kbd>Space</kbd> demo · <kbd>T</kbd> trail · <kbd>R</kbd> reset</li>
+          <li>Shapes tab → <strong>Pick</strong>, then click where the robot should put it; <kbd>Q</kbd> <kbd>E</kbd> turn it on the way</li>
           <li>Drag to orbit, scroll to zoom, right-drag to pan</li>
         </ul>
       </details>

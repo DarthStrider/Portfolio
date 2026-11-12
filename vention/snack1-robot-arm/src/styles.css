@@ -108,6 +108,13 @@ button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(
 .diff { margin: 8px 0 0; color: var(--muted); }
 .diff span { color: var(--text); font-variant-numeric: tabular-nums; }
 
+.program { margin-top: 16px; }
+.program h2 { margin-top: 0; }
+.program-step { margin: 0 0 6px; }
+.muted { color: var(--muted); }
+.program-bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin-bottom: 8px; }
+.program-bar span { display: block; height: 100%; width: 0; background: var(--accent); }
+.program button { width: 100%; }
 .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 16px; }
 
 .help { margin-top: 14px; color: var(--muted); }

@@ -135,7 +135,7 @@ const palmMesh = addMesh("Palm", palm, ANODIZED);
 const leftMesh = addMesh("FingerLeft", finger(1), ACCENT);
 const rightMesh = addMesh("FingerRight", finger(-1), ACCENT);
 
-const OPEN_X = 0.07;
+const OPEN_X = 0.085; // fully open: 12.6 cm between the grip pads (src/arm/Gripper.ts)
 const gltf = {
   asset: { version: "2.0", generator: "robot-arm/scripts/build-gripper.ts" },
   scene: 0,
