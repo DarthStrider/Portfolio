@@ -49,13 +49,20 @@ console.log("hint after Q x3:", await page.locator("#shapes-panel p.hint").first
 await shot(page, "02-choosing-spot");
 await page.mouse.click(target.x, target.y);
 
-const t0 = Date.now();
-for (const [ms, name] of [[1800, "03-above"], [3300, "04-gripped"], [5200, "05-carrying"], [7600, "06-placed"], [12500, "07-done"]]) {
-  await page.waitForTimeout(Math.max(0, ms - (Date.now() - t0)));
-  console.log(name, "program:", await page.locator("#program").isVisible() ? await page.locator("#program-label").textContent() : "(hidden)");
-  await shot(page, name);
+const seen = new Set();
+for (let i = 0; i < 400; i++) {
+  await page.waitForTimeout(250);
+  if (!(await page.locator("#program").isVisible())) break;
+  const label = await page.locator("#program-label").textContent();
+  if (!seen.has(label)) {
+    seen.add(label);
+    console.log("step:", label);
+    if (/^(Grip|Carry|Lower)/.test(label)) await shot(page, `step-${seen.size}`);
+  }
 }
-console.log("status:", await page.locator("#shapes-panel p.shapes-status").textContent());
+await page.waitForTimeout(1500);
+await shot(page, "99-done");
+console.log("status:", await page.locator("#shapes-panel p.shapes-status").last().textContent());
 const after = (await (await fetch(`${API}/shapes`)).json()).find((s) => s.id === created.id);
 console.log("saved", JSON.stringify({ position: after.position, rotationY: after.rotationY }));
 console.log("errors", JSON.stringify(errors));
