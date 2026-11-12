@@ -13,9 +13,15 @@ runs or uses the project, MINOR for new features, PATCH for fixes.
   and `npm test` passes a quoted glob (`"tests/**/*.test.ts"`) that only Node 21+ expands itself.
   Because this can stop the project running for someone on Node 20, the next release is 2.0.0.
 - `npm run build` type-checks through the new `typecheck` script.
+- Build tools upgraded through Dependabot: Vite 6 → 8 and TypeScript 5.9 → 7.0. Both are major
+  versions of development tools only, so nothing changes for anyone using the app.
+- CI runs on every push to any branch and every pull request, not only on changes to this folder.
 
 ### Added
 
+- `npm start`: starts the inventory database and API (Snack 5) in Docker, waits until they're
+  ready, then the arm. `npm run start:mongo` does the same with MongoDB, and `npm run db:down`
+  stops the containers.
 - `npm run typecheck`, `npm run test:coverage` (coverage of `src/`) and `npm run check`
   (type-check and tests, what to run before pushing).
 - `.nvmrc` pinning Node 22, matching the new `engines` field in `package.json`.

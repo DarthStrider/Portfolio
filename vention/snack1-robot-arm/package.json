@@ -8,6 +8,11 @@
   },
   "scripts": {
     "dev": "vite",
+    "start": "npm run db:up && vite",
+    "start:mongo": "npm run db:up:mongo && vite",
+    "db:up": "docker compose -f ../snack5-inventory/docker-compose.yml --profile postgres up -d --build --wait",
+    "db:up:mongo": "docker compose -f ../snack5-inventory/docker-compose.yml --profile mongo up -d --build --wait",
+    "db:down": "docker compose -f ../snack5-inventory/docker-compose.yml --profile postgres --profile mongo down",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
