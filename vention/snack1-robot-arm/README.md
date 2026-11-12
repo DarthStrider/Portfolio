@@ -59,14 +59,19 @@ npm run build      # type-check + production build into dist/
 
 ### Shapes (needs Snack 5's API)
 
-The Shapes panel on the right saves to the inventory API, so start that first:
+The Shapes panel on the right saves to the inventory API. One command starts everything, with Docker
+Desktop running:
 
 ```powershell
-cd vention/snack5-inventory
-docker compose --profile postgres up --build     # or --profile mongo; API at http://localhost:8081
+cd vention/snack1-robot-arm
+npm start          # PostgreSQL + API + web in Docker (waits until they're ready), then the arm
+npm run start:mongo   # the same with MongoDB
+npm run db:down    # stop the database and API (your data is kept in a Docker volume)
 ```
 
-Then run this app as above. Without the API the arm works as before and the panel says it's offline.
+<kbd>Ctrl</kbd>+<kbd>C</kbd> stops the arm; the containers keep running until `npm run db:down`, so the
+next `npm start` is quick. `npm run dev` still starts the arm alone. Without the API the arm works as
+before and the panel says it's offline.
 To use the API without Docker (`DB=memory npm start` in `snack5-inventory/api`, port 8080), start this
 app with `$env:VITE_INVENTORY_API="http://localhost:8080"; npm run dev`.
 
