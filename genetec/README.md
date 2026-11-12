@@ -4,10 +4,33 @@ A set of small projects mirroring Genetec's stack: desktop security software in 
 
 | # | Project | Stack | Effort | Status |
 |---|---|---|---|---|
-| 1 | [Camera Status Monitor](snack1-camera-status-monitor/) | WPF, MVVM | ~1.5 days | Not started |
-| 2 | [Access Event Log](snack2-access-event-log/) | WPF, SQL Server, .NET Framework 4.8 | ~1.5 days | Not started |
-| 3 | [Mini Plugin Framework](snack3-plugin-framework/) | C#, reflection | ~1 day | Not started |
-| 4 | [Web Dashboard](snack4-web-dashboard/) _(optional)_ | ASP.NET Core, React, TypeScript | ~0.5 day | Not started |
+| 1 | [Camera Status Monitor](snack1-camera-status-monitor/) | WPF, MVVM, .NET 10 | ~1.5 days | Built |
+| 2 | [Access Event Log](snack2-access-event-log/) | WPF, SQL Server, Dapper, .NET Framework 4.8 | ~1.5 days | Built |
+| 3 | [Mini Plugin Framework](snack3-plugin-framework/) | C#, reflection, AssemblyLoadContext | ~1 day | Built |
+| 4 | [Web Dashboard](snack4-web-dashboard/) _(optional)_ | ASP.NET Core, React, TypeScript | ~0.5 day | Built |
+
+## Building and testing
+
+All four snacks are in one solution, `Genetec.slnx`. With the [.NET 10 SDK](https://dotnet.microsoft.com/download)
+(Windows for the two WPF apps):
+
+```powershell
+cd genetec
+dotnet restore --locked-mode   # exactly the versions in each packages.lock.json
+dotnet build
+dotnet test
+```
+
+Each snack's README covers running it. `global.json` pins the SDK (any 10.0 feature band) and opts
+into Microsoft.Testing.Platform, which xUnit v3 needs with `dotnet test` on .NET 10.
+
+- **CI:** `.github/workflows/genetec.yml` runs on every push and pull request. It builds everything
+  on Windows with warnings as errors, runs all the tests, runs Snack 2's database tests against a
+  real SQL Server on Linux, tests and builds Snack 4's page, and fails on high or critical package
+  vulnerabilities and on any project without a committed lock file.
+- **Versions:** see [CHANGELOG.md](CHANGELOG.md); `Directory.Build.props` holds the version.
+- **Updates:** Dependabot opens weekly pull requests for NuGet and npm packages.
+- **Walkthrough:** [Four Snacks, Line by Line](walkthrough/genetec-snacks-book.pdf) explains every project.
 
 ---
 
