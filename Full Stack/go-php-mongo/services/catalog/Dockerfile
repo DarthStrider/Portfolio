@@ -1,7 +1,7 @@
 # catalog-service (Laravel 12, PHP 8.3) and its events worker share this image.
 FROM composer:2 AS composer
 
-FROM php:8.3-cli-bookworm AS base
+FROM php:8.5-cli-bookworm AS base
 # mongodb: the MongoDB driver extension. sockets: needed by php-amqplib. pcntl: lets
 # artisan commands handle stop signals.
 RUN apt-get update && apt-get install -y --no-install-recommends git unzip libssl-dev \
