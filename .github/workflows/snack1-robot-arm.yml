@@ -30,7 +30,7 @@ jobs:
         # The lowest version package.json's "engines" allows, and the current LTS.
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v5
         with:
@@ -53,7 +53,7 @@ jobs:
     name: audit runtime dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
           node-version-file: vention/snack1-robot-arm/.nvmrc
