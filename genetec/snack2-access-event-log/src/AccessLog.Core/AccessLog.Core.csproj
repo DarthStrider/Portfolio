@@ -11,6 +11,11 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="*" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="*" />
+    <!--
+      SqlClient depends on System.Security.Cryptography.Pkcs, and the versions it asks for have
+      known vulnerabilities. Referencing a patched version directly overrides the transitive one.
+    -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.*" />
   </ItemGroup>
 
   <!-- Lets net48 build anywhere (including Linux CI) without the .NET Framework targeting pack. -->

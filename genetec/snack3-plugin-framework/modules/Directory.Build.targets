@@ -1,0 +1,18 @@
+<Project>
+  <!--
+    Imported by every module project. After a module builds, its output (its DLL, its .deps.json and
+    any libraries of its own) is copied to artifacts/modules/<ModuleName>/, which is where the host
+    looks when run from source. Shipping a module means copying that one folder.
+  -->
+  <PropertyGroup>
+    <ModulesFolder>$(MSBuildThisFileDirectory)..\artifacts\modules\$(AssemblyName)\</ModulesFolder>
+  </PropertyGroup>
+
+  <Target Name="CopyModuleToModulesFolder" AfterTargets="Build">
+    <ItemGroup>
+      <ModuleOutput Include="$(OutDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ModuleOutput)" DestinationFiles="@(ModuleOutput->'$(ModulesFolder)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

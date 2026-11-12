@@ -1,0 +1,12 @@
+{
+  // Each module reads only its own section, found by the module's Name.
+  "DoorForcedEmail": {
+    "To": "security-desk@example.com",
+    // Don't send another email for the same door within this many seconds.
+    "QuietSeconds": 300
+  },
+  "AfterHoursAutoLock": {
+    "Start": "19:00",
+    "End": "07:00"
+  }
+}

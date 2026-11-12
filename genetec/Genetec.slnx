@@ -9,4 +9,12 @@
     <Project Path="snack2-access-event-log/src/AccessLog.App/AccessLog.App.csproj" />
     <Project Path="snack2-access-event-log/tests/AccessLog.Tests/AccessLog.Tests.csproj" />
   </Folder>
+  <Folder Name="/snack3-plugin-framework/">
+    <Project Path="snack3-plugin-framework/src/SolutionFramework.Abstractions/SolutionFramework.Abstractions.csproj" />
+    <Project Path="snack3-plugin-framework/src/SolutionFramework.Common/SolutionFramework.Common.csproj" />
+    <Project Path="snack3-plugin-framework/src/SolutionFramework.Host/SolutionFramework.Host.csproj" />
+    <Project Path="snack3-plugin-framework/modules/DoorForcedEmail/DoorForcedEmail.csproj" />
+    <Project Path="snack3-plugin-framework/modules/AfterHoursAutoLock/AfterHoursAutoLock.csproj" />
+    <Project Path="snack3-plugin-framework/tests/SolutionFramework.Tests/SolutionFramework.Tests.csproj" />
+  </Folder>
 </Solution>

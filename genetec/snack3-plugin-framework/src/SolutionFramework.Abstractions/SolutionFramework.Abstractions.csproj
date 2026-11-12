@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The contract between the host and its modules, and nothing else. Modules compile against it but
+    don't ship a copy: at run time every module uses the host's one, so ISolutionModule is the same
+    type on both sides. Keep it small and stable; changing it is a breaking change for every module.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

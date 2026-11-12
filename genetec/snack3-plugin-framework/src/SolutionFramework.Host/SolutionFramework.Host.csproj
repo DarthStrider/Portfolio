@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The host: loads modules from a folder, routes simulated events to them, and carries out the
+    commands they send. It doesn't reference any module; it only knows ISolutionModule.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>solution-host</AssemblyName>
+    <RootNamespace>SolutionFramework.Host</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SolutionFramework.Abstractions\SolutionFramework.Abstractions.csproj" />
+    <ProjectReference Include="..\SolutionFramework.Common\SolutionFramework.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="modules.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

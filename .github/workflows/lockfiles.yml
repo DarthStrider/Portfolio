@@ -47,6 +47,13 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Build and test genetec (feedback only)
+        continue-on-error: true
+        working-directory: genetec
+        run: |
+          dotnet build Genetec.slnx -c Release -warnaserror 2>&1 | grep -E "error|warning|Build succeeded|Time Elapsed" | sort -u | head -80
+          dotnet test --solution Genetec.slnx -c Release --no-build 2>&1 | tail -60
+
       - name: Collect
         run: |
           out="$(cygpath -u "$RUNNER_TEMP")/locks"

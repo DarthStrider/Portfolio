@@ -28,7 +28,7 @@ public sealed class AccessSimulator(IAccessEventRepository repository, Random ra
     private IReadOnlyList<Device> _doors = [];
     private IReadOnlyList<Device> _cameras = [];
     private IReadOnlyList<Cardholder> _cardholders = [];
-    private readonly Dictionary<int, string> _cameraStatus = [];
+    private readonly Dictionary<int, string> _cameraStatus = new();
 
     /// <summary>Badge numbers that are always refused (expired or revoked).</summary>
     public static readonly string[] RevokedBadges = ["B-1009", "B-1010"];
