@@ -1,5 +1,5 @@
 # ---- build stage: restore and publish with the .NET SDK ----
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 COPY TaskApi.csproj packages.lock.json ./
 # --locked-mode restores exactly what packages.lock.json records, and fails if the project disagrees.
