@@ -1,5 +1,5 @@
 # ---- build stage: compile TypeScript ----
-FROM node:22-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 # npm ci installs exactly what package-lock.json records (and fails if it disagrees with package.json).
@@ -8,7 +8,7 @@ COPY . .
 RUN npm run build
 
 # ---- runtime stage: production dependencies + compiled JS only ----
-FROM node:22-alpine
+FROM node:25-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./
