@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/snack1-camera-status-monitor/">
+    <Project Path="snack1-camera-status-monitor/src/CameraMonitor.Core/CameraMonitor.Core.csproj" />
+    <Project Path="snack1-camera-status-monitor/src/CameraMonitor.App/CameraMonitor.App.csproj" />
+    <Project Path="snack1-camera-status-monitor/tests/CameraMonitor.Tests/CameraMonitor.Tests.csproj" />
+  </Folder>
+</Solution>

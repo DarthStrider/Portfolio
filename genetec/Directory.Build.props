@@ -1,0 +1,12 @@
+<Project>
+  <!-- Settings shared by every project under genetec/. -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- Write packages.lock.json next to each project: the exact version of every package. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- The version of the snacks, following Semantic Versioning (see CHANGELOG.md). -->
+    <Version>1.0.0</Version>
+    <Authors>Kyle Gartner</Authors>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,37 @@
+# CI for genetec/: builds every snack (the WPF apps need Windows) and runs all the tests.
+# Runs on every push and pull request.
+name: genetec
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: build and test (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: genetec
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: genetec/global.json
+      # --locked-mode: restore exactly what the packages.lock.json files record, or fail.
+      - run: dotnet restore Genetec.slnx --locked-mode
+      - run: dotnet build Genetec.slnx --no-restore -c Release -warnaserror
+      - run: dotnet test Genetec.slnx --no-build -c Release
+      - name: Vulnerable packages
+        shell: bash
+        run: |
+          dotnet list Genetec.slnx package --vulnerable --include-transitive | tee vulnerable.txt
+          ! grep -q -E "High|Critical" vulnerable.txt

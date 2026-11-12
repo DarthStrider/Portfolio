@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The WPF window. Windows only; everything it shows comes from CameraMonitor.Core. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Lets the project restore and build on Linux too (CI checks the XAML compiles there). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>CameraMonitor</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CameraMonitor.Core\CameraMonitor.Core.csproj" />
+  </ItemGroup>
+
+</Project>
