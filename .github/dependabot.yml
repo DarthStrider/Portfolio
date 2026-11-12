@@ -42,6 +42,12 @@ updates:
       # React and its types are released together.
       react:
         patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      # Vite and its React plugin must be upgraded together: each new major needs the other.
+      vite:
+        patterns: ["vite", "@vitejs/*"]
+      # The same for Stripe's two packages.
+      stripe:
+        patterns: ["@stripe/*"]
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
@@ -58,6 +64,10 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # EF Core and ASP.NET Core majors follow .NET: 11.x needs the project moved to net11.0.
+      - dependency-name: "Microsoft.*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: gomod
     directory: "/Full Stack/go-php-mongo/services/go"
@@ -95,6 +105,15 @@ updates:
       interval: monthly
     commit-message:
       prefix: "full stack"
+    ignore:
+      # Stay on Node's long-term-support line (22); odd majors are short-lived, and moving to the
+      # next LTS is a deliberate change (engines, .nvmrc, CI), not a base-image bump.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      # The images must match the .NET version the app targets (net10.0): changing it means
+      # retargeting the project too, so it's done by hand.
+      - dependency-name: "dotnet/*"
+        update-types: ["version-update:semver-major"]
 
   # ---- genetec ----
   - package-ecosystem: nuget
@@ -124,6 +143,13 @@ updates:
         patterns: ["xunit*"]
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Microsoft's System.* and Microsoft.* packages follow the .NET version: 10.x goes with
+      # net10.0. A major (11.x) means moving the whole solution to .NET 11, done by hand.
+      - dependency-name: "System.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: "/genetec/snack4-web-dashboard/web"
@@ -135,6 +161,8 @@ updates:
     groups:
       react:
         patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      vite:
+        patterns: ["vite", "@vitejs/*"]
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
