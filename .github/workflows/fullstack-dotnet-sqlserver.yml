@@ -33,7 +33,7 @@ jobs:
           --health-interval 10s --health-timeout 5s --health-retries 12 --health-start-period 20s
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: Full Stack/dotnet-sqlserver/global.json
       # --locked-mode only enforces a lock file that exists, so check every project has one.
