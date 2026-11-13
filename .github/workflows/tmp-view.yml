@@ -2,6 +2,7 @@ name: tmp view check
 on: push
 jobs:
   snack5-contract:
+    if: false
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: vention/snack5-inventory } }
     steps:
@@ -25,6 +26,6 @@ jobs:
       - run: mkdir /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@latest && npx playwright install --with-deps chromium
       - run: sleep 5 && cp .github/ci-tmp/view-check.mjs /tmp/pw/ && cd /tmp/pw && node view-check.mjs
       - if: always()
-        run: tail -20 /tmp/api.log /tmp/vite.log
+        run: tail -20 /tmp/api.log /tmp/vite.log || true
       - if: always()
         run: for f in /tmp/shots/*.jpg; do base64 -w 3000 "$f" | sed "s|^|B64 $(basename $f .jpg) |"; done

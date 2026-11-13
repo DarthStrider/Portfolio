@@ -31,15 +31,22 @@ export function createStage(canvas: HTMLCanvasElement) {
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   // Shadows cover 8 m × 8 m around where the camera is looking: main.ts moves the sun with
-  // the view (followSun), so the shadow map stays sharp however big the floor is.
+  // the view (followView), so the shadow map stays sharp however big the floor is.
   Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 0.5, far: 20 });
   sun.shadow.camera.updateProjectionMatrix();
   sun.shadow.normalBias = 0.02;
   scene.add(sun, sun.target);
   const SUN_OFFSET = new THREE.Vector3(2, 4, 2.5);
-  function followSun(target: THREE.Vector3) {
+  /**
+   * Called as the view moves: the sun (and so the sharp shadow area) follows what you're
+   * looking at, and the 10 cm lines fade out from 6 m away, where they'd only be noise.
+   */
+  function followView(target: THREE.Vector3) {
     sun.target.position.set(target.x, 0, target.z);
     sun.position.copy(sun.target.position).add(SUN_OFFSET);
+    const distance = camera.position.distanceTo(target);
+    fineMaterial.opacity = THREE.MathUtils.clamp((12 - distance) / 6, 0, 1);
+    fine.visible = fineMaterial.opacity > 0;
   }
 
   // An invisible floor that only shows shadows, a grid with a line every 10 cm and a
@@ -54,6 +61,8 @@ export function createStage(canvas: HTMLCanvasElement) {
 
   const fine = new THREE.GridHelper(size, size * 10, 0x262b33, 0x262b33);
   fine.position.y = 0.001; // avoid z-fighting with the shadow plane
+  const fineMaterial = fine.material as THREE.LineBasicMaterial;
+  fineMaterial.transparent = true;
   const meters = new THREE.GridHelper(size, size, 0x4a5361, 0x343a45);
   meters.position.y = 0.0015;
   const edge = new THREE.LineLoop(
@@ -75,5 +84,5 @@ export function createStage(canvas: HTMLCanvasElement) {
   window.addEventListener("resize", resize);
   resize();
 
-  return { renderer, scene, camera, controls, followSun };
+  return { renderer, scene, camera, controls, followView };
 }

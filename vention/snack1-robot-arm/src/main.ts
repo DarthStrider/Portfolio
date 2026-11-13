@@ -17,7 +17,7 @@ const JOG_SPEED = 60; // degrees per second while a key or jog button is held
 const DEMO_SMOOTHING = 3; // higher = joints follow the demo path more tightly
 
 const canvas = document.getElementById("scene") as HTMLCanvasElement;
-const { renderer, scene, camera, controls, followSun } = createStage(canvas);
+const { renderer, scene, camera, controls, followView } = createStage(canvas);
 
 const arm = new RobotArm(ARM, JOINTS);
 scene.add(arm.root);
@@ -319,7 +319,7 @@ canvas.addEventListener("pointermove", (e) => {
 // ---- Camera: the pad at the bottom of the screen, and keys ----
 
 const view = createView({
-  camera, controls, host: document.getElementById("view-pad")!, onMove: followSun,
+  camera, controls, host: document.getElementById("view-pad")!, onMove: followView,
   bounds: () => {
     const box = new THREE.Box3().setFromObject(arm.root);
     for (const root of [shapes.layer.root, belts.layer.root, line.binLayer.root]) box.union(new THREE.Box3().setFromObject(root));

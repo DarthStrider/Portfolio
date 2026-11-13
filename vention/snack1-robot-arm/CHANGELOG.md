@@ -24,6 +24,12 @@ runs or uses the project, MINOR for new features, PATCH for fixes.
 
 ### Added
 
+- A bigger floor: 20 m × 20 m (was 6 m × 6 m), with a line every meter on the grid and a blue
+  edge. Shapes, belts and bins can go anywhere on it. Needs Snack 5's API with the same limit.
+- Camera controls: a pad at the bottom of the screen (hold ▲ ◀ ▼ ▶ to move along the floor,
+  ⟲ ⟳ to orbit, ＋ − to zoom; **Fit**, **Top**, **Home**) and keys <kbd>I</kbd> <kbd>J</kbd>
+  <kbd>K</kbd> <kbd>L</kbd>, <kbd>U</kbd> <kbd>O</kbd>, <kbd>+</kbd> <kbd>−</kbd>, <kbd>F</kbd>,
+  <kbd>V</kbd>, <kbd>H</kbd>. Moving is faster the further out you are, and shadows follow the view.
 - Conveyor lines. Select a belt and extend it one section at a time: a straight of a typed length
   or dragged out with the mouse, a 45° or 90° curve, or a square corner transfer, each placed
   exactly at the end of the last. Move, turn and reverse act on the whole line; deleting a middle

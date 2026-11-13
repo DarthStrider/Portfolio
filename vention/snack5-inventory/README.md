@@ -145,7 +145,7 @@ replica set, the same steps could run inside a multi-document transaction instea
 | POST | `/api/reservations/{id}/release` | | Stock goes back to available |
 | POST | `/api/reservations/{id}/fulfil` | | Stock leaves the shelf |
 | GET | `/api/shapes` | | Shapes in the robot arm's scene, oldest first |
-| POST | `/api/shapes` | `{ "name": "Crate", "kind": "box", "size": { "x": 0.3, "y": 0.2, "z": 0.25 }, "color": "#d97706", "position": { "x": 0.5, "z": -0.2 }, "rotationY": 15 }` | 201 + shape (meters, degrees; round shapes' depth follows the diameter) |
+| POST | `/api/shapes` | `{ "name": "Crate", "kind": "box", "size": { "x": 0.3, "y": 0.2, "z": 0.25 }, "color": "#d97706", "position": { "x": 0.5, "z": -0.2 }, "rotationY": 15 }` | 201 + shape (meters, degrees; round shapes' depth follows the diameter). Positions of shapes, belts and bins are within 10 m of the arm's base each way |
 | PATCH | `/api/shapes/{id}` | `{ "position": {...} }`, `name`, `color` or `rotationY` | Updated shape |
 | DELETE | `/api/shapes/{id}` | | `{ "deleted": id }`, or 404 |
 | GET | `/api/conveyors` | | Conveyor belts in the robot arm's scene, oldest first |
