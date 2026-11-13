@@ -287,7 +287,10 @@ canvas.addEventListener("pointerdown", (e) => {
 canvas.addEventListener("pointerdown", () => (controls.enabled = !belts.isExtending()), { capture: true });
 canvas.addEventListener("pointerup", (e) => {
   // Dragging a straight out of a line's end: the release adds it, however far the mouse went.
-  if (belts.isExtending() && belts.handleClick(e)) return;
+  if (belts.isExtending() && belts.handleClick(e)) {
+    controls.enabled = !belts.isExtending(); // done: the camera can orbit and zoom again
+    return;
+  }
   if (Math.hypot(e.clientX - pressX, e.clientY - pressY) > 4) return; // that was an orbit drag
   // Whoever is placing something gets the click; then shapes (they sit on top of belts), then
   // splitter gates (they stand over belts), then belts.
