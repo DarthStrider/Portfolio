@@ -1,29 +1,18 @@
-# TEMPORARY: runs vention/start-all.mjs end to end. Removed before merging.
+# TEMPORARY: generates lock files for snacks 3 and 4. Removed before merging.
 name: try start-all
 on:
   push:
     branches: [vention-start-all]
 jobs:
-  run:
+  locks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: npm start, then check every page, then Ctrl+C
+      - name: Generate
         working-directory: vention
         run: |
-          npm start > /tmp/start.log 2>&1 &
-          PID=$!
-          for i in $(seq 240); do grep -q "All five Vention snacks are running" /tmp/start.log && break; sleep 1; done
-          tail -n 25 /tmp/start.log
-          for url in http://localhost:5173 http://localhost:5174 http://localhost:5175 http://localhost:8081 http://localhost:8081/api/shapes; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" $url); echo "$url -> $code"
-          done
-          echo "--- snack 4 lines:"; grep "^\S*\[snack4\]" /tmp/start.log | sed 's/\x1b\[[0-9;]*m//g' | head -12
-          kill -INT $(pgrep -f "node start-all.mjs") ; sleep 3
-          pgrep -f "node start-all.mjs" && echo "STILL RUNNING" || echo "stopped cleanly"
-          if pgrep -f vite > /dev/null; then echo "vite still running"; exit 1; else echo "no vite left"; fi
-          docker ps --format '{{.Names}}'
-          npm run stop > /dev/null 2>&1; echo "containers after npm run stop: $(docker ps -q | wc -l)"
+          for d in snack3-conveyor-physics snack4-refactor-kata; do (cd $d && npm install --package-lock-only --no-audit --no-fund && npm ci --no-audit --no-fund && npm test 2>&1 | tail -3); done
+          echo LOCKS-BEGIN; tar czf - snack3-conveyor-physics/package-lock.json snack4-refactor-kata/package-lock.json | base64 -w 76; echo LOCKS-END
