@@ -378,7 +378,8 @@ export function createSplitters({ root, scene, camera, canvas, shapes, conveyors
 
   function render() {
     // Belt picker and form
-    const bs = belts();
+    // Gates go on straight sections only: a curve or a transfer has no straight run to divert from.
+    const bs = belts().filter((b) => b.kind === "straight");
     if (!bs.some((b) => b.id === draft.beltId)) draft.beltId = bs[0]?.id ?? "";
     if (document.activeElement !== beltSelect) beltSelect.innerHTML = bs.length
       ? bs.map((b) => `<option value="${b.id}" ${b.id === draft.beltId ? "selected" : ""}>${esc(b.name)} (${cm(b.length)} cm)</option>`).join("")

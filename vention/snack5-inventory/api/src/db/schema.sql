@@ -68,7 +68,7 @@ CREATE INDEX IF NOT EXISTS shapes_by_sku ON shapes (sku);
 CREATE TABLE IF NOT EXISTS conveyors (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name        text NOT NULL CHECK (length(name) BETWEEN 1 AND 40),
-  length      double precision NOT NULL CHECK (length BETWEEN 0.3 AND 4),
+  length      double precision NOT NULL, -- checked below, with the section fields
   width       double precision NOT NULL CHECK (width BETWEEN 0.1 AND 1.2),
   height      double precision NOT NULL CHECK (height BETWEEN 0.05 AND 1.2),
   speed       double precision NOT NULL DEFAULT 0.2 CHECK (speed BETWEEN -1 AND 1),
@@ -78,6 +78,28 @@ CREATE TABLE IF NOT EXISTS conveyors (
   created_at  timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at  timestamptz NOT NULL DEFAULT clock_timestamp()
 );
+
+-- Sections of a conveyor line: straight, curve or transfer, and which line, in what order.
+-- Added separately so databases created before lines existed gain the columns; their belts
+-- become straight sections on their own.
+ALTER TABLE conveyors ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'straight';
+ALTER TABLE conveyors ADD COLUMN IF NOT EXISTS turn double precision NOT NULL DEFAULT 0;
+ALTER TABLE conveyors ADD COLUMN IF NOT EXISTS radius double precision NOT NULL DEFAULT 0;
+ALTER TABLE conveyors ADD COLUMN IF NOT EXISTS line_id uuid;
+ALTER TABLE conveyors ADD COLUMN IF NOT EXISTS line_index integer NOT NULL DEFAULT 0;
+-- A curve or transfer can be shorter than the 0.3 m a straight belt starts at, so the
+-- original length check is replaced by one covering every section field.
+ALTER TABLE conveyors DROP CONSTRAINT IF EXISTS conveyors_length_check;
+DO $$ BEGIN
+  ALTER TABLE conveyors ADD CONSTRAINT conveyors_section_check CHECK (
+    length BETWEEN 0.05 AND 4
+    AND kind IN ('straight', 'curve', 'transfer')
+    AND turn BETWEEN -90 AND 90
+    AND radius BETWEEN 0 AND 2
+    AND line_index BETWEEN 0 AND 999);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+CREATE INDEX IF NOT EXISTS conveyors_by_line ON conveyors (line_id, line_index);
 
 -- Splitters: diverter gates on a belt, with their sorting rules. The rules are a list of
 -- objects that the API validates and only the arm app interprets, so they're stored as one

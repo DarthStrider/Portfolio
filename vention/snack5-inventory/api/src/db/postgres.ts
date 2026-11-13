@@ -17,7 +17,7 @@ import type {
   InventoryRepo, Line, Movement, Part, PartFilter, Reservation, ReserveResult, SeedPart, Shortage,
 } from "../domain/types.ts";
 import type { NewShape, Shape, ShapeKind, ShapePatch } from "../domain/shapes.ts";
-import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
+import { withSectionDefaults, type Conveyor, type ConveyorPatch, type ConveyorUpdate, type NewConveyor, type SectionKind } from "../domain/conveyors.ts";
 import type { Exit, NewSplitter, Rule, Splitter, SplitterPatch } from "../domain/splitters.ts";
 import type { PartPatch } from "../domain/newPart.ts";
 import type { Bin, BinPatch, BinResult, Feed, LoadLine, NewBin } from "../domain/bins.ts";
@@ -59,7 +59,8 @@ interface AssemblyRow {
 
 interface ConveyorRow {
   id: string; name: string; length: number; width: number; height: number; speed: number;
-  x: number; z: number; rotation_y: number; created_at: Date; updated_at: Date;
+  x: number; z: number; rotation_y: number; kind: SectionKind; turn: number; radius: number;
+  line_id: string | null; line_index: number; created_at: Date; updated_at: Date;
 }
 
 interface SplitterRow {
@@ -209,20 +210,40 @@ export class PostgresRepo implements InventoryRepo {
     return rows.map(toConveyor);
   }
 
-  async createConveyor(c: NewConveyor): Promise<Conveyor> {
+  async createConveyor(input: NewConveyor): Promise<Conveyor> {
+    const c = withSectionDefaults(input);
     const { rows } = await this.pool.query<ConveyorRow>(Q.createConveyor, [
       c.name, c.length, c.width, c.height, c.speed, c.position.x, c.position.z, c.rotationY,
+      c.kind, c.turn, c.radius, c.lineId, c.lineIndex,
     ]);
     return toConveyor(rows[0]);
   }
 
-  async updateConveyor(id: string, p: ConveyorPatch): Promise<Conveyor> {
+  async updateConveyor(id: string, p: ConveyorPatch, db: Pick<pg.PoolClient, "query"> = this.pool): Promise<Conveyor> {
     if (!UUID.test(id)) throw new NotFoundError(`No conveyor ${id}`);
-    const { rows } = await this.pool.query<ConveyorRow>(Q.updateConveyor, [
+    const { rows } = await db.query<ConveyorRow>(Q.updateConveyor, [
       id, p.name ?? null, p.position?.x ?? null, p.position?.z ?? null, p.rotationY ?? null, p.speed ?? null,
+      p.lineId !== undefined, p.lineId ?? null, p.lineIndex ?? null,
     ]);
     if (!rows[0]) throw new NotFoundError(`No conveyor ${id}`);
     return toConveyor(rows[0]);
+  }
+
+  async updateConveyors(updates: readonly ConveyorUpdate[]): Promise<Conveyor[]> {
+    // One transaction: a whole line moves, or none of it does.
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const out: Conveyor[] = [];
+      for (const { id, patch } of updates) out.push(await this.updateConveyor(id, patch, client));
+      await client.query("COMMIT");
+      return out;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async deleteConveyor(id: string): Promise<void> {
@@ -473,6 +494,7 @@ function toConveyor(r: ConveyorRow): Conveyor {
   return {
     id: r.id, name: r.name, length: r.length, width: r.width, height: r.height, speed: r.speed,
     position: { x: r.x, z: r.z }, rotationY: r.rotation_y,
+    kind: r.kind, turn: r.turn, radius: r.radius, lineId: r.line_id, lineIndex: r.line_index,
     createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
   };
 }

@@ -76,19 +76,21 @@ export const Q = {
     RETURNING id, name, kind, size_x, size_y, size_z, color, x, z, rotation_y, sku, attached_to, attach, bin_id, stock_taken, created_at, updated_at`,
   deleteShape: `DELETE FROM shapes WHERE id = $1 RETURNING id`,
   listConveyors: `
-    SELECT id, name, length, width, height, speed, x, z, rotation_y, created_at, updated_at
+    SELECT id, name, length, width, height, speed, x, z, rotation_y, kind, turn, radius, line_id, line_index, created_at, updated_at
       FROM conveyors ORDER BY created_at, id`,
   createConveyor: `
-    INSERT INTO conveyors (name, length, width, height, speed, x, z, rotation_y)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    RETURNING id, name, length, width, height, speed, x, z, rotation_y, created_at, updated_at`,
+    INSERT INTO conveyors (name, length, width, height, speed, x, z, rotation_y, kind, turn, radius, line_id, line_index)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    RETURNING id, name, length, width, height, speed, x, z, rotation_y, kind, turn, radius, line_id, line_index, created_at, updated_at`,
+  // $7 says whether lineId was sent at all, since null is a value it can be set to (leaving a line).
   updateConveyor: `
     UPDATE conveyors
        SET name = coalesce($2, name), x = coalesce($3, x), z = coalesce($4, z),
            rotation_y = coalesce($5, rotation_y), speed = coalesce($6, speed),
+           line_id = CASE WHEN $7 THEN $8::uuid ELSE line_id END, line_index = coalesce($9, line_index),
            updated_at = clock_timestamp()
      WHERE id = $1
-    RETURNING id, name, length, width, height, speed, x, z, rotation_y, created_at, updated_at`,
+    RETURNING id, name, length, width, height, speed, x, z, rotation_y, kind, turn, radius, line_id, line_index, created_at, updated_at`,
   deleteConveyor: `DELETE FROM conveyors WHERE id = $1 RETURNING id`,
   listSplitters: `
     SELECT id, name, conveyor_id, along, rules, otherwise, created_at, updated_at

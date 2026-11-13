@@ -283,7 +283,11 @@ canvas.addEventListener("pointerdown", (e) => {
   pressX = e.clientX;
   pressY = e.clientY;
 });
+// Before OrbitControls sees the press (capture runs first): don't orbit while dragging out a section.
+canvas.addEventListener("pointerdown", () => (controls.enabled = !belts.isExtending()), { capture: true });
 canvas.addEventListener("pointerup", (e) => {
+  // Dragging a straight out of a line's end: the release adds it, however far the mouse went.
+  if (belts.isExtending() && belts.handleClick(e)) return;
   if (Math.hypot(e.clientX - pressX, e.clientY - pressY) > 4) return; // that was an orbit drag
   // Whoever is placing something gets the click; then shapes (they sit on top of belts), then
   // splitter gates (they stand over belts), then belts.
@@ -297,6 +301,9 @@ canvas.addEventListener("pointerup", (e) => {
   if (hit) select(hit.userData.jointIndex as number);
 });
 canvas.addEventListener("pointermove", (e) => {
+  // While extending, the camera holds still and the new section follows the mouse, button down or not.
+  controls.enabled = !belts.isExtending();
+  if (belts.isExtending()) return void belts.handleHover(e);
   if (e.buttons !== 0) return;
   if (line.isActive() ? line.handleHover(e) : splitters.isActive() ? splitters.handleHover(e) : belts.isActive() ? belts.handleHover(e) : shapes.handleHover(e)) return;
   canvas.style.cursor = housingAt(e) || splitters.hoversGate(e) || belts.hoversBelt(e) ? "pointer" : "";

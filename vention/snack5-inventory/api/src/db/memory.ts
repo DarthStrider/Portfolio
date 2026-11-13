@@ -11,7 +11,7 @@ import type {
   InventoryRepo, Line, Movement, MovementKind, Part, PartFilter, Reservation, ReserveResult, SeedPart, Shortage,
 } from "../domain/types.ts";
 import type { NewShape, Shape, ShapePatch } from "../domain/shapes.ts";
-import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
+import { withSectionDefaults, type Conveyor, type ConveyorPatch, type ConveyorUpdate, type NewConveyor } from "../domain/conveyors.ts";
 import type { NewSplitter, Splitter, SplitterPatch } from "../domain/splitters.ts";
 import type { PartPatch } from "../domain/newPart.ts";
 import { stockNeeded, type Bin, type BinPatch, type BinResult, type LoadLine, type NewBin } from "../domain/bins.ts";
@@ -161,7 +161,7 @@ export class MemoryRepo implements InventoryRepo {
 
   async createConveyor(input: NewConveyor): Promise<Conveyor> {
     const now = new Date().toISOString();
-    const c: Conveyor = { ...structuredClone(input), id: randomUUID(), createdAt: now, updatedAt: now };
+    const c: Conveyor = { ...structuredClone(withSectionDefaults(input)), id: randomUUID(), createdAt: now, updatedAt: now };
     this.conveyors.set(c.id, c);
     return structuredClone(c);
   }
@@ -171,6 +171,14 @@ export class MemoryRepo implements InventoryRepo {
     if (!c) throw new NotFoundError(`No conveyor ${id}`);
     Object.assign(c, structuredClone(patch), { updatedAt: new Date().toISOString() });
     return structuredClone(c);
+  }
+
+  async updateConveyors(updates: readonly ConveyorUpdate[]): Promise<Conveyor[]> {
+    // Check every id first, so a bad one changes nothing (as a transaction would).
+    for (const { id } of updates) if (!this.conveyors.has(id)) throw new NotFoundError(`No conveyor ${id}`);
+    const out: Conveyor[] = [];
+    for (const { id, patch } of updates) out.push(await this.updateConveyor(id, patch));
+    return out;
   }
 
   async deleteConveyor(id: string): Promise<void> {

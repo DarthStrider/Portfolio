@@ -224,6 +224,41 @@ export function contractTests(name: string, makeRepo: () => Promise<InventoryRep
       await assert.rejects(repo.updateConveyor("00000000-0000-4000-8000-000000000000", { speed: 0 }), NotFoundError);
     });
 
+    test("conveyor lines: section fields stored, older belts default to straight, a batch update is all or none", async () => {
+      const line = "6f1c2a1e-6c1b-4f7e-9a40-2d6b0a6c1f11";
+      const first = await repo.createConveyor({ name: "Line 1", length: 1, width: 0.3, height: 0.3, speed: 0.2, position: { x: 0.5, z: 0 }, rotationY: 0, lineId: line, lineIndex: 0 });
+      const bend = await repo.createConveyor({
+        name: "Line 2", length: 0.942478, width: 0.3, height: 0.3, speed: 0.2, position: { x: 1, z: -0.6 }, rotationY: 0,
+        kind: "curve", turn: 90, radius: 0.6, lineId: line, lineIndex: 1,
+      });
+      const corner = await repo.createConveyor({
+        name: "Line 3", length: 0.3, width: 0.3, height: 0.3, speed: 0.2, position: { x: 1.75, z: -0.6 }, rotationY: 90,
+        kind: "transfer", turn: -90, radius: 0, lineId: line, lineIndex: 2,
+      });
+      const plain = await repo.createConveyor({ name: "Alone", length: 0.8, width: 0.3, height: 0.2, speed: 0.1, position: { x: -0.5, z: 0.5 }, rotationY: 0 });
+      assert.deepEqual([bend.kind, bend.turn, bend.radius, bend.lineId, bend.lineIndex], ["curve", 90, 0.6, line, 1]);
+      assert.deepEqual([corner.kind, corner.turn], ["transfer", -90]);
+      assert.deepEqual([plain.kind, plain.turn, plain.radius, plain.lineId, plain.lineIndex], ["straight", 0, 0, null, 0]);
+
+      // A line moves as one: every section, in one request.
+      const moved = await repo.updateConveyors([
+        { id: first.id, patch: { position: { x: 0.6, z: 0.1 }, speed: 0.3 } },
+        { id: bend.id, patch: { position: { x: 1.1, z: -0.5 }, speed: 0.3 } },
+        { id: corner.id, patch: { position: { x: 1.85, z: -0.5 }, speed: 0.3 } },
+      ]);
+      assert.deepEqual(moved.map((c) => [c.id, c.position.x, c.speed]), [[first.id, 0.6, 0.3], [bend.id, 1.1, 0.3], [corner.id, 1.85, 0.3]]);
+      // A missing id changes nothing at all.
+      await assert.rejects(repo.updateConveyors([
+        { id: first.id, patch: { speed: -0.3 } },
+        { id: "00000000-0000-4000-8000-000000000000", patch: { speed: -0.3 } },
+      ]), NotFoundError);
+      assert.equal((await repo.listConveyors()).find((c) => c.id === first.id)!.speed, 0.3);
+      // Leaving a line: lineId back to null, and a new place.
+      const left = await repo.updateConveyor(corner.id, { lineId: null, lineIndex: 0 });
+      assert.deepEqual([left.lineId, left.lineIndex, left.kind], [null, 0, "transfer"]);
+      for (const c of [first, bend, corner, plain]) await repo.deleteConveyor(c.id);
+    });
+
     test("splitters: rules stored as written, updated whole, deleted with their belt", async () => {
       const belt = await repo.createConveyor({ name: "Sorter", length: 2, width: 0.4, height: 0.3, speed: 0.3, position: { x: 0.8, z: 0 }, rotationY: 0 });
       const rules = [
