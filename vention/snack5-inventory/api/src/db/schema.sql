@@ -54,8 +54,8 @@ CREATE TABLE IF NOT EXISTS shapes (
   size_y      double precision NOT NULL CHECK (size_y BETWEEN 0.01 AND 2),
   size_z      double precision NOT NULL CHECK (size_z BETWEEN 0.01 AND 2),
   color       text NOT NULL CHECK (color ~ '^#[0-9a-f]{6}$'),
-  x           double precision NOT NULL CHECK (x BETWEEN -3 AND 3),
-  z           double precision NOT NULL CHECK (z BETWEEN -3 AND 3),
+  x           double precision NOT NULL, -- on the floor: checked below (floor_check)
+  z           double precision NOT NULL,
   rotation_y  double precision NOT NULL DEFAULT 0,
   created_at  timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at  timestamptz NOT NULL DEFAULT clock_timestamp()
@@ -72,8 +72,8 @@ CREATE TABLE IF NOT EXISTS conveyors (
   width       double precision NOT NULL CHECK (width BETWEEN 0.1 AND 1.2),
   height      double precision NOT NULL CHECK (height BETWEEN 0.05 AND 1.2),
   speed       double precision NOT NULL DEFAULT 0.2 CHECK (speed BETWEEN -1 AND 1),
-  x           double precision NOT NULL CHECK (x BETWEEN -3 AND 3),
-  z           double precision NOT NULL CHECK (z BETWEEN -3 AND 3),
+  x           double precision NOT NULL, -- on the floor: checked below (floor_check)
+  z           double precision NOT NULL,
   rotation_y  double precision NOT NULL DEFAULT 0,
   created_at  timestamptz NOT NULL DEFAULT clock_timestamp(),
   updated_at  timestamptz NOT NULL DEFAULT clock_timestamp()
@@ -341,8 +341,8 @@ CREATE TABLE IF NOT EXISTS bins (
                 '^(part:[A-Z0-9][A-Z0-9-]{1,31}|kind:(box|cylinder|sphere|cone))(,(part:[A-Z0-9][A-Z0-9-]{1,31}|kind:(box|cylinder|sphere|cone)))*$'),
   accept      jsonb NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(accept) = 'array' AND jsonb_array_length(accept) <= 5),
   capacity    integer NOT NULL CHECK (capacity BETWEEN 1 AND 200),
-  x           double precision NOT NULL CHECK (x BETWEEN -3 AND 3),
-  z           double precision NOT NULL CHECK (z BETWEEN -3 AND 3),
+  x           double precision NOT NULL, -- on the floor: checked below (floor_check)
+  z           double precision NOT NULL,
   rotation_y  double precision NOT NULL DEFAULT 0,
   feed        jsonb NOT NULL DEFAULT '{"type": "none"}' CHECK (feed ->> 'type' IN ('none', 'belt', 'machine')),
   created_at  timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -472,4 +472,20 @@ BEGIN
   UPDATE shapes SET stock_taken = true WHERE id IN (SELECT unnest(v_tree)) AND sku IS NOT NULL;
   UPDATE shapes SET bin_id = p_bin, updated_at = clock_timestamp() WHERE id = p_shape;
   RETURN jsonb_build_object('ok', true);
+END $$;
+
+-- The floor: shapes, belts and bins within 10 m of the arm's base each way (floor.ts in the
+-- API). It was 3 m; databases made then have column checks named <table>_x_check and
+-- <table>_z_check, which are replaced. Safe to run every start, like the rest of this file.
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['shapes', 'conveyors', 'bins'] LOOP
+    EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', t, t || '_x_check');
+    EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', t, t || '_z_check');
+    BEGIN
+      EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I CHECK (x BETWEEN -10 AND 10 AND z BETWEEN -10 AND 10)', t, t || '_floor_check');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+  END LOOP;
 END $$;

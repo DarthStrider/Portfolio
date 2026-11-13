@@ -198,6 +198,10 @@ export function contractTests(name: string, makeRepo: () => Promise<InventoryRep
       assert.match(box.id, /^[0-9a-f-]{36}$/);
       assert.deepEqual(box.size, { x: 0.3, y: 0.2, z: 0.25 });
       assert.deepEqual((await repo.listShapes()).map((s) => s.name), ["Crate", "Actuator"]);
+      // The floor is 20 m × 20 m: far corners are allowed by every store (PostgreSQL's CHECK too).
+      const far = await repo.updateShape(can.id, { position: { x: 9.5, z: -10 } });
+      assert.deepEqual(far.position, { x: 9.5, z: -10 });
+      await repo.updateShape(can.id, { position: { x: -0.4, z: 0.3 } });
 
       const moved = await repo.updateShape(box.id, { position: { x: 0.6, z: 0.1 }, rotationY: 90 });
       assert.deepEqual([moved.position, moved.rotationY, moved.name, moved.color], [{ x: 0.6, z: 0.1 }, 90, "Crate", "#d97706"]);

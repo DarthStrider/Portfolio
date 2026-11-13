@@ -16,6 +16,7 @@ import {
 import { parseBinPatch, parseLoad, parseNewBin, type BinResult, type Feed } from "./domain/bins.ts";
 import type { InventoryRepo } from "./domain/types.ts";
 import { checkDesign, reserveDesign } from "./service.ts";
+import { FLOOR_HALF } from "./domain/floor.ts";
 
 type Params = Record<string, string>;
 type Handler = (ctx: { params: Params; query: URLSearchParams; body: unknown }) => Promise<[number, unknown]>;
@@ -256,8 +257,8 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
   route("POST", "/api/bins/:id/release", async ({ params, body }) => {
     const shapeId = field(body, "shapeId");
     const at = field(body, "position") as { x?: unknown; z?: unknown } | undefined;
-    const ok = (v: unknown) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 3;
-    if (typeof shapeId !== "string" || !at || !ok(at.x) || !ok(at.z)) throw new ValidationError(["send { shapeId, position: { x, z } } with x and z from -3 to 3"]);
+    const ok = (v: unknown) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= FLOOR_HALF;
+    if (typeof shapeId !== "string" || !at || !ok(at.x) || !ok(at.z)) throw new ValidationError([`send { shapeId, position: { x, z } } with x and z from -${FLOOR_HALF} to ${FLOOR_HALF}`]);
     return binAnswer(await repo.releaseFromBin(params.id, shapeId, { x: at.x as number, z: at.z as number }), 200, () => ({ released: shapeId }));
   });
 

@@ -474,7 +474,7 @@ export function createLine({ root, binsRoot, scene, camera, canvas, shapes, conv
   void load();
 
   return {
-    layer, points,
+    layer, binLayer, points,
     handleClick: (e: PointerEvent) => points.handleClick(e) || binPanel.handleClick(e),
     handleHover: (e: PointerEvent) => points.handleHover() || binPanel.handleHover(e),
     handleKey: (e: KeyboardEvent) => binPanel.handleKey(e),

@@ -21,13 +21,13 @@ import { poses, rootOf } from "../line/joints";
 import type { Join, Stations } from "../line/stations";
 import type { Attachment } from "../line/types";
 import type { Conveyor, NewConveyor } from "./types";
+import { onFloor } from "../scene/floor";
 
 type Shapes = ReturnType<typeof createShapes>;
 /** extending: dragging a new straight out of the end of a line (fromId is its last section). */
 type Mode = { kind: "idle" } | { kind: "placing" } | { kind: "moving"; id: string } | { kind: "extending"; fromId: string; length: number };
 
 const POLL_MS = 4000;
-const FLOOR_LIMIT = 3;
 /** Physics steps are at most this long, however slow the frame. */
 const MAX_STEP = 1 / 120;
 
@@ -324,7 +324,7 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     if (!raycaster.ray.intersectPlane(floorPlane, hitPoint)) return null;
     const x = Math.round(hitPoint.x * 100) / 100;
     const z = Math.round(hitPoint.z * 100) / 100;
-    return Math.abs(x) <= FLOOR_LIMIT && Math.abs(z) <= FLOOR_LIMIT ? { x, z } : null;
+    return onFloor(x, z) ? { x, z } : null;
   }
 
   function ghostBelt(): (Pick<Conveyor, "length" | "width" | "height" | "rotationY"> & Partial<Conveyor>) | null {
@@ -460,8 +460,8 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
       </div>
       <label class="wide">Name <input type="text" data-field="name" maxlength="40" placeholder="Automatic"></label>
       <div class="row">
-        <label>X cm <input type="number" data-field="x" min="-300" max="300" step="5"></label>
-        <label>Z cm <input type="number" data-field="z" min="-300" max="300" step="5"></label>
+        <label>X cm <input type="number" data-field="x" min="-1000" max="1000" step="5"></label>
+        <label>Z cm <input type="number" data-field="z" min="-1000" max="1000" step="5"></label>
       </div>
       <div class="actions">
         <button type="button" data-action="place" class="primary">Place with mouse</button>
