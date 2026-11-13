@@ -65,12 +65,16 @@ await page.waitForTimeout(300);
 await page.click('[data-ext="drag"]');
 // Find a spot on screen that gives a middling length (the camera decides where the line is).
 let spot = null;
+await shot("before-drag");
+const grid = [];
 for (let fx = 0.05; box.x + box.width * fx < panelLeft - 40 && !spot; fx += 0.04) for (let fy = 0.15; fy <= 0.9 && !spot; fy += 0.04) {
   await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
   const cmv = Number((await page.locator("#conveyors-panel p.hint").textContent()).match(/^(\d+) cm/)?.[1] ?? 0);
+  grid.push(`${fx.toFixed(2)},${fy.toFixed(2)}:${cmv}`);
   if (cmv >= 60 && cmv <= 140) spot = [fx, fy, cmv];
 }
-log("drag spot:", JSON.stringify(spot));
+log("drag spot:", JSON.stringify(spot), "panelLeft", panelLeft, "box", JSON.stringify(box));
+log("grid:", grid.join(" "));
 if (spot) await page.mouse.move(box.x + box.width * spot[0], box.y + box.height * spot[1]);
 log("drag hint:", await page.locator("#conveyors-panel p.hint").textContent());
 if (!spot) throw new Error("no spot for the drag");
