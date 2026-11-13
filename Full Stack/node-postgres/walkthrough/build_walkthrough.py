@@ -368,16 +368,30 @@ def part5(b):
         "known high or critical vulnerability in anything that ships; dev tools never reach the image, so they aren't counted.")
     b.H1("5.4 Dependabot")
     b.code(DB, "  # ---- Full Stack ----", "yaml", end="update-types: [\"version-update:semver-major\"]", doc=False)
-    b.P("Every Monday, Dependabot opens pull requests for outdated packages, with React and its types grouped "
-        "(they're released together) and minor and patch updates bundled. A separate entry keeps the Docker base "
-        "images (" + M("node:22-alpine") + ", " + M("nginx:1.27-alpine") + ", " + M("postgres") + ") current. Each pull "
-        "request runs the workflow above, so an update that breaks something shows up red before it's merged.")
+    b.P("Every Monday, Dependabot opens pull requests for outdated packages, minor and patch updates bundled into one. "
+        "Some packages must move together: React and its types are released together, Vite's React plugin needs a "
+        "matching Vite, and Stripe's two packages need each other. A <b>group</b> puts each set in one pull request. "
+        "A separate entry keeps the Docker base images (" + M("node:22-alpine") + ", " + M("nginx:1.31-alpine") + ", "
+        + M("postgres") + ") current, monthly. Each pull request runs the workflow above, so an update that breaks "
+        "something shows up red before it's merged.")
+    b.H2("Green isn't always right")
+    b.P("The first Dependabot run offered " + M("node:25-alpine") + " for every Dockerfile, and the images built, so CI "
+        "was green, and they were merged. But Node 25 is an odd-numbered release: short-lived, and already past its end "
+        "of life. The project runs on the long-term-support line (22, matching " + M("engines") + " and " + M(".nvmrc") +
+        "), so the images went back to 22, and Dependabot now skips Node majors for the images. Moving to the next LTS "
+        "(24) is a deliberate change of " + M("engines") + ", " + M(".nvmrc") + " and CI together, not a base-image bump.")
+    b.P("Two rules come out of it. A passing check only proves what it checks: building an image isn't running it. And "
+        "for every update, read what changed and ask whether you want it, not only whether it's green.")
     b.H1("5.5 Interview questions")
     b.QA("^5.1.0 vs ~5.1.0?",
          "Caret allows minor and patch updates (5.x); tilde allows patch only (5.1.x). For 0.x versions, the caret "
          "is as strict as the tilde, because below 1.0.0 a minor bump may break.")
     b.QA("Why commit package-lock.json?",
          "So every install, on any machine, gets the same tree. Without it, two builds from the same commit can differ.")
+    b.QA("Dependabot offers a major version and CI is green. Merge it?",
+         "Not automatically. Green means the checks passed, not that the change is wanted: Node 25 built fine but is "
+         "past end of life. Read the release notes, check it fits the support policy (LTS here), and if it's a version "
+         "you'll skip, tell Dependabot to ignore it.")
     b.QA("Why test against PostgreSQL in CI if the routes are tested with a fake?",
          "The fake can't check SQL. A typo in a query, a wrong alias or a type mismatch only shows up against the "
          "real database.")

@@ -102,10 +102,18 @@ def write(b):
         "against the real database in CI.")
 
     b.H1("5.6 Dependabot")
-    b.code(DB, "  # ---- genetec ----", "yaml", end="update-types: [\"version-update:semver-major\"]", doc=False)
+    a = b.ln(DB, "  # ---- genetec ----")
+    e = b.ln(DB, "dependency-name: \"@types/node\"", a) + 1  # through the npm entry's last rule
+    b.lines(DB, a, e, "yaml")
     b.P("NuGet updates for every Genetec project, with xUnit's packages grouped (they release together), and npm "
-        "updates for Snack 4's page. Each update arrives as a pull request, and the workflow above tests it before "
-        "anyone merges.")
+        "updates for Snack 4's page, with Vite and its React plugin grouped (each new major needs the other). Each "
+        "update arrives as a pull request, and the workflow above tests it before anyone merges.")
+    b.P("The " + M("ignore") + " rules skip major versions of Microsoft's " + M("System.*") + " and "
+        + M("Microsoft.*") + " packages. Those follow the .NET version: 10.x goes with " + M("net10.0") + ". Dependabot's "
+        "first run offered " + M("System.Security.Cryptography.Pkcs") + " 11.0.0 for Snack 2, the package from 5.3. "
+        "It updated one project's lock file but not the ones that reference it, so " + M("--locked-mode") + " failed "
+        "everywhere else, which is the lock check doing its job. 10.0.x already has the fix, so the pull request was "
+        "closed, and moving to .NET 11 stays a deliberate change for the whole solution.")
 
     b.H1("5.7 Running it all")
     b.T([["Snack", "Run", "Test"],
