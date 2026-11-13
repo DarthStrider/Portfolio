@@ -71,8 +71,10 @@ function pipe(child, name, color) {
 async function install(dir, name, color) {
   const cwd = join(ROOT, dir);
   if (existsSync(join(cwd, "node_modules"))) return;
-  console.log(`${paint(color, `[${name}]`.padEnd(9))} first run: npm ci`);
-  await run(name, color, "npm ci --no-audit --no-fund", cwd);
+  // npm ci installs exactly what the lock file says; a snack without one gets npm install.
+  const cmd = existsSync(join(cwd, "package-lock.json")) ? "npm ci" : "npm install";
+  console.log(`${paint(color, `[${name}]`.padEnd(9))} first run: ${cmd}`);
+  await run(name, color, `${cmd} --no-audit --no-fund`, cwd);
 }
 
 let stopping = false;
