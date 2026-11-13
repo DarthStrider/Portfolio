@@ -24,6 +24,6 @@ jobs:
           echo "--- snack 4 lines:"; grep "^\S*\[snack4\]" /tmp/start.log | sed 's/\x1b\[[0-9;]*m//g' | head -12
           kill -INT $(pgrep -f "node start-all.mjs") ; sleep 3
           pgrep -f "node start-all.mjs" && echo "STILL RUNNING" || echo "stopped cleanly"
-          pgrep -f vite && echo "vite still running" || echo "no vite left"
+          if pgrep -f vite > /dev/null; then echo "vite still running"; exit 1; else echo "no vite left"; fi
           docker ps --format '{{.Names}}'
-          (cd vention 2>/dev/null; npm run stop > /dev/null 2>&1) ; docker ps --format '{{.Names}}' | wc -l
+          npm run stop > /dev/null 2>&1; echo "containers after npm run stop: $(docker ps -q | wc -l)"

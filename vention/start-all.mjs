@@ -15,7 +15,7 @@
  * `npm run stop` stops it. No dependencies: only Node's own modules, so it runs before any
  * `npm ci`, and does those itself the first time.
  */
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,7 +47,8 @@ function run(name, color, cmd, cwd) {
 
 /** Starts a long-running command; its output is prefixed so you can tell the apps apart. */
 function start(name, color, cmd, cwd) {
-  const child = spawn(cmd, { cwd, shell: true, stdio: ["ignore", "pipe", "pipe"] });
+  // Its own process group (on macOS and Linux), so stopping it stops everything it started.
+  const child = spawn(cmd, { cwd, shell: true, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
   pipe(child, name, color);
   child.on("exit", (code) => {
     if (!stopping) console.log(paint(31, `[${name}] stopped (exit code ${code})`));
@@ -82,7 +83,15 @@ function stopAll(code = 0) {
   if (stopping) return;
   stopping = true;
   console.log(paint(1, "\nStopping the web servers. The database keeps running: `npm run stop` stops it."));
-  for (const child of children) child.kill();
+  // The shell runs npx, which runs Vite: stop the whole tree, not just the shell.
+  for (const child of children) {
+    try {
+      if (process.platform === "win32") execSync(`taskkill /pid ${child.pid} /T /F`, { stdio: "ignore" });
+      else process.kill(-child.pid, "SIGTERM");
+    } catch {
+      // already gone
+    }
+  }
   setTimeout(() => process.exit(code), 500);
 }
 process.on("SIGINT", () => stopAll());
