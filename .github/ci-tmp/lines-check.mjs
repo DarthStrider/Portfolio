@@ -38,7 +38,7 @@ mkdirSync("/tmp/shots", { recursive: true });
 const out = [];
 const log = (...a) => { console.log(...a); out.push(a.join(" ")); };
 
-await j("/conveyors", { method: "POST", body: JSON.stringify({ name: "Line A", length: 0.8, width: 0.3, height: 0.3, speed: 0.25, position: { x: -0.9, z: 0.7 }, rotationY: 0 }) });
+await j("/conveyors", { method: "POST", body: JSON.stringify({ name: "Line A", length: 0.8, width: 0.3, height: 0.3, speed: 0.25, position: { x: 0.7, z: 0.8 }, rotationY: 180 }) });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const errors = [];
@@ -52,10 +52,6 @@ const shot = async (name) => {
   await page.screenshot({ path: `/tmp/shots/${name}.jpg`, type: "jpeg", quality: 60 });
 };
 await page.locator("section.line-build").waitFor();
-await page.click('[data-ext="curve"][data-turn="90"]'); await count(2);
-await page.fill('[data-field="extLength"]', "60");
-await page.click('[data-ext="straight"]'); await count(3);
-await page.click('[data-ext="transfer"][data-turn="-90"]'); await count(4);
 // Drag a straight out with the mouse: the camera mustn't orbit.
 const box = await page.locator("#scene").boundingBox();
 const panelLeft = (await page.locator("#conveyors-panel").boundingBox()).x;
@@ -74,7 +70,7 @@ for (let fx = 0.05; box.x + box.width * fx < panelLeft - 40 && !spot; fx += 0.04
   if (cmv >= 60 && cmv <= 140) spot = [fx, fy, cmv];
 }
 log("drag spot:", JSON.stringify(spot), "panelLeft", panelLeft, "box", JSON.stringify(box));
-log("grid:", grid.join(" "));
+if (!spot) log("grid:", grid.join(" "));
 if (spot) await page.mouse.move(box.x + box.width * spot[0], box.y + box.height * spot[1]);
 log("drag hint:", await page.locator("#conveyors-panel p.hint").textContent());
 if (!spot) throw new Error("no spot for the drag");
@@ -82,7 +78,12 @@ await page.mouse.down();
 if (spot) await page.mouse.move(box.x + box.width * (spot[0] - 0.02), box.y + box.height * spot[1], { steps: 8 });
 log("drag hint while held:", await page.locator("#conveyors-panel p.hint").textContent());
 await shot("dragging");
-await page.mouse.up(); await count(5);
+await page.mouse.up(); await count(2);
+await page.click('[data-ext="curve"][data-turn="90"]'); await count(3);
+await page.fill('[data-field="extLength"]', "60");
+await page.click('[data-ext="straight"]'); await count(4);
+await page.click('[data-ext="transfer"][data-turn="-90"]'); await count(5);
+
 await page.click('[data-ext="curve"][data-turn="-45"]'); await count(6);
 await page.click('[data-ext="straight"]'); await count(7);
 

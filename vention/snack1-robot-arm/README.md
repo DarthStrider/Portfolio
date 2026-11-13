@@ -18,6 +18,7 @@ click, turning them on the way if you ask.
 - [x] Demo mode, a trail of the tool's path, click-to-select joints, keyboard and touch controls
 - [x] Shapes: create boxes, cylinders, spheres and cones, place and move them on the floor with the mouse, and see which ones the arm can reach. They're saved in the inventory database (Snack 5), PostgreSQL or MongoDB
 - [x] Conveyor belts: build your own (length, width, height, speed, angle), place them with the mouse, then **Run** them: shapes on a belt ride along, fall off the end, and can land on another belt. Stop saves where everything ended up
+- [x] Conveyor lines: build belts into a line one section at a time, with straights (typed, or dragged out to length with the mouse), 45° and 90° curves, and square corner transfers. A line moves, turns, reverses and runs as one; deleting a middle section splits it
 - [x] Splitters: diverter gates on a belt that send each item left, right or straight on by rules you write (shape kind, color, size, name, SKU, or the inventory part's category, location and stock). Rules are stored in the database, and inventory changes apply to the next item through the gate
 - [x] Mergers: a feeder belt joining a main belt at a point, or a Y where two belts become one. Feeder items queue and wait for a gap; choose main belt first, feeders first, or take turns
 - [x] Joining machines: a station on a belt holds one item of each of two kinds and joins them at their connection points; the joined object carries on down the line. Each join is saved as an assembly that uses up the parts from stock
@@ -96,6 +97,17 @@ The **Conveyors** tab, next to Shapes, builds belts.
 - **■ Stop belts** saves each moved shape's new position to the database (one PATCH per shape). Until then, a run is only a preview.
 
 The model is simple on purpose: shapes don't collide with each other or with a belt's side rails.
+
+#### Building a line
+
+Select a belt (or the last section of a line) and the **Extend the line** panel appears, with a blue arrow at the end:
+
+- **Add straight** adds a straight of the length you type; **Drag a straight with the mouse** lets the length follow the mouse along the line in 5 cm steps (click or release to add). The camera holds still while you drag.
+- **↰ 90° / ↖ 45° / ↗ 45° / ↱ 90°** add a curve with the radius you set (at least half the belt's width plus 5 cm). Items go round at a constant distance from the center.
+- **Transfer ↰ / ↱** adds a square corner module: items ride in to the middle, then out of the side.
+- The new section is selected, so you can keep going. It takes the line's width, height and speed.
+- **Move**, **↻ 90°** (about the line's start) and **⇄** act on the whole line, in one all-or-none request. **✕** on a middle section splits the line in two.
+- Splitters, mergers, machines and bin feeds go on straight sections only.
 
 ### Splitters (rules saved by Snack 5's API)
 
@@ -178,9 +190,10 @@ src/
 │   └── controller.ts    the Shapes panel and mouse placement
 ├── conveyors/
 │   ├── types.ts         a belt as the API stores it
-│   ├── transport.ts     what a belt does to a shape: ride, fall, land (pure math, unit-tested)
-│   ├── ConveyorLayer.ts belt models, the scrolling chevron texture, the placement preview
-│   └── controller.ts    the Conveyors tab, Run / Stop, saving positions after a run
+│   ├── sections.ts      lines: where each section starts and ends, placing the next one (pure math, unit-tested)
+│   ├── transport.ts     what a belt does to a shape: ride, go round a curve, cross a transfer, fall, land (unit-tested)
+│   ├── ConveyorLayer.ts belt, curve and transfer models, the scrolling chevron texture, the placement preview
+│   └── controller.ts    the Conveyors tab, building lines, Run / Stop, saving positions after a run
 ├── splitters/
 │   ├── types.ts         a splitter and its rules, as the API stores them
 │   ├── rules.ts         which exit a rule list picks for a shape and its part (pure, unit-tested)
