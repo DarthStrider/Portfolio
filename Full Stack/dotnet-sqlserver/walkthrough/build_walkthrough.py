@@ -348,18 +348,37 @@ def part5(b):
     b.P("The front end's tests, build and " + M("npm audit") + ", and a " + M("docker compose build") + " to catch a "
         "broken Dockerfile. All on every push to any branch and every pull request.")
     b.H1("5.5 Dependabot")
-    b.code(DB, "  - package-ecosystem: nuget", "yaml", end="update-types: [minor, patch]", doc=False)
-    b.P("Weekly NuGet updates for this project, minor and patch bundled into one pull request. The front end's npm "
-        "packages and the Dockerfiles' base images (" + M("dotnet/sdk:10.0") + ", " + M("dotnet/aspnet:10.0") + ", "
-        + M("nginx") + ") have entries of their own. Every pull request runs the workflow, against SQL Server.")
+    b.code(DB, "  - package-ecosystem: nuget", "yaml", end="update-types: [\"version-update:semver-major\"]", doc=False)
+    b.P("Weekly NuGet updates for this project, minor and patch bundled into one pull request. Major versions of "
+        "Microsoft's packages are skipped: EF Core and ASP.NET Core 11 need .NET 11, so they arrive with a deliberate "
+        "move of the whole project, not as a package bump. The front end's npm packages and the Dockerfiles' base "
+        "images (" + M("dotnet/sdk:10.0") + ", " + M("dotnet/aspnet:10.0") + ", " + M("nginx") + ") have entries of "
+        "their own. Every pull request runs the workflow, against SQL Server.")
+    b.H2("A green build that wouldn't start")
+    b.P("Dependabot's first run offered " + M("dotnet/sdk:11.0") + " and " + M("dotnet/aspnet:11.0") + " for the "
+        "Dockerfile. CI built the image, passed, and they were merged. But the project still targets "
+        + M("net10.0") + ", and the .NET runtime only rolls forward to newer <i>minor</i> versions by default: a .NET 10 "
+        "app on the .NET 11 runtime image stops at once with \"You must install or update .NET to run this "
+        "application\". The image built fine; it just couldn't run.")
+    b.P("Nothing in CI started the container, so nothing noticed. The images went back to 10.0, and Dependabot now "
+        "skips majors of the " + M("dotnet/*") + " images. A smoke test would have caught it: start the container in CI "
+        "and request " + M("/api/health/live") + " (exercise below).")
     b.H1("5.6 Interview questions")
     b.QA("What does packages.lock.json add when the .csproj has exact versions?",
          "The transitive graph and content hashes. The project pins only what it references directly.")
     b.QA("How do you find where a transitive package comes from?",
-         M("dotnet list package --include-transitive") + ", or " + M("dotnet nuget why &lt;project&gt; &lt;package&gt;") +
+         M("dotnet list package --include-transitive") + ", or " + M("dotnet nuget why <project> <package>") +
          " on recent SDKs, which prints the dependency path.")
+    b.QA("CI built the Docker image and passed, but the container won't start. How?",
+         "Building only proves it compiles and packages. Here the runtime image was a newer .NET major than the app "
+         "targets, which the runtime won't run by default. Start the container in CI and hit a health endpoint, and "
+         "keep the SDK, runtime image and TargetFramework on the same major.")
     b.QA("Why run the tests twice in CI?",
          "Once to prove they skip cleanly without a database, once to prove they pass with one.")
+    b.H1("5.7 Exercise")
+    b.EX("Smoke-test the image", "Add a CI step that runs the API's image and checks it answers.",
+         M("docker compose up -d --wait") + " with the database, then " + M("curl -f localhost:8081/api/health/live") +
+         ". Try it against " + M("dotnet/aspnet:11.0") + " to watch it catch the problem in 5.5.")
 
 
 book = Book(ROOT, accent="#5b3d99", highlight="#e8a33d")

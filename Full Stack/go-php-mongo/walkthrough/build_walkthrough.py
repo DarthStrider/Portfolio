@@ -240,7 +240,7 @@ T([["Service", "Language", "Owns", "Why here"],
    ["auth", "Go", "Users, passwords, sessions, roles. Holds the JWT signing key.", "Security code with no dependencies: password hashing and RS256 are in Go's standard library."],
    ["order", "Go", "Carts, stock, orders, coupons, order emails.", "The concurrency-sensitive core: two people buying the last unit at the same moment."],
    ["payment", "Go", "Payment attempts, provider webhooks, refunds.", "Money movement: idempotency and signature checks matter most here."],
-   ["catalog", "PHP (Laravel 12)", "Products, categories, reviews, CMS pages, uploads.", "Mostly forms, validation and editorial CRUD, which Laravel makes quick."]],
+   ["catalog", "PHP (Laravel 13)", "Products, categories, reviews, CMS pages, uploads.", "Mostly forms, validation and editorial CRUD, which Laravel makes quick."]],
   [0.75 * inch, 0.95 * inch, 2.35 * inch, 2.7 * inch])
 
 H1("1.3 Three ways services talk")
@@ -441,7 +441,7 @@ notes(f, [
 ])
 
 # ---------------- PART 4 ----------------
-PART(4, "The PHP catalog", "Laravel 12 for routing, validation and commands; the official MongoDB library for data.")
+PART(4, "The PHP catalog", "Laravel 13 for routing, validation and commands; the official MongoDB library for data.")
 
 H1("4.1 Why no ORM")
 P("Laravel's Eloquent is built around SQL. Adapters exist for MongoDB, but they translate an ORM's ideas "
@@ -641,11 +641,16 @@ P("go.mod lists each module at a minimum version. Go doesn't take the newest rel
   "match. A major version is part of the import path (<font face='Mono'>go.mongodb.org/mongo-driver/v2</font>), so "
   "a breaking upgrade is a deliberate code change, never a silent update.")
 H2("PHP: Composer")
-P("composer.json uses caret ranges like npm (<font face='Mono'>\"laravel/framework\": \"^12.0\"</font>: any 12.x). "
+P("composer.json uses caret ranges like npm (<font face='Mono'>\"laravel/framework\": \"^13.40\"</font>: any 13.x from 13.40). "
   "With composer.lock committed, <font face='Mono'>composer install</font> ignores the ranges and installs the locked "
   "versions; <font face='Mono'>composer update</font> is the deliberate step that moves them. "
   "<font face='Mono'>config.platform</font> tells Composer to resolve as if PHP were 8.3.0, the oldest supported, "
-  "so a developer on a newer PHP can't lock a package that needs it.")
+  "so a developer on a newer PHP can't lock a package that needs it. The catalog's Docker image runs PHP 8.5, newer "
+  "than the 8.3 that CI tests with; testing both would close that gap.")
+P("Laravel 12 to 13 was a major version: Dependabot proposed it, the tests passed against it, and it was merged. "
+  "That's the order to take majors in: read the upgrade guide, let CI run the suite, then merge. Go 1.25 came the "
+  "same way: two Go packages started requiring it, so the services' Dockerfile moved to "
+  "<font face='Mono'>golang:1.25-alpine</font> first, and their update passed after it.")
 H2("The workflow")
 code_block(WF, "  go:", "yaml", "- run: go test -race ./...")
 notes(WF, [("go-version-file:", "The Go version comes from go.mod's <font face='Mono'>go</font> line, so CI and "

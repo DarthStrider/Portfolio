@@ -14,7 +14,7 @@ def write(b, part, stack_label, web_port):
     b.whole("frontend/index.html", "html")
     b.whole("frontend/src/main.tsx", "tsx")
     b.notes("frontend/src/main.tsx", [
-        ("createRoot(document.getElementById(\"root\")!)", "React takes over the empty " + M("&lt;div id=\"root\"&gt;") +
+        ("createRoot(document.getElementById(\"root\")!)", "React takes over the empty " + M("<div id=\"root\">") +
          ". The " + M("!") + " tells TypeScript \"this isn't null\"; index.html guarantees it."),
         ("<StrictMode>", "In development only, React runs effects twice to flush out code that isn't safe to re-run. "
          "It's why the initial load in App.tsx must be harmless to repeat (it is: it just fetches)."),
