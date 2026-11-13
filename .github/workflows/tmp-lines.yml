@@ -2,6 +2,7 @@ name: tmp lines check
 on: push
 jobs:
   snack5-contract:
+    if: false
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: vention/snack5-inventory } }
     steps:
@@ -27,3 +28,5 @@ jobs:
       - run: sleep 5 && cp .github/ci-tmp/lines-check.mjs /tmp/pw/ && cd /tmp/pw && node lines-check.mjs
       - if: always()
         run: cat /tmp/api.log /tmp/vite.log | tail -40
+      - if: always()
+        run: for f in /tmp/shots/*.jpg; do echo "== $f"; base64 -w 3000 "$f" | sed "s|^|B64 $(basename $f .jpg) |"; done

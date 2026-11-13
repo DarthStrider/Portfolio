@@ -33,6 +33,8 @@ const lines = (belts) => {
   for (const b of belts) { const k = b.lineId ?? b.id; m.set(k, [...(m.get(k) ?? []), b]); }
   return [...m.values()].map((l) => l.sort((a, b) => a.lineIndex - b.lineIndex));
 };
+import { mkdirSync } from "node:fs";
+mkdirSync("/tmp/shots", { recursive: true });
 const out = [];
 const log = (...a) => { console.log(...a); out.push(a.join(" ")); };
 
@@ -47,8 +49,7 @@ await page.click("#tab-conveyors");
 await page.locator("#conveyors-panel .pick", { hasText: "Line A" }).click();
 const count = (n) => page.waitForFunction((n) => document.querySelector("#conveyors-panel span.count")?.textContent === `(${n})`, n, { timeout: 10000 });
 const shot = async (name) => {
-  const b = await page.screenshot({ type: "jpeg", quality: 55 });
-  console.log(`SHOT ${name} ${b.toString("base64")}`);
+  await page.screenshot({ path: `/tmp/shots/${name}.jpg`, type: "jpeg", quality: 60 });
 };
 await page.locator("section.line-build").waitFor();
 await page.click('[data-ext="curve"][data-turn="90"]'); await count(2);
@@ -58,11 +59,19 @@ await page.click('[data-ext="transfer"][data-turn="-90"]'); await count(4);
 // Drag a straight out with the mouse: the camera mustn't orbit.
 await page.click('[data-ext="drag"]');
 const box = await page.locator("#scene").boundingBox();
-await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.6);
-await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.62);
+// Find a spot on screen that gives a middling length (the camera decides where the line is).
+let spot = null;
+for (let fx = 0.1; fx <= 0.9 && !spot; fx += 0.05) for (let fy = 0.3; fy <= 0.9 && !spot; fy += 0.05) {
+  await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
+  const cmv = Number((await page.locator("#conveyors-panel p.hint").textContent()).match(/^(\d+) cm/)?.[1] ?? 0);
+  if (cmv >= 70 && cmv <= 120) spot = [fx, fy, cmv];
+}
+log("drag spot:", JSON.stringify(spot));
+if (spot) await page.mouse.move(box.x + box.width * spot[0], box.y + box.height * spot[1]);
 log("drag hint:", await page.locator("#conveyors-panel p.hint").textContent());
 await page.mouse.down();
-await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.65, { steps: 8 });
+if (spot) await page.mouse.move(box.x + box.width * (spot[0] + 0.03), box.y + box.height * (spot[1] + 0.02), { steps: 8 });
+log("drag hint while held:", await page.locator("#conveyors-panel p.hint").textContent());
 await shot("dragging");
 await page.mouse.up(); await count(5);
 await page.click('[data-ext="curve"][data-turn="-45"]'); await count(6);
