@@ -57,20 +57,25 @@ await page.fill('[data-field="extLength"]', "60");
 await page.click('[data-ext="straight"]'); await count(3);
 await page.click('[data-ext="transfer"][data-turn="-90"]'); await count(4);
 // Drag a straight out with the mouse: the camera mustn't orbit.
-await page.click('[data-ext="drag"]');
 const box = await page.locator("#scene").boundingBox();
+const panelLeft = (await page.locator("#conveyors-panel").boundingBox()).x;
+await page.mouse.move(box.x + 300, box.y + box.height / 2);
+for (let i = 0; i < 5; i++) await page.mouse.wheel(0, 300);
+await page.waitForTimeout(300);
+await page.click('[data-ext="drag"]');
 // Find a spot on screen that gives a middling length (the camera decides where the line is).
 let spot = null;
-for (let fx = 0.1; fx <= 0.9 && !spot; fx += 0.05) for (let fy = 0.3; fy <= 0.9 && !spot; fy += 0.05) {
+for (let fx = 0.05; box.x + box.width * fx < panelLeft - 40 && !spot; fx += 0.04) for (let fy = 0.15; fy <= 0.9 && !spot; fy += 0.04) {
   await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
   const cmv = Number((await page.locator("#conveyors-panel p.hint").textContent()).match(/^(\d+) cm/)?.[1] ?? 0);
-  if (cmv >= 70 && cmv <= 120) spot = [fx, fy, cmv];
+  if (cmv >= 60 && cmv <= 140) spot = [fx, fy, cmv];
 }
 log("drag spot:", JSON.stringify(spot));
 if (spot) await page.mouse.move(box.x + box.width * spot[0], box.y + box.height * spot[1]);
 log("drag hint:", await page.locator("#conveyors-panel p.hint").textContent());
+if (!spot) throw new Error("no spot for the drag");
 await page.mouse.down();
-if (spot) await page.mouse.move(box.x + box.width * (spot[0] + 0.03), box.y + box.height * (spot[1] + 0.02), { steps: 8 });
+if (spot) await page.mouse.move(box.x + box.width * (spot[0] - 0.02), box.y + box.height * spot[1], { steps: 8 });
 log("drag hint while held:", await page.locator("#conveyors-panel p.hint").textContent());
 await shot("dragging");
 await page.mouse.up(); await count(5);
@@ -84,7 +89,6 @@ log("splitter belt options:", await page.$$eval('#splitters-panel [data-draft="b
 
 // Zoom out to see it all, then run with a box on the start.
 await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-for (let i = 0; i < 6; i++) await page.mouse.wheel(0, 300);
 await page.waitForTimeout(400);
 await shot("built");
 const first = ls[0][0];
@@ -92,7 +96,8 @@ const s0 = startOf(first);
 const shape = await j("/shapes", { method: "POST", body: JSON.stringify({ name: "Box", kind: "box", size: { x: 0.1, y: 0.1, z: 0.1 }, color: "#e8590c", position: add(s0, dir(s0.h), 0.1), rotationY: 0 }) });
 await page.reload();
 await page.click("#tab-conveyors");
-for (let i = 0; i < 6; i++) await page.mouse.wheel(0, 300);
+await page.mouse.move(box.x + 300, box.y + box.height / 2);
+for (let i = 0; i < 5; i++) await page.mouse.wheel(0, 300);
 await page.click("#btn-run");
 await page.waitForTimeout(6000);
 await shot("running");
