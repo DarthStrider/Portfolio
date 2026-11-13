@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { FLOOR_HALF } from "../src/scene/floor";
 import { beltUnder, beltVelocity, step, supportHeight, toBelt, type Body } from "../src/conveyors/transport";
 
 const belt = (over: Partial<{ length: number; width: number; height: number; speed: number; x: number; z: number; rotationY: number }> = {}) => {
@@ -86,7 +87,8 @@ test("a stopped belt holds things in place, and a reversed one runs backwards", 
 });
 
 test("carried shapes stop at the edge of the floor area", () => {
-  const body: Body = { x: 2.8, z: 0, y: 0.2, vx: 0, vy: 0, vz: 0 };
-  run([body], [belt({ x: 2.5, length: 1.5, speed: 1 })], 1);
-  assert.equal(body.x, 2.95);
+  const edge = FLOOR_HALF - 0.05;
+  const body: Body = { x: edge - 0.15, z: 0, y: 0.2, vx: 0, vy: 0, vz: 0 };
+  run([body], [belt({ x: edge - 0.45, length: 1.5, speed: 1 })], 1);
+  assert.equal(body.x, edge);
 });

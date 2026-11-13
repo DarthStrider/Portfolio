@@ -8,6 +8,7 @@
 import { isSku } from "./design.ts";
 import { ValidationError } from "./errors.ts";
 import type { Attachment } from "./assembly.ts";
+import { FLOOR_HALF } from "./floor.ts";
 
 export type ShapeKind = "box" | "cylinder" | "sphere" | "cone";
 export const SHAPE_KINDS: readonly ShapeKind[] = ["box", "cylinder", "sphere", "cone"];
@@ -56,7 +57,7 @@ export type ShapePatch = Partial<Pick<Shape, "name" | "color" | "position" | "ro
 export const LIMITS = {
   minSize: 0.01, // 1 cm
   maxSize: 2, // 2 m
-  floor: 3, // positions within ±3 m of the arm's base
+  floor: FLOOR_HALF, // positions within ±10 m of the arm's base (floor.ts)
 };
 
 const COLOR = /^#[0-9a-f]{6}$/;

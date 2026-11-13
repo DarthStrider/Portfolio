@@ -310,3 +310,20 @@ button:disabled { opacity: 0.45; cursor: default; }
 .ext-grid button { padding: 6px 4px; }
 .small-note { margin: 4px 0 0; font-size: 12px; color: var(--muted, #64748b); }
 .linkish { background: none; border: none; padding: 0; color: var(--accent, #2563eb); text-decoration: underline; cursor: pointer; font: inherit; }
+
+/* ---- Camera pad (bottom middle, between the panels) ---- */
+#view-pad { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); }
+.view-pad {
+  display: flex; gap: 8px; align-items: center; padding: 8px;
+  background: var(--panel-bg); border: 1px solid var(--border); border-radius: 12px; backdrop-filter: blur(8px);
+  user-select: none; -webkit-user-select: none;
+}
+.view-pad button { min-width: 34px; height: 30px; padding: 0 8px; font-size: 14px; touch-action: none; }
+.view-pad button.held { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pad-grid { display: grid; grid-template-columns: repeat(3, 34px); gap: 4px; }
+.pad-col { display: grid; gap: 4px; }
+.pad-col:last-child button { font-size: 11px; height: 20px; }
+@media (max-width: 700px) {
+  #view-pad { left: auto; right: 8px; top: 8px; bottom: auto; transform: none; }
+  .view-pad { flex-direction: column; }
+}

@@ -18,6 +18,7 @@ click, turning them on the way if you ask.
 - [x] Demo mode, a trail of the tool's path, click-to-select joints, keyboard and touch controls
 - [x] Shapes: create boxes, cylinders, spheres and cones, place and move them on the floor with the mouse, and see which ones the arm can reach. They're saved in the inventory database (Snack 5), PostgreSQL or MongoDB
 - [x] Conveyor belts: build your own (length, width, height, speed, angle), place them with the mouse, then **Run** them: shapes on a belt ride along, fall off the end, and can land on another belt. Stop saves where everything ended up
+- [x] A 20 m × 20 m floor to build on (meter lines on the grid, a blue edge), and camera controls: a pad at the bottom of the screen and keys to move along the floor, orbit, zoom, fit everything in view, look straight down, or go back to the start
 - [x] Conveyor lines: build belts into a line one section at a time, with straights (typed, or dragged out to length with the mouse), 45° and 90° curves, and square corner transfers. A line moves, turns, reverses and runs as one; deleting a middle section splits it
 - [x] Splitters: diverter gates on a belt that send each item left, right or straight on by rules you write (shape kind, color, size, name, SKU, or the inventory part's category, location and stock). Rules are stored in the database, and inventory changes apply to the next item through the gate
 - [x] Mergers: a feeder belt joining a main belt at a point, or a Y where two belts become one. Feeder items queue and wait for a gap; choose main belt first, feeders first, or take turns
@@ -163,6 +164,10 @@ PL-200 plate shares them, as does every plain cylinder. Until you change them, e
 | <kbd>G</kbd> / <kbd>Space</kbd> / <kbd>T</kbd> / <kbd>R</kbd> | Gripper, demo, trail, reset |
 | **Pick**, then click the floor; <kbd>Q</kbd> / <kbd>E</kbd> while choosing | Pick and place a shape; turn it 15° |
 | Drag / scroll / right-drag | Orbit / zoom / pan |
+| <kbd>I</kbd> <kbd>K</kbd> / <kbd>J</kbd> <kbd>L</kbd> (hold), or ▲ ▼ / ◀ ▶ on the pad | Move the camera forward, back, left, right along the floor |
+| <kbd>U</kbd> <kbd>O</kbd> (hold), or ⟲ ⟳ | Orbit left / right |
+| <kbd>+</kbd> <kbd>−</kbd> (hold), or ＋ − | Zoom in / out |
+| <kbd>F</kbd> / <kbd>V</kbd> / <kbd>H</kbd>, or **Fit** / **Top** / **Home** | Everything in view / look straight down / the starting view |
 
 ## How it's built
 

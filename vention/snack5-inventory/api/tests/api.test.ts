@@ -121,9 +121,12 @@ test("shapes: create, validate, move, delete", async () => {
   const cyl = await call("POST", "/api/shapes", { name: "Post", kind: "cylinder", size: { x: 0.08, y: 0.6, z: 1.5 }, color: "#64748b", position: { x: -0.5, z: 0.5 } });
   assert.deepEqual(cyl.body.size, { x: 0.08, y: 0.6, z: 0.08 }); // round: depth follows the diameter
 
-  const bad = await call("POST", "/api/shapes", { name: "", kind: "pyramid", color: "red", position: { x: 9, z: 0 } });
+  const bad = await call("POST", "/api/shapes", { name: "", kind: "pyramid", color: "red", position: { x: 12, z: 0 } });
   assert.equal(bad.status, 400);
   assert.equal(bad.body.problems.length, 4); // kind, name, color, position
+  const corner = await call("POST", "/api/conveyors", { name: "Far", length: 1, width: 0.3, height: 0.3, position: { x: -9.5, z: 9.8 } });
+  assert.equal(corner.status, 201); // the floor reaches 10 m each way
+  await call("DELETE", `/api/conveyors/${corner.body.id}`);
 
   const moved = await call("PATCH", `/api/shapes/${made.body.id}`, { position: { x: 0.4, z: 0.3 } });
   assert.deepEqual(moved.body.position, { x: 0.4, z: 0.3 });
@@ -254,7 +257,7 @@ test("connection points, mergers, machines and assemblies over HTTP", async () =
 });
 
 test("bins over HTTP: validation, loading, catching and releasing", async () => {
-  const bad = await call("POST", "/api/bins", { name: "", holds: [], capacity: 0, position: { x: 9, z: 0 }, feed: { type: "belt" } });
+  const bad = await call("POST", "/api/bins", { name: "", holds: [], capacity: 0, position: { x: 12, z: 0 }, feed: { type: "belt" } });
   assert.equal(bad.status, 400);
   assert.ok(bad.body.problems.length >= 4);
   const missing = await call("POST", "/api/bins", { name: "X", holds: ["kind:box", "part:NOPE-1"], position: { x: 0, z: 0 } });

@@ -15,6 +15,7 @@ import { ValidationError } from "./errors.ts";
 import { isOwner, type Owner } from "./assembly.ts";
 import { parseCondition, type Condition } from "./splitters.ts";
 import { SHAPE_KINDS, type ShapeKind, type Size } from "./shapes.ts";
+import { FLOOR_HALF, FLOOR_MESSAGE } from "./floor.ts";
 
 export type FeedMode = "steady" | "demand";
 export type Feed =
@@ -94,8 +95,8 @@ function parseAccept(v: unknown, problems: string[]): Condition[] | null {
 
 function position(v: unknown) {
   const p = asBody(v);
-  const x = num(p.x, -3, 3);
-  const z = num(p.z, -3, 3);
+  const x = num(p.x, -FLOOR_HALF, FLOOR_HALF);
+  const z = num(p.z, -FLOOR_HALF, FLOOR_HALF);
   return x === null || z === null ? null : { x, z };
 }
 
@@ -109,7 +110,7 @@ export function parseNewBin(input: unknown): NewBin {
   const capacity = b.capacity === undefined ? 50 : Number.isInteger(b.capacity) ? num(b.capacity, 1, MAX_CAPACITY) : null;
   if (capacity === null) problems.push(`capacity must be a whole number from 1 to ${MAX_CAPACITY}`);
   const pos = position(b.position);
-  if (!pos) problems.push("position must be { x, z } in meters, each from -3 to 3");
+  if (!pos) problems.push(FLOOR_MESSAGE);
   const rotationY = num(b.rotationY ?? 0, -360, 360);
   if (rotationY === null) problems.push("rotationY must be degrees from -360 to 360");
   const feed = parseFeed(b.feed, problems);
@@ -141,7 +142,7 @@ export function parseBinPatch(input: unknown): BinPatch {
   if (b.position !== undefined) {
     const p = position(b.position);
     if (p) patch.position = p;
-    else problems.push("position must be { x, z } in meters, each from -3 to 3");
+    else problems.push(FLOOR_MESSAGE);
   }
   if (b.rotationY !== undefined) {
     const r = num(b.rotationY, -360, 360);

@@ -16,9 +16,9 @@ import { SHAPE_KINDS, type NewShape, type Shape, type ShapeKind, type Size } fro
 import { graspFor, gripHeight } from "../pick/grasp";
 import { CLEARANCE } from "../pick/clearance";
 import type { PickRequest } from "../pick/program";
+import { onFloor } from "../scene/floor";
 
 const POLL_MS = 4000;
-const FLOOR_LIMIT = 3; // meters, same as the API
 const DEFAULT_COLORS: Record<ShapeKind, string> = { box: "#f59e0b", cylinder: "#22c55e", sphere: "#e11d48", cone: "#a855f7" };
 
 /** dropping: the robot will pick shape `id`; the next click on the floor says where it goes. */
@@ -191,7 +191,7 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
     }
     const x = Math.round(at.x * 100) / 100;
     const z = Math.round(at.z * 100) / 100;
-    return Math.abs(x) <= FLOOR_LIMIT && Math.abs(z) <= FLOOR_LIMIT ? { x, z } : null;
+    return onFloor(x, z) ? { x, z } : null;
   }
 
   function ghostSource(): { kind: ShapeKind; size: Size; color: string; rotationY: number } | null {
@@ -372,8 +372,8 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
       </div>
       <label class="wide">Name <input type="text" data-field="name" maxlength="40" placeholder="Automatic"></label>
       <div class="row">
-        <label>X cm <input type="number" data-field="x" min="-300" max="300" step="5"></label>
-        <label>Z cm <input type="number" data-field="z" min="-300" max="300" step="5"></label>
+        <label>X cm <input type="number" data-field="x" min="-1000" max="1000" step="5"></label>
+        <label>Z cm <input type="number" data-field="z" min="-1000" max="1000" step="5"></label>
       </div>
       <p class="reach-line">At X, Z: <span class="reach"></span></p>
       <div class="actions">

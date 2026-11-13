@@ -4,6 +4,7 @@ import { forwardKinematics } from "./arm/kinematics";
 import { Gripper } from "./arm/Gripper";
 import { RobotArm } from "./arm/RobotArm";
 import { createStage } from "./scene/stage";
+import { createView } from "./scene/view";
 import { Trail } from "./scene/Trail";
 import { createPanel, type JogDirection } from "./ui/panel";
 import { createShapes } from "./shapes/controller";
@@ -16,7 +17,7 @@ const JOG_SPEED = 60; // degrees per second while a key or jog button is held
 const DEMO_SMOOTHING = 3; // higher = joints follow the demo path more tightly
 
 const canvas = document.getElementById("scene") as HTMLCanvasElement;
-const { renderer, scene, camera, controls } = createStage(canvas);
+const { renderer, scene, camera, controls, followView } = createStage(canvas);
 
 const arm = new RobotArm(ARM, JOINTS);
 scene.add(arm.root);
@@ -232,7 +233,7 @@ window.addEventListener("keydown", (e) => {
   // Typing a shape's name or size must not move the arm (R would reset it, G open the gripper…).
   const t = e.target;
   if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return;
-  if (line.handleKey(e) || splitters.handleKey(e) || belts.handleKey(e) || shapes.handleKey(e)) {
+  if (line.handleKey(e) || splitters.handleKey(e) || belts.handleKey(e) || shapes.handleKey(e) || view.handleKey(e)) {
     e.preventDefault();
     return;
   }
@@ -256,7 +257,10 @@ window.addEventListener("keydown", (e) => {
   e.preventDefault();
 });
 
-window.addEventListener("keyup", (e) => held.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key));
+window.addEventListener("keyup", (e) => {
+  held.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key);
+  view.handleKeyUp(e);
+});
 window.addEventListener("blur", () => held.clear());
 
 function keyboardDirection(): number {
@@ -312,6 +316,17 @@ canvas.addEventListener("pointermove", (e) => {
   canvas.style.cursor = housingAt(e) || splitters.hoversGate(e) || belts.hoversBelt(e) ? "pointer" : "";
 });
 
+// ---- Camera: the pad at the bottom of the screen, and keys ----
+
+const view = createView({
+  camera, controls, host: document.getElementById("view-pad")!, onMove: followView,
+  bounds: () => {
+    const box = new THREE.Box3().setFromObject(arm.root);
+    for (const root of [shapes.layer.root, belts.layer.root, line.binLayer.root]) box.union(new THREE.Box3().setFromObject(root));
+    return box;
+  },
+});
+
 // ---- Frame loop ----
 
 const tcpWorld = new THREE.Vector3();
@@ -355,6 +370,7 @@ renderer.setAnimationLoop((time) => {
   if (state.trail) trail.push(tcpWorld);
   panel.update(arm.anglesDeg, tcpWorld, forwardKinematics(ARM, arm.anglesRad()));
 
+  view.update(dt); // camera pad and keys, then the mouse's orbit controls
   controls.update();
   renderer.render(scene, camera);
 });

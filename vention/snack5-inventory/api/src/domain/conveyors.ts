@@ -18,6 +18,7 @@
  * PATCH /api/conveyors updates several at once so a line moves as one.
  */
 import { ValidationError } from "./errors.ts";
+import { FLOOR_HALF } from "./floor.ts";
 
 export interface Conveyor {
   id: string;
@@ -73,7 +74,7 @@ export const CONVEYOR_LIMITS = {
   width: [0.1, 1.2],
   height: [0.05, 1.2],
   speed: [-1, 1],
-  floor: 3,
+  floor: FLOOR_HALF,
 } as const;
 
 type Body = Record<string, unknown>;

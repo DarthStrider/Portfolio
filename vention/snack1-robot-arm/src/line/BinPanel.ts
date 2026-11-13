@@ -17,6 +17,7 @@ import { FIELDS, OP_LABEL, OPS, type Condition, type Field } from "../splitters/
 import type { Shape } from "../shapes/types";
 import type { BinLayer } from "./BinLayer";
 import type { Bin, Feed, ItemLook, Machine, NewBin, Owner } from "./types";
+import { onFloor } from "../scene/floor";
 
 const KIND_COLOR: Record<ShapeKind, string> = { box: "#f59e0b", cylinder: "#22c55e", sphere: "#e11d48", cone: "#a855f7" };
 const IN_CM = new Set<Field>(["width", "height", "depth"]);
@@ -153,7 +154,7 @@ export function createBinPanel(o: Options) {
     raycaster.setFromCamera(pointer, o.camera);
     if (!raycaster.ray.intersectPlane(floor, hit)) return null;
     const p = { x: Math.round(hit.x * 100) / 100, z: Math.round(hit.z * 100) / 100 };
-    return Math.abs(p.x) <= 2.75 && Math.abs(p.z) <= 2.8 ? p : null;
+    return onFloor(p.x, p.z, 0.25) ? p : null; // a bin's middle, keeping the bin on the floor
   }
 
   function handleHover(e: PointerEvent): boolean {
