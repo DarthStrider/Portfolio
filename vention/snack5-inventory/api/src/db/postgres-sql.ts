@@ -174,5 +174,24 @@ export const Q = {
   insertPart: `
     INSERT INTO parts (sku, name, category, unit, on_hand, reorder_level, location)
     VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (sku) DO NOTHING`,
-  reset: `TRUNCATE shapes, bins, assemblies, machines, mergers, connectors, splitters, conveyors, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
+  listRobots: `
+    SELECT id, name, x, z, rotation_y, pick, rules, otherwise, created_at, updated_at
+      FROM robots WHERE ($1::uuid IS NULL OR id = $1) ORDER BY created_at, id`,
+  createRobot: `
+    INSERT INTO robots (name, x, z, rotation_y, pick, rules, otherwise)
+    VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb) RETURNING id`,
+  updateRobot: `
+    UPDATE robots
+       SET name = coalesce($2, name), x = coalesce($3, x), z = coalesce($4, z), rotation_y = coalesce($5, rotation_y),
+           pick = coalesce($6::jsonb, pick), rules = coalesce($7::jsonb, rules),
+           otherwise = CASE WHEN $8 THEN $9::jsonb ELSE otherwise END,
+           updated_at = clock_timestamp()
+     WHERE id = $1 RETURNING id`,
+  deleteRobot: `DELETE FROM robots WHERE id = $1 RETURNING id`,
+  /** Order matters: shapes first (bins RESTRICT deleting while they hold some), belts last (their stations cascade). */
+  clearScene: [
+    "DELETE FROM robots", "DELETE FROM shapes", "DELETE FROM bins", "DELETE FROM mergers",
+    "DELETE FROM machines", "DELETE FROM splitters", "DELETE FROM conveyors",
+  ],
+  reset: `TRUNCATE robots, shapes, bins, assemblies, machines, mergers, connectors, splitters, conveyors, movements, reservation_lines, reservations, parts RESTART IDENTITY`,
 } as const;

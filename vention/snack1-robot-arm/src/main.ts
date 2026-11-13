@@ -11,6 +11,9 @@ import { createShapes } from "./shapes/controller";
 import { createConveyors } from "./conveyors/controller";
 import { createSplitters } from "./splitters/controller";
 import { createLine } from "./line/controller";
+import { createRobots } from "./robots/controller";
+import { setFloorHalf } from "./scene/floor";
+import { sceneApi } from "./shapes/api";
 import { planPickPlace, ProgramPlayer, type ArmState } from "./pick/program";
 
 const JOG_SPEED = 60; // degrees per second while a key or jog button is held
@@ -46,6 +49,48 @@ const line = createLine({
   scene, camera, canvas, shapes, conveyors: belts,
 });
 
+// Automated robots: extra arms that pick items up from their zone and put them where their rules say.
+// (`program`, the main arm's pick, is declared below; it's only read once things are running.)
+const robots = createRobots({
+  root: document.getElementById("robots-panel")!, scene, camera, canvas, shapes, conveyors: belts, line,
+  mainArmShape: () => program?.shapeId ?? null,
+  gripperUrl: `${import.meta.env.BASE_URL}models/gripper.glb`,
+});
+
+// The floor's size is the inventory API's setting (FLOOR_SIZE); until it answers, the default.
+void sceneApi.config().then((c) => setFloorHalf(c.floorHalf)).catch(() => {});
+
+// Clear scene: everything but the arm. Two clicks, so one stray click can't wipe the floor.
+const clearBtn = document.getElementById("btn-clear") as HTMLButtonElement;
+let clearArmed = 0;
+clearBtn.addEventListener("click", async () => {
+  if (belts.running) return panel.showStatus("Stop the belts before clearing the scene.");
+  if (!clearArmed) {
+    clearBtn.textContent = "Click again to clear";
+    clearBtn.classList.add("danger");
+    clearArmed = window.setTimeout(disarmClear, 4000);
+    return;
+  }
+  disarmClear();
+  stopProgram("Stopped: the scene was cleared.");
+  robots.cancelAll();
+  clearBtn.disabled = true;
+  try {
+    const { cleared: c } = await sceneApi.clear();
+    panel.showStatus(`Cleared ${c.shapes} shape${c.shapes === 1 ? "" : "s"}, ${c.conveyors} belt${c.conveyors === 1 ? "" : "s"}, ${c.bins} bin${c.bins === 1 ? "" : "s"} and ${c.robots} robot${c.robots === 1 ? "" : "s"}. Stock is unchanged.`);
+  } catch (err) {
+    panel.showStatus(`Couldn't clear the scene: ${(err as Error).message}`);
+  }
+  clearBtn.disabled = false;
+  await Promise.all([shapes.reload(), belts.reload(), splitters.reload(), line.reload(), robots.reload()]);
+});
+function disarmClear() {
+  window.clearTimeout(clearArmed);
+  clearArmed = 0;
+  clearBtn.textContent = "Clear scene";
+  clearBtn.classList.remove("danger");
+}
+
 // The right-hand panel's tabs.
 const tabs = {
   shapes: document.getElementById("tab-shapes")!,
@@ -53,6 +98,7 @@ const tabs = {
   splitters: document.getElementById("tab-splitters")!,
   machines: document.getElementById("tab-machines")!,
   bins: document.getElementById("tab-bins")!,
+  robots: document.getElementById("tab-robots")!,
 };
 function showTab(name: keyof typeof tabs) {
   for (const [key, tab] of Object.entries(tabs)) {
@@ -66,6 +112,8 @@ tabs.conveyors.addEventListener("click", () => showTab("conveyors"));
 tabs.splitters.addEventListener("click", () => showTab("splitters"));
 tabs.machines.addEventListener("click", () => showTab("machines"));
 tabs.bins.addEventListener("click", () => showTab("bins"));
+tabs.robots.addEventListener("click", () => showTab("robots"));
+robots.onShowTab(() => showTab("robots"));
 belts.onShowTab(() => showTab("conveyors"));
 splitters.onShowTab(() => showTab("splitters"));
 
@@ -233,7 +281,7 @@ window.addEventListener("keydown", (e) => {
   // Typing a shape's name or size must not move the arm (R would reset it, G open the gripper…).
   const t = e.target;
   if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return;
-  if (line.handleKey(e) || splitters.handleKey(e) || belts.handleKey(e) || shapes.handleKey(e) || view.handleKey(e)) {
+  if (robots.handleKey(e) || line.handleKey(e) || splitters.handleKey(e) || belts.handleKey(e) || shapes.handleKey(e) || view.handleKey(e)) {
     e.preventDefault();
     return;
   }
@@ -299,11 +347,13 @@ canvas.addEventListener("pointerup", (e) => {
   // Whoever is placing something gets the click; then shapes (they sit on top of belts), then
   // splitter gates (they stand over belts), then belts.
   if (line.isActive() && line.handleClick(e)) return; // putting a connection point on an object, or placing a bin
+  if (robots.isActive() && robots.handleClick(e)) return; // placing a robot, its pick zone or a drop spot
   if (splitters.isActive() && splitters.handleClick(e)) return;
   if (belts.isActive() && belts.handleClick(e)) return;
   if (shapes.handleClick(e)) return; // placing, moving or selecting a shape
   if (splitters.handlePick(e)) return;
   if (belts.handlePick(e)) return;
+  if (robots.handlePick(e)) return;
   const hit = housingAt(e);
   if (hit) select(hit.userData.jointIndex as number);
 });
@@ -312,6 +362,7 @@ canvas.addEventListener("pointermove", (e) => {
   controls.enabled = !belts.isExtending();
   if (belts.isExtending()) return void belts.handleHover(e);
   if (e.buttons !== 0) return;
+  if (robots.isActive() && robots.handleHover(e)) return;
   if (line.isActive() ? line.handleHover(e) : splitters.isActive() ? splitters.handleHover(e) : belts.isActive() ? belts.handleHover(e) : shapes.handleHover(e)) return;
   canvas.style.cursor = housingAt(e) || splitters.hoversGate(e) || belts.hoversBelt(e) ? "pointer" : "";
 });
@@ -322,7 +373,7 @@ const view = createView({
   camera, controls, host: document.getElementById("view-pad")!, onMove: followView,
   bounds: () => {
     const box = new THREE.Box3().setFromObject(arm.root);
-    for (const root of [shapes.layer.root, belts.layer.root, line.binLayer.root]) box.union(new THREE.Box3().setFromObject(root));
+    for (const root of [shapes.layer.root, belts.layer.root, line.binLayer.root, robots.layer.root]) box.union(new THREE.Box3().setFromObject(root));
     return box;
   },
 });
@@ -363,6 +414,7 @@ renderer.setAnimationLoop((time) => {
   gripper?.update(dt);
   belts.update(dt); // moves shapes riding the belts while running
   splitters.update(dt); // swings the gates' flaps
+  robots.update(dt); // the automated robots, always at work
 
   // getWorldPosition walks up the hierarchy and refreshes world matrices first,
   // so it's correct even though the joints changed since the last render.

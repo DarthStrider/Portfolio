@@ -285,6 +285,40 @@ test("bins over HTTP: validation, loading, catching and releasing", async () => 
   assert.equal((await call("DELETE", `/api/bins/${bin.body.id}`)).status, 200);
 });
 
+test("robots over HTTP: rules and targets checked; config; clearing the scene", async () => {
+  const config = await call("GET", "/api/config");
+  assert.deepEqual(config.body, { floorSize: 20, floorHalf: 10 });
+
+  const belt = (await call("POST", "/api/conveyors", { name: "Takeaway", length: 1, width: 0.3, height: 0.3, position: { x: 1, z: 0 } })).body;
+  const curve = (await call("POST", "/api/conveyors", { name: "Bend", width: 0.3, height: 0.3, position: { x: 3, z: 0 }, kind: "curve", turn: 90, radius: 0.5 })).body;
+  const made = await call("POST", "/api/robots", {
+    name: "Picker", position: { x: 0.5, z: 1 },
+    rules: [{ conditions: [{ field: "color", op: "eq", value: "#e11d48" }], target: { type: "belt", conveyorId: belt.id, along: 0.3 } }],
+    otherwise: { type: "spot", x: 1, z: 1.4 },
+  });
+  assert.equal(made.status, 201);
+  assert.deepEqual(made.body.pick, { x: 1, z: 1, radius: 0.15 }); // half a meter in front, by default
+  const bad = await call("POST", "/api/robots", {
+    name: "", position: { x: 50, z: 0 }, pick: { x: 0, z: 0, radius: 2 },
+    rules: [{ conditions: [], target: { type: "belt", conveyorId: "nope", along: 9 } }], otherwise: { type: "drop" },
+  });
+  assert.equal(bad.status, 400);
+  assert.ok(bad.body.problems.length >= 5, bad.body.problems.join("; "));
+  const onCurve = await call("PATCH", `/api/robots/${made.body.id}`, { rules: [{ conditions: [{ field: "kind", op: "eq", value: "box" }], target: { type: "belt", conveyorId: curve.id, along: 0.1 } }] });
+  assert.equal(onCurve.status, 400);
+  assert.match(onCurve.body.problems[0], /straight sections/);
+  const tooFar = await call("PATCH", `/api/robots/${made.body.id}`, { rules: [{ conditions: [{ field: "kind", op: "eq", value: "box" }], target: { type: "belt", conveyorId: belt.id, along: 1.5 } }] });
+  assert.equal(tooFar.status, 400);
+  assert.equal((await call("PATCH", `/api/robots/${made.body.id}`, { otherwise: null })).body.otherwise, null);
+  assert.equal((await call("GET", "/api/robots")).body.length, 1);
+
+  const cleared = await call("DELETE", "/api/scene");
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.cleared.robots, 1);
+  assert.ok(cleared.body.cleared.conveyors >= 2);
+  assert.deepEqual([(await call("GET", "/api/robots")).body, (await call("GET", "/api/conveyors")).body, (await call("GET", "/api/shapes")).body], [[], [], []]);
+});
+
 test("CORS: pages on localhost may call the API; other sites may not", async () => {
   const pre = await fetch(base + "/api/shapes", { method: "OPTIONS", headers: { origin: "http://localhost:5173", "access-control-request-method": "POST" } });
   assert.equal(pre.status, 204);

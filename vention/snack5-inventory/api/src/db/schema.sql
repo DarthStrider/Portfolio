@@ -474,18 +474,28 @@ BEGIN
   RETURN jsonb_build_object('ok', true);
 END $$;
 
--- The floor: shapes, belts and bins within 10 m of the arm's base each way (floor.ts in the
--- API). It was 3 m; databases made then have column checks named <table>_x_check and
--- <table>_z_check, which are replaced. Safe to run every start, like the rest of this file.
-DO $$
-DECLARE t text;
-BEGIN
-  FOREACH t IN ARRAY ARRAY['shapes', 'conveyors', 'bins'] LOOP
-    EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', t, t || '_x_check');
-    EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', t, t || '_z_check');
-    BEGIN
-      EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I CHECK (x BETWEEN -10 AND 10 AND z BETWEEN -10 AND 10)', t, t || '_floor_check');
-    EXCEPTION WHEN duplicate_object THEN NULL;
-    END;
-  END LOOP;
-END $$;
+-- Automated robot arms: where each stands, the circle it picks from, and its rules (the same
+-- conditions as a splitter's, each with a target). Rules and targets are jsonb, like a splitter's.
+CREATE TABLE IF NOT EXISTS robots (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        text NOT NULL CHECK (length(name) BETWEEN 1 AND 40),
+  x           double precision NOT NULL, -- on the floor: checked below (floor_check)
+  z           double precision NOT NULL,
+  rotation_y  double precision NOT NULL DEFAULT 0,
+  pick        jsonb NOT NULL CHECK (jsonb_typeof(pick) = 'object'),
+  rules       jsonb NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(rules) = 'array' AND jsonb_array_length(rules) <= 10),
+  otherwise   jsonb, -- null: items no rule matches are left alone
+  created_at  timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at  timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+
+-- The floor: positions within FLOOR_SIZE / 2 of the arm's base. The size is a setting
+-- (src/domain/floor.ts), so the checks themselves are made by PostgresRepo.init from it, each
+-- time the API starts. Databases from when the floor was a fixed 3 m have column checks named
+-- <table>_x_check and <table>_z_check: they go.
+ALTER TABLE shapes DROP CONSTRAINT IF EXISTS shapes_x_check;
+ALTER TABLE shapes DROP CONSTRAINT IF EXISTS shapes_z_check;
+ALTER TABLE conveyors DROP CONSTRAINT IF EXISTS conveyors_x_check;
+ALTER TABLE conveyors DROP CONSTRAINT IF EXISTS conveyors_z_check;
+ALTER TABLE bins DROP CONSTRAINT IF EXISTS bins_x_check;
+ALTER TABLE bins DROP CONSTRAINT IF EXISTS bins_z_check;

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { FLOOR_HALF } from "./floor";
+import { onFloorChange } from "./floor";
 
 /** Renderer, camera, orbit controls, lights and floor: everything except the arm. */
 export function createStage(canvas: HTMLCanvasElement) {
@@ -20,7 +20,6 @@ export function createStage(canvas: HTMLCanvasElement) {
   controls.target.set(0, 0.4, 0);
   controls.enableDamping = true;
   controls.minDistance = 0.5;
-  controls.maxDistance = 6 * FLOOR_HALF; // far enough to see the whole floor beside the panels
   controls.maxPolarAngle = Math.PI * 0.49; // stay above the floor
   controls.update();
 
@@ -50,29 +49,39 @@ export function createStage(canvas: HTMLCanvasElement) {
   }
 
   // An invisible floor that only shows shadows, a grid with a line every 10 cm and a
-  // brighter one every meter, and the edge of the area you can build on.
-  const size = 2 * FLOOR_HALF;
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(size + 10, size + 10).rotateX(-Math.PI / 2),
-    new THREE.ShadowMaterial({ opacity: 0.35 }),
-  );
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  const fine = new THREE.GridHelper(size, size * 10, 0x262b33, 0x262b33);
-  fine.position.y = 0.001; // avoid z-fighting with the shadow plane
-  const fineMaterial = fine.material as THREE.LineBasicMaterial;
-  fineMaterial.transparent = true;
-  const meters = new THREE.GridHelper(size, size, 0x4a5361, 0x343a45);
-  meters.position.y = 0.0015;
-  const edge = new THREE.LineLoop(
-    new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-FLOOR_HALF, 0.002, -FLOOR_HALF), new THREE.Vector3(FLOOR_HALF, 0.002, -FLOOR_HALF),
-      new THREE.Vector3(FLOOR_HALF, 0.002, FLOOR_HALF), new THREE.Vector3(-FLOOR_HALF, 0.002, FLOOR_HALF),
-    ]),
-    new THREE.LineBasicMaterial({ color: 0x5b8def }),
-  );
-  scene.add(fine, meters, edge);
+  // brighter one every meter, and the edge of the area you can build on. Rebuilt if the
+  // floor's size changes (it comes from the API at startup).
+  const floorGroup = new THREE.Group();
+  scene.add(floorGroup);
+  const fineMaterial = new THREE.LineBasicMaterial({ color: 0x262b33, transparent: true });
+  let fine: THREE.Object3D = new THREE.Group();
+  onFloorChange((half) => {
+    for (const child of [...floorGroup.children]) {
+      child.removeFromParent();
+      child.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    }
+    const size = 2 * half;
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(size + 10, size + 10).rotateX(-Math.PI / 2),
+      new THREE.ShadowMaterial({ opacity: 0.35 }),
+    );
+    floor.receiveShadow = true;
+    const fineGrid = new THREE.GridHelper(size, Math.round(size * 10), 0x262b33, 0x262b33);
+    fineGrid.material = fineMaterial;
+    fineGrid.position.y = 0.001; // avoid z-fighting with the shadow plane
+    fine = fineGrid;
+    const meters = new THREE.GridHelper(size, Math.round(size), 0x4a5361, 0x343a45);
+    meters.position.y = 0.0015;
+    const edge = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-half, 0.002, -half), new THREE.Vector3(half, 0.002, -half),
+        new THREE.Vector3(half, 0.002, half), new THREE.Vector3(-half, 0.002, half),
+      ]),
+      new THREE.LineBasicMaterial({ color: 0x5b8def }),
+    );
+    floorGroup.add(floor, fineGrid, meters, edge);
+    controls.maxDistance = Math.max(10, 6 * half); // far enough to see the whole floor beside the panels
+  });
 
   function resize() {
     const width = canvas.clientWidth;

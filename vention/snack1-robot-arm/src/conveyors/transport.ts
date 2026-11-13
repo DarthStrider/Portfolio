@@ -16,7 +16,7 @@
  */
 import { curveFrame, headingOf, wrap } from "./sections";
 import type { Conveyor } from "./types";
-import { FLOOR_HALF } from "../scene/floor";
+import { floorHalf } from "../scene/floor";
 
 /** Belts without section fields (tests, older code) are straight. */
 type Belt = Pick<Conveyor, "length" | "width" | "height" | "speed" | "position" | "rotationY"> &
@@ -206,7 +206,7 @@ export function divertVelocity(b: Belt, side: 1 | -1): { vx: number; vz: number 
 
 /** Advances every body by dt seconds. Bodies are changed in place. */
 export function step(bodies: Iterable<Body>, belts: readonly Belt[], dt: number, options: StepOptions | number = {}): void {
-  const { gates = [], route, stops = [], hold, floorLimit = FLOOR_HALF - 0.05 } = typeof options === "number" ? { floorLimit: options } : options;
+  const { gates = [], route, stops = [], hold, floorLimit = floorHalf() - 0.05 } = typeof options === "number" ? { floorLimit: options } : options;
   const all = [...bodies];
   for (const body of all) {
     if (body.guide) {

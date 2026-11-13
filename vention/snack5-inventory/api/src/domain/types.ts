@@ -3,6 +3,7 @@ import type { Conveyor, ConveyorPatch, ConveyorUpdate, NewConveyor } from "./con
 import type { NewSplitter, Splitter, SplitterPatch } from "./splitters.ts";
 import type { PartPatch } from "./newPart.ts";
 import type { Bin, BinPatch, BinResult, LoadLine, NewBin } from "./bins.ts";
+import type { NewRobot, Robot, RobotPatch } from "./robots.ts";
 import type { AssembleResult, Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner } from "./assembly.ts";
 
 /**
@@ -208,6 +209,26 @@ export interface InventoryRepo {
   /** Takes a stored shape out of the bin and puts it on the floor at (x, z). */
   releaseFromBin(id: string, shapeId: string, at: { x: number; z: number }): Promise<BinResult>;
 
+  /** Automated robot arms, oldest first. */
+  listRobots(): Promise<Robot[]>;
+  createRobot(robot: NewRobot): Promise<Robot>;
+  updateRobot(id: string, patch: RobotPatch): Promise<Robot>;
+  deleteRobot(id: string): Promise<void>;
+
+  /**
+   * Empties the arm app's scene: shapes (stored ones too), belts with their splitters, mergers
+   * and machines, bins and robots, all at once. Stock, parts, connection points and the
+   * assembly history stay. Returns how many of each were removed.
+   */
+  clearScene(): Promise<SceneCleared>;
+
   /** Deletes everything. Tests only. */
   reset(): Promise<void>;
+}
+
+export interface SceneCleared {
+  shapes: number;
+  conveyors: number;
+  bins: number;
+  robots: number;
 }

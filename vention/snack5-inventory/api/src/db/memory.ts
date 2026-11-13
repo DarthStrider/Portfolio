@@ -16,6 +16,8 @@ import type { NewSplitter, Splitter, SplitterPatch } from "../domain/splitters.t
 import type { PartPatch } from "../domain/newPart.ts";
 import { stockNeeded, type Bin, type BinPatch, type BinResult, type LoadLine, type NewBin } from "../domain/bins.ts";
 import type { AssembleResult, Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner } from "../domain/assembly.ts";
+import type { NewRobot, Robot, RobotPatch } from "../domain/robots.ts";
+import type { SceneCleared } from "../domain/types.ts";
 
 interface PartRow { sku: string; name: string; category: Part["category"]; unit: string; onHand: number; reserved: number; reorderLevel: number; location: string; updatedAt: string }
 
@@ -33,6 +35,7 @@ export class MemoryRepo implements InventoryRepo {
   private machines = new Map<string, Machine>();
   private assemblies: Assembly[] = [];
   private bins = new Map<string, Omit<Bin, "count">>();
+  private robots = new Map<string, Robot>();
 
   async init(): Promise<void> {}
   async ping(): Promise<void> {}
@@ -431,7 +434,36 @@ export class MemoryRepo implements InventoryRepo {
     if (!this.splitters.delete(id)) throw new NotFoundError(`No splitter ${id}`);
   }
 
+  async listRobots(): Promise<Robot[]> {
+    return [...this.robots.values()].map((r) => structuredClone(r));
+  }
+
+  async createRobot(input: NewRobot): Promise<Robot> {
+    const now = new Date().toISOString();
+    const r: Robot = { ...structuredClone(input), id: randomUUID(), createdAt: now, updatedAt: now };
+    this.robots.set(r.id, r);
+    return structuredClone(r);
+  }
+
+  async updateRobot(id: string, patch: RobotPatch): Promise<Robot> {
+    const r = this.robots.get(id);
+    if (!r) throw new NotFoundError(`No robot ${id}`);
+    Object.assign(r, structuredClone(patch), { updatedAt: new Date().toISOString() });
+    return structuredClone(r);
+  }
+
+  async deleteRobot(id: string): Promise<void> {
+    if (!this.robots.delete(id)) throw new NotFoundError(`No robot ${id}`);
+  }
+
+  async clearScene(): Promise<SceneCleared> {
+    const out = { shapes: this.shapes.size, conveyors: this.conveyors.size, bins: this.bins.size, robots: this.robots.size };
+    for (const m of [this.shapes, this.conveyors, this.splitters, this.mergers, this.machines, this.bins, this.robots]) m.clear();
+    return out;
+  }
+
   async reset(): Promise<void> {
+    this.robots.clear();
     this.splitters.clear();
     this.connectors.clear();
     this.mergers.clear();

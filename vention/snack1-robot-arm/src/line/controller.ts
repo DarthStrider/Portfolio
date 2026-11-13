@@ -481,6 +481,12 @@ export function createLine({ root, binsRoot, scene, camera, canvas, shapes, conv
     isActive: () => points.isActive() || binPanel.isActive(),
     /** Rebuild the 3D models after a run (Stop) so lights go back to idle. */
     idle: () => layer.show(new Map(), new Map()),
+    /** Re-read mergers, machines, bins and parts now. */
+    reload: load,
+    /** The bins as last loaded. */
+    get bins(): readonly Bin[] {
+      return bins;
+    },
   };
 }
 

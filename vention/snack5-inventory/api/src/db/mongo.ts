@@ -33,6 +33,8 @@ import type {
 } from "../domain/assembly.ts";
 import { consumption } from "./memory.ts";
 import { stockNeeded, type Bin, type BinPatch, type BinResult, type LoadLine, type NewBin } from "../domain/bins.ts";
+import type { NewRobot, Robot, RobotPatch } from "../domain/robots.ts";
+import type { SceneCleared } from "../domain/types.ts";
 
 interface PartDoc {
   _id: string; // the SKU
@@ -51,6 +53,7 @@ interface ConveyorDoc extends Omit<Conveyor, "id" | "createdAt" | "updatedAt" | 
   Partial<Pick<Conveyor, "kind" | "turn" | "radius" | "lineId" | "lineIndex">> { _id: string; createdAt: Date; updatedAt: Date }
 /** A splitter's rules are nested lists of objects: a document holds them as they are. */
 interface SplitterDoc extends Omit<Splitter, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
+interface RobotDoc extends Omit<Robot, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 interface BinDoc extends Omit<Bin, "id" | "count" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 interface ConnectorsDoc { _id: Owner; points: ConnectionPoint[]; updatedAt: Date }
 interface MergerDoc extends Omit<Merger, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
@@ -76,6 +79,7 @@ export class MongoRepo implements InventoryRepo {
   private readonly machines: Collection<MachineDoc>;
   private readonly assemblies: Collection<AssemblyDoc>;
   private readonly bins: Collection<BinDoc>;
+  private readonly robots: Collection<RobotDoc>;
 
   constructor(url: string, dbName = "inventory") {
     this.client = new MongoClient(url, { serverSelectionTimeoutMS: 5000 });
@@ -92,6 +96,7 @@ export class MongoRepo implements InventoryRepo {
     this.machines = this.db.collection<MachineDoc>("machines");
     this.assemblies = this.db.collection<AssemblyDoc>("assemblies");
     this.bins = this.db.collection<BinDoc>("bins");
+    this.robots = this.db.collection<RobotDoc>("robots");
   }
 
   async init(): Promise<void> {
@@ -557,7 +562,41 @@ export class MongoRepo implements InventoryRepo {
     if (r.deletedCount !== 1) throw new NotFoundError(`No splitter ${id}`);
   }
 
+  async listRobots(): Promise<Robot[]> {
+    return (await this.robots.find({}).sort({ createdAt: 1, _id: 1 }).toArray()).map((d) => fromDoc<Robot>(d));
+  }
+
+  async createRobot(r: NewRobot): Promise<Robot> {
+    const now = new Date();
+    const doc: RobotDoc = { ...r, _id: randomUUID(), createdAt: now, updatedAt: now };
+    await this.robots.insertOne(doc);
+    return fromDoc<Robot>(doc);
+  }
+
+  async updateRobot(id: string, patch: RobotPatch): Promise<Robot> {
+    const doc = await this.robots.findOneAndUpdate({ _id: id }, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
+    if (!doc) throw new NotFoundError(`No robot ${id}`);
+    return fromDoc<Robot>(doc);
+  }
+
+  async deleteRobot(id: string): Promise<void> {
+    if ((await this.robots.deleteOne({ _id: id })).deletedCount !== 1) throw new NotFoundError(`No robot ${id}`);
+  }
+
+  async clearScene(): Promise<SceneCleared> {
+    // No multi-document transaction on a standalone server: each collection is emptied in
+    // turn, shapes first so no bin is ever left holding a shape that's gone. If it stops
+    // halfway, pressing Clear again finishes the job.
+    const shapes = (await this.shapes.deleteMany({})).deletedCount;
+    const bins = (await this.bins.deleteMany({})).deletedCount;
+    const robots = (await this.robots.deleteMany({})).deletedCount;
+    await Promise.all([this.splitters.deleteMany({}), this.mergers.deleteMany({}), this.machines.deleteMany({})]);
+    const conveyors = (await this.conveyors.deleteMany({})).deletedCount;
+    return { shapes, conveyors, bins, robots };
+  }
+
   async reset(): Promise<void> {
+    await this.robots.deleteMany({});
     await Promise.all([this.bins.deleteMany({}), this.assemblies.deleteMany({}), this.machines.deleteMany({}), this.mergers.deleteMany({}), this.connectors.deleteMany({}), this.splitters.deleteMany({}), this.conveyors.deleteMany({}), this.shapes.deleteMany({}), this.parts.deleteMany({}), this.moves.deleteMany({}), this.res.deleteMany({}), this.counters.deleteMany({})]);
   }
 
