@@ -114,10 +114,10 @@ export function createView({ camera, controls, host, bounds, onMove }: Options) 
     if (box.isEmpty()) return go(home.position.clone(), home.target.clone());
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     const fov = THREE.MathUtils.degToRad(camera.fov) / 2;
-    // The side panels cover about half the width on a wide screen: fit into the middle half.
-    const visibleAspect = window.innerWidth > 700 ? camera.aspect * 0.5 : camera.aspect;
+    // The side panels cover more than half the width on a wide screen: fit into the middle.
+    const visibleAspect = window.innerWidth > 700 ? camera.aspect * 0.42 : camera.aspect;
     const fit = sphere.radius / Math.sin(Math.min(fov, Math.atan(Math.tan(fov) * visibleAspect)));
-    const d = THREE.MathUtils.clamp(fit * 1.1, controls.minDistance, controls.maxDistance);
+    const d = THREE.MathUtils.clamp(fit * 1.15, controls.minDistance, controls.maxDistance);
     // From the current direction, but at least 35° above the floor, so far belts aren't edge-on.
     const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
     const minUp = Math.sin(THREE.MathUtils.degToRad(35));
