@@ -18,6 +18,8 @@ click, turning them on the way if you ask.
 - [x] Demo mode, a trail of the tool's path, click-to-select joints, keyboard and touch controls
 - [x] Shapes: create boxes, cylinders, spheres and cones, place and move them on the floor with the mouse, and see which ones the arm can reach. They're saved in the inventory database (Snack 5), PostgreSQL or MongoDB
 - [x] Conveyor belts: build your own (length, width, height, speed, angle), place them with the mouse, then **Run** them: shapes on a belt ride along, fall off the end, and can land on another belt. Stop saves where everything ended up
+- [x] Automated robots: place extra arms anywhere; each watches a green pick zone and moves every item that arrives there to where its rules say (a spot, a belt or a bin), all the time, with the belts running or not
+- [x] **Clear scene**: removes every shape, belt, bin and robot (the arm stays; stock isn't changed)
 - [x] A 20 m × 20 m floor to build on (meter lines on the grid, a blue edge), and camera controls: a pad at the bottom of the screen and keys to move along the floor, orbit, zoom, fit everything in view, look straight down, or go back to the start
 - [x] Conveyor lines: build belts into a line one section at a time, with straights (typed, or dragged out to length with the mouse), 45° and 90° curves, and square corner transfers. A line moves, turns, reverses and runs as one; deleting a middle section splits it
 - [x] Splitters: diverter gates on a belt that send each item left, right or straight on by rules you write (shape kind, color, size, name, SKU, or the inventory part's category, location and stock). Rules are stored in the database, and inventory changes apply to the next item through the gate
@@ -154,6 +156,18 @@ PL-200 plate shares them, as does every plain cylinder. Until you change them, e
 - **Load** fills the bin with new items of the kind you pick; for a part they're **taken from stock** (one ledger line), and you can't load more than is available or than fits. **Unload** takes plain items out and gives parts back to stock.
 - The label over each bin shows how full it is; the dashed line shows what it feeds. As always, nothing is saved until **Stop**: then items that left bins are put back on the floor, and items that ended up in bins are stored (a part that hadn't left stock yet is taken as it goes in, and refused if there isn't enough).
 
+### Robots (Robots tab)
+
+- **Place with mouse** puts a new robot on the floor, facing the way you set. Its **pick zone** (the green circle) starts half a meter in front; **Set with mouse** moves it, for example to the end of a belt. It reaches about 80 cm (the blue ring); the panel warns if the zone is out of reach.
+- **Rules** are checked in order: conditions like a splitter's (kind, color, size, SKU, part category…), then where matching items go: **a spot on the floor** (laid out in a grid around it, the orange square), **a belt** (at a distance along it) or **a bin**. **Anything else** can go somewhere too, or be left alone. **Save rules** to put them to work.
+- Robots work **all the time**. With the belts stopped, each move is saved as it's made. With them running, an item is held still while the gripper comes down, and put down where it lands on whatever is there; Stop saves it with everything else.
+- Items a robot can't lift (too wide, out of reach) or has no rule for are left alone until they move. Its line in the list says what it's doing or why it's waiting.
+- **Move**, **↻ 90°** and **✕** on each robot; moving one takes its pick zone along.
+
+**Clear scene** (beside Run) removes every shape, belt (with its splitters, mergers and machines), bin and robot. Click it twice: there's no undo. Stock levels don't change.
+
+**The floor's size** comes from the inventory API's `FLOOR_SIZE` setting (default 20 m across): see Snack 5's README.
+
 ### Controls
 
 | Input | Action |
@@ -202,8 +216,14 @@ src/
 ├── splitters/
 │   ├── types.ts         a splitter and its rules, as the API stores them
 │   ├── rules.ts         which exit a rule list picks for a shape and its part (pure, unit-tested)
+│   ├── conditions.ts    one condition's row in a rule editor (shared with the robots)
 │   ├── SplitterLayer.ts the gate model: gantry and swinging flaps
 │   └── controller.ts    the Splitters tab: placing gates, the rule editor, the live preview
+├── robots/
+│   ├── types.ts         a robot, its rules and targets, as the API stores them
+│   ├── cell.ts          what a robot decides: its frame, rules, where to put things (pure, unit-tested)
+│   ├── RobotLayer.ts    each robot's arm and gripper, pick zone, reach ring and spot markers
+│   └── controller.ts    the Robots tab, and the robots at work every frame
 └── line/
     ├── types.ts         connection points, mergers, machines, assemblies, as the API stores them
     ├── joints.ts        where points are, where to put a joined object, poses through joins (pure)

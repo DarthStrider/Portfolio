@@ -27,6 +27,8 @@ repository interface and pass the same contract tests.
 - [x] Bins: hold the kinds of object you list; loading takes parts from stock, unloading gives them back; items caught off the line are stored, and a part is never taken from stock twice
 - [x] Edit a part's name, category, location or reorder level (stock only changes through receive and consume, so the ledger stays complete)
 - [x] Conveyor belts for the same scene: size, speed (forward or reversed), position and angle, so a line layout is saved with the parts it uses
+- [x] Automated robots for the arm's scene: where each stands, its pick zone, and rules that send each kind of item to a spot, a belt or a bin
+- [x] Clear the arm's scene in one request (one transaction in PostgreSQL); one `FLOOR_SIZE` setting for the floor
 - [x] Conveyor lines: each belt is a straight, curve or corner transfer section, with a line id and its place in the line. A line moves, turns or splits with one all-or-none `PATCH /api/conveyors`
 - [x] Switchable storage: `DB=postgres`, `DB=mongo`, or `DB=memory` (no database at all)
 - [x] Docker Compose profiles and Kubernetes overlays for each database
@@ -48,6 +50,16 @@ docker compose --profile mongo up --build       # MongoDB
 Open **http://localhost:8081**. The badge in the top right says which database is answering.
 Stop with `Ctrl+C`; `docker compose --profile postgres down -v` (or `mongo`) also deletes that database's volume.
 Run one profile at a time: both serve the same port.
+
+**The floor's size** (for the robot arm's scene) is one setting, `FLOOR_SIZE`, in meters across (default 20):
+
+```powershell
+$env:FLOOR_SIZE="30";  docker compose --profile postgres up --build     # a 30 m × 30 m floor
+```
+
+The API checks every position against it, the arm app reads it from `GET /api/config`, and PostgreSQL's floor
+checks are rebuilt from it on every start. To change the default for good, edit `DEFAULT_FLOOR_SIZE` in
+[`api/src/domain/floor.ts`](api/src/domain/floor.ts).
 
 **Contract tests against both real databases** (throwaway containers, your data isn't touched):
 
@@ -173,6 +185,10 @@ replica set, the same steps could run inside a multi-document transaction instea
 | POST | `/api/bins/{id}/unload` | `{ "qty": 10 }` | `{ unloaded }`: plain items out, parts back into stock |
 | POST | `/api/bins/{id}/catch` | `{ "shapeId" }` | Stores a free shape (and anything joined to it); its parts are taken from stock if they haven't been. 409 if wrong kind, full or short |
 | POST | `/api/bins/{id}/release` | `{ "shapeId", "position": { "x", "z" } }` | Puts a stored shape back on the floor |
+| GET / POST | `/api/robots` | `{ "name", "position": { "x", "z" }, "rotationY", "pick": { "x", "z", "radius" }, "rules": [{ "conditions": [...], "target": { "type": "spot", "x", "z" } \| { "type": "belt", "conveyorId", "along" } \| { "type": "bin", "binId" } }], "otherwise": target or null }` | List, or 201 + robot. `pick` defaults to half a meter in front |
+| PATCH / DELETE | `/api/robots/{id}` | `name`, `position`, `rotationY`, `pick`, `rules` or `otherwise` | Updated robot / `{ "deleted": id }` |
+| DELETE | `/api/scene` | | `{ cleared: { shapes, conveyors, bins, robots } }`: everything in the arm's scene goes (splitters, mergers and machines with their belts); stock stays |
+| GET | `/api/config` | | `{ floorSize, floorHalf }`: the floor's size in meters (`FLOOR_SIZE`) |
 | PATCH | `/api/parts/{sku}` | `name`, `category`, `location` or `reorderLevel` | Updated part. Stock fields are refused: use receive/consume |
 
 Rule fields: `kind`, `color`, `name`, `sku`, `width`, `height`, `depth` (meters), `isPart`, `part.category`, `part.location`,

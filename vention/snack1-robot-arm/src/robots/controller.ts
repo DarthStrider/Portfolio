@@ -504,7 +504,7 @@ export function createRobots(o: Options) {
     </section>
     <section>
       <h2>Robots <span class="count"></span></h2>
-      <ul class="list robot-list"></ul>
+      <ul class="shape-list robot-list"></ul>
     </section>
     <section class="robot-editor" hidden>
       <h2>Pick zone <small class="for"></small></h2>

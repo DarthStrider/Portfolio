@@ -63,6 +63,9 @@ export class RobotLayer {
     for (const [id, v] of this.views) {
       if (keep.has(id)) continue;
       v.group.removeFromParent();
+      v.zone.removeFromParent();
+      v.marks.removeFromParent();
+      v.zone.geometry.dispose();
       this.views.delete(id);
     }
     for (const r of robots) {

@@ -24,6 +24,16 @@ runs or uses the project, MINOR for new features, PATCH for fixes.
 
 ### Added
 
+- Automated robots (Robots tab): extra arms anywhere on the floor, each with a pick zone and rules
+  that send each kind of item to a spot on the floor, a place on a belt, or a bin. They work all
+  the time, with the belts running or not, using the same planner as **Pick**. Saved by Snack 5's
+  API (`/api/robots`).
+- **Clear scene**: removes every shape, belt, bin and robot in one request; the arm stays and
+  stock isn't changed.
+- The floor's size comes from the inventory API (`GET /api/config`, set by `FLOOR_SIZE`) instead of
+  a constant in this app.
+- `tests/robots.test.ts`. The splitters' condition editor moved to `src/splitters/conditions.ts` so
+  the robots' rules share it.
 - A bigger floor: 20 m × 20 m (was 6 m × 6 m), with a line every meter on the grid and a blue
   edge. Shapes, belts and bins can go anywhere on it. Needs Snack 5's API with the same limit.
 - Camera controls: a pad at the bottom of the screen (hold ▲ ◀ ▼ ▶ to move along the floor,
