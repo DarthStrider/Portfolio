@@ -20,7 +20,7 @@ export function createStage(canvas: HTMLCanvasElement) {
   controls.target.set(0, 0.4, 0);
   controls.enableDamping = true;
   controls.minDistance = 0.5;
-  controls.maxDistance = 3 * FLOOR_HALF; // far enough to see the whole floor
+  controls.maxDistance = 6 * FLOOR_HALF; // far enough to see the whole floor beside the panels
   controls.maxPolarAngle = Math.PI * 0.49; // stay above the floor
   controls.update();
 
