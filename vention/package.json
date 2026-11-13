@@ -1,0 +1,15 @@
+{
+  "name": "vention-snacks",
+  "private": true,
+  "description": "Runs all five Vention snacks with one command. See start-all.mjs.",
+  "type": "module",
+  "scripts": {
+    "start": "node start-all.mjs",
+    "start:mongo": "node start-all.mjs --mongo",
+    "start:open": "node start-all.mjs --open",
+    "stop": "docker compose -f snack5-inventory/docker-compose.yml --profile postgres --profile mongo down"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
