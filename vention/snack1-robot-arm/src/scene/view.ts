@@ -9,7 +9,7 @@
  */
 import * as THREE from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { FLOOR_HALF } from "./floor";
+import { floorHalf } from "./floor";
 
 export type ViewAction = "forward" | "back" | "left" | "right" | "orbitLeft" | "orbitRight" | "zoomIn" | "zoomOut";
 export type ViewJump = "home" | "top" | "fit";
@@ -50,8 +50,9 @@ export function createView({ camera, controls, host, bounds, onMove }: Options) 
   /** Moves the camera and its target together, keeping the target over the floor. */
   function pan(dx: number, dz: number) {
     const t = controls.target;
-    const nx = THREE.MathUtils.clamp(t.x + dx, -FLOOR_HALF, FLOOR_HALF);
-    const nz = THREE.MathUtils.clamp(t.z + dz, -FLOOR_HALF, FLOOR_HALF);
+    const h = floorHalf();
+    const nx = THREE.MathUtils.clamp(t.x + dx, -h, h);
+    const nz = THREE.MathUtils.clamp(t.z + dz, -h, h);
     camera.position.x += nx - t.x;
     camera.position.z += nz - t.z;
     t.x = nx;

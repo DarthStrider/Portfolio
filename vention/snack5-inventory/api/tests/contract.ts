@@ -445,6 +445,38 @@ export function contractTests(name: string, makeRepo: () => Promise<InventoryRep
       assert.equal(full.ok === false && full.reason, "full");
     });
 
+    test("robots: stored with their rules, patched, deleted; clearing the scene keeps stock", async () => {
+      const belt = await repo.createConveyor({ name: "Out", length: 1.5, width: 0.3, height: 0.3, speed: 0.2, position: { x: 1, z: 1 }, rotationY: 0 });
+      const robot = await repo.createRobot({
+        name: "Sorter", position: { x: 2, z: -1 }, rotationY: 90, pick: { x: 2, z: -1.5, radius: 0.15 },
+        rules: [{ conditions: [{ field: "kind", op: "eq", value: "box" }], target: { type: "belt", conveyorId: belt.id, along: 0.2 } }],
+        otherwise: null,
+      });
+      assert.equal(robot.otherwise, null);
+      assert.deepEqual(robot.rules[0].target, { type: "belt", conveyorId: belt.id, along: 0.2 });
+      const moved = await repo.updateRobot(robot.id, { pick: { x: 2.2, z: -1.4, radius: 0.2 }, otherwise: { type: "spot", x: 2.6, z: -1 } });
+      assert.deepEqual([moved.pick, moved.otherwise, moved.name, moved.rules.length], [{ x: 2.2, z: -1.4, radius: 0.2 }, { type: "spot", x: 2.6, z: -1 }, "Sorter", 1]);
+      assert.equal((await repo.updateRobot(robot.id, { otherwise: null })).otherwise, null);
+      await assert.rejects(repo.updateRobot("00000000-0000-4000-8000-000000000000", { name: "X" }), NotFoundError);
+
+      // A scene with a bin holding a part, a free shape, a splitter: all go, the stock stays.
+      const bin = await repo.createBin({ name: "B", holds: ["part:PL-200"], accept: [], capacity: 10, position: { x: -1, z: 1 }, rotationY: 0, feed: { type: "none" } });
+      const before = (await repo.getParts(["PL-200"]))[0].onHand;
+      assert.ok((await repo.loadBin(bin.id, [{ owner: "part:PL-200", qty: 2, look: { name: "Plate", kind: "box", size: { x: 0.1, y: 0.02, z: 0.1 }, color: "#94a3b8" } }], false)).ok);
+      await repo.createShape({ name: "Crate", kind: "box", size: { x: 0.1, y: 0.1, z: 0.1 }, color: "#d97706", position: { x: 0, z: 0.5 }, rotationY: 0, sku: null });
+      await repo.createSplitter({ name: "Gate", conveyorId: belt.id, along: 0.5, rules: [], otherwise: "straight" });
+      const cleared = await repo.clearScene();
+      assert.deepEqual(cleared, { shapes: 3, conveyors: 1, bins: 1, robots: 1 });
+      assert.deepEqual(
+        [(await repo.listShapes()).length, (await repo.listConveyors()).length, (await repo.listSplitters()).length, (await repo.listBins()).length, (await repo.listRobots()).length],
+        [0, 0, 0, 0, 0],
+      );
+      assert.equal((await repo.getParts(["PL-200"]))[0].onHand, before - 2); // loading took them; clearing doesn't give them back
+      await repo.createRobot({ name: "Again", position: { x: 0, z: 0 }, rotationY: 0, pick: { x: 0.5, z: 0, radius: 0.1 }, rules: [], otherwise: null });
+      await repo.deleteRobot((await repo.listRobots())[0].id);
+      await assert.rejects(repo.deleteRobot("00000000-0000-4000-8000-000000000000"), NotFoundError);
+    });
+
     test("reservations and movements come newest first, with a limit", async () => {
       for (const q of ["Q-1", "Q-2", "Q-3"]) assert.ok((await repo.reserve(q, [{ sku: "PL-200", qty: 1 }])).ok);
       assert.deepEqual((await repo.reservations(2)).map((r) => r.quoteRef), ["Q-3", "Q-2"]);

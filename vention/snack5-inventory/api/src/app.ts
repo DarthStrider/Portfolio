@@ -16,7 +16,8 @@ import {
 import { parseBinPatch, parseLoad, parseNewBin, type BinResult, type Feed } from "./domain/bins.ts";
 import type { InventoryRepo } from "./domain/types.ts";
 import { checkDesign, reserveDesign } from "./service.ts";
-import { FLOOR_HALF } from "./domain/floor.ts";
+import { FLOOR_HALF, FLOOR_SIZE } from "./domain/floor.ts";
+import { parseNewRobot, parseRobotPatch, targetsOf, type Target } from "./domain/robots.ts";
 
 type Params = Record<string, string>;
 type Handler = (ctx: { params: Params; query: URLSearchParams; body: unknown }) => Promise<[number, unknown]>;
@@ -38,6 +39,8 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
     return [200, { ok: true, db: repo.kind }];
   });
   route("GET", "/api/info", async () => [200, { db: repo.kind, host: hostname(), version }]);
+  // Settings the arm app needs: the floor's size (FLOOR_SIZE, src/domain/floor.ts).
+  route("GET", "/api/config", async () => [200, { floorSize: FLOOR_SIZE, floorHalf: FLOOR_HALF }]);
 
   // ---- Parts ----
   route("GET", "/api/parts", async ({ query }) => [200, await repo.listParts({
@@ -222,6 +225,43 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
     const missing = skus.filter((s) => !found.has(s));
     if (missing.length) throw new ValidationError(missing.map((s) => `No part ${s} in the inventory`));
   }
+  // ---- Robots: automated arms with a pick zone and rules ----
+  /** Belt targets must be on a straight belt, within its length; bins must exist. */
+  async function checkTargets(targets: readonly Target[]) {
+    const problems: string[] = [];
+    const belts = targets.some((t) => t.type === "belt") ? await repo.listConveyors() : [];
+    const bins = targets.some((t) => t.type === "bin") ? await repo.listBins() : [];
+    for (const t of targets) {
+      if (t.type === "belt") {
+        const b = belts.find((c) => c.id === t.conveyorId);
+        if (!b) problems.push(`No conveyor ${t.conveyorId}`);
+        else if (b.kind !== "straight") problems.push(`${b.name} is a ${b.kind}: robots put items on straight sections`);
+        else if (t.along > b.length) problems.push(`along must be at most ${b.length} m, the length of ${b.name}`);
+      } else if (t.type === "bin" && !bins.some((b) => b.id === t.binId)) problems.push(`No bin ${t.binId}`);
+    }
+    if (problems.length) throw new ValidationError([...new Set(problems)]);
+  }
+  route("GET", "/api/robots", async () => [200, await repo.listRobots()]);
+  route("POST", "/api/robots", async ({ body }) => {
+    const r = parseNewRobot(body);
+    await checkTargets(targetsOf(r));
+    return [201, await repo.createRobot(r)];
+  });
+  route("PATCH", "/api/robots/:id", async ({ params, body }) => {
+    const patch = parseRobotPatch(body);
+    await checkTargets(targetsOf({ rules: patch.rules ?? [], otherwise: patch.otherwise ?? null }));
+    return [200, await repo.updateRobot(params.id, patch)];
+  });
+  route("DELETE", "/api/robots/:id", async ({ params }) => {
+    await repo.deleteRobot(params.id);
+    return [200, { deleted: params.id }];
+  });
+
+  // ---- The whole scene ----
+  // Everything the arm app shows except the arm itself: shapes, belts and their stations, bins,
+  // robots. Stock is untouched.
+  route("DELETE", "/api/scene", async () => [200, { cleared: await repo.clearScene() }]);
+
   route("GET", "/api/bins", async () => [200, await repo.listBins()]);
   route("POST", "/api/bins", async ({ body }) => {
     const b = parseNewBin(body);

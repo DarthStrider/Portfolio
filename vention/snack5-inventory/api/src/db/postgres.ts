@@ -25,6 +25,9 @@ import type { Condition } from "../domain/splitters.ts";
 import type {
   AssembleResult, Assembly, Attachment, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner,
 } from "../domain/assembly.ts";
+import type { NewRobot, Robot, RobotPatch, RobotRule, Target } from "../domain/robots.ts";
+import type { SceneCleared } from "../domain/types.ts";
+import { FLOOR_HALF } from "../domain/floor.ts";
 
 
 interface PartRow {
@@ -42,6 +45,10 @@ interface ShapeRow {
 interface BinRow {
   id: string; name: string; holds: Owner[]; accept: Condition[]; capacity: number; x: number; z: number; rotation_y: number;
   feed: Feed; count: number; created_at: Date; updated_at: Date;
+}
+interface RobotRow {
+  id: string; name: string; x: number; z: number; rotation_y: number; pick: Robot["pick"]; rules: RobotRule[];
+  otherwise: Target | null; created_at: Date; updated_at: Date;
 }
 interface ConnectorsRow { owner: Owner; points: ConnectionPoint[]; updated_at: Date }
 interface MergerRow {
@@ -80,6 +87,25 @@ export class PostgresRepo implements InventoryRepo {
 
   async init(): Promise<void> {
     await this.pool.query(readFileSync(new URL("./schema.sql", import.meta.url), "utf8"));
+    await this.floorChecks(FLOOR_HALF);
+  }
+
+  /**
+   * One CHECK per table that has a position, from the floor size setting. Replaced at every
+   * start, so changing FLOOR_SIZE takes effect on the next restart. NOT VALID: rows already
+   * there aren't checked (after shrinking the floor, they'd stop the API starting), new and
+   * changed ones are. Two replicas starting together may race: the loser's duplicate is ignored.
+   */
+  private async floorChecks(half: number): Promise<void> {
+    const h = Number(half);
+    if (!Number.isFinite(h) || h <= 0) throw new Error(`bad floor half-size ${half}`);
+    for (const table of ["shapes", "conveyors", "bins", "robots"]) {
+      await this.pool.query(`DO $$ BEGIN
+        ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${table}_floor_check;
+        ALTER TABLE ${table} ADD CONSTRAINT ${table}_floor_check CHECK (x BETWEEN -${h} AND ${h} AND z BETWEEN -${h} AND ${h}) NOT VALID;
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$`);
+    }
   }
 
   async seedIfEmpty(seed: readonly SeedPart[]): Promise<boolean> {
@@ -373,6 +399,57 @@ export class PostgresRepo implements InventoryRepo {
     return rows.map(toAssembly);
   }
 
+  async listRobots(): Promise<Robot[]> {
+    const { rows } = await this.pool.query<RobotRow>(Q.listRobots, [null]);
+    return rows.map(toRobot);
+  }
+
+  private async robot(id: string): Promise<Robot> {
+    const { rows } = await this.pool.query<RobotRow>(Q.listRobots, [id]);
+    if (!rows[0]) throw new NotFoundError(`No robot ${id}`);
+    return toRobot(rows[0]);
+  }
+
+  async createRobot(r: NewRobot): Promise<Robot> {
+    const { rows } = await this.pool.query<{ id: string }>(Q.createRobot, [
+      r.name, r.position.x, r.position.z, r.rotationY, JSON.stringify(r.pick), JSON.stringify(r.rules), r.otherwise ? JSON.stringify(r.otherwise) : null,
+    ]);
+    return this.robot(rows[0].id);
+  }
+
+  async updateRobot(id: string, p: RobotPatch): Promise<Robot> {
+    if (!UUID.test(id)) throw new NotFoundError(`No robot ${id}`);
+    const { rows } = await this.pool.query<{ id: string }>(Q.updateRobot, [
+      id, p.name ?? null, p.position?.x ?? null, p.position?.z ?? null, p.rotationY ?? null,
+      p.pick ? JSON.stringify(p.pick) : null, p.rules ? JSON.stringify(p.rules) : null,
+      p.otherwise !== undefined, p.otherwise ? JSON.stringify(p.otherwise) : null,
+    ]);
+    if (!rows[0]) throw new NotFoundError(`No robot ${id}`);
+    return this.robot(id);
+  }
+
+  async deleteRobot(id: string): Promise<void> {
+    if (!UUID.test(id)) throw new NotFoundError(`No robot ${id}`);
+    const { rowCount } = await this.pool.query(Q.deleteRobot, [id]);
+    if (!rowCount) throw new NotFoundError(`No robot ${id}`);
+  }
+
+  async clearScene(): Promise<SceneCleared> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const counts: Record<string, number> = {};
+      for (const sql of Q.clearScene) counts[sql.split(" ").at(-1)!] = (await client.query(sql)).rowCount ?? 0;
+      await client.query("COMMIT");
+      return { shapes: counts.shapes, conveyors: counts.conveyors, bins: counts.bins, robots: counts.robots };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   async listBins(): Promise<Bin[]> {
     const { rows } = await this.pool.query<BinRow>(Q.listBins, [null]);
     return rows.map(toBin);
@@ -525,6 +602,13 @@ function toAssembly(r: AssemblyRow): Assembly {
   return {
     id: r.id, name: r.name, baseShapeId: r.base_shape_id, attachedShapeId: r.attached_shape_id,
     basePoint: r.base_point, attachedPoint: r.attached_point, consumed: r.consumed, createdAt: r.created_at.toISOString(),
+  };
+}
+
+function toRobot(r: RobotRow): Robot {
+  return {
+    id: r.id, name: r.name, position: { x: r.x, z: r.z }, rotationY: r.rotation_y, pick: r.pick, rules: r.rules,
+    otherwise: r.otherwise, createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString(),
   };
 }
 

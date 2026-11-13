@@ -8,6 +8,7 @@ import type { Conveyor, ConveyorPatch, NewConveyor } from "../conveyors/types";
 import type { NewSplitter, Splitter, SplitterPatch } from "../splitters/types";
 import type { Part } from "../splitters/rules";
 import type { Bin, BinPatch, ItemLook, NewBin } from "../line/types";
+import type { NewRobot, Robot, RobotPatch } from "../robots/types";
 import type { Assembly, ConnectionPoint, Connectors, Machine, MachinePatch, Merger, MergerPatch, NewAssembly, NewMachine, NewMerger, Owner } from "../line/types";
 
 /** Override with VITE_INVENTORY_API, e.g. http://localhost:8080 for the API without Docker. */
@@ -91,4 +92,18 @@ export const binsApi = {
   unload: (id: string, qty: number) => call<{ unloaded: number }>("POST", `/bins/${id}/unload`, { qty }),
   catch: (id: string, shapeId: string) => call<{ caught: string }>("POST", `/bins/${id}/catch`, { shapeId }),
   release: (id: string, shapeId: string, position: { x: number; z: number }) => call<{ released: string }>("POST", `/bins/${id}/release`, { shapeId, position }),
+};
+
+export const robotsApi = {
+  list: () => call<Robot[]>("GET", "/robots"),
+  create: (r: NewRobot) => call<Robot>("POST", "/robots", r),
+  update: (id: string, patch: RobotPatch) => call<Robot>("PATCH", `/robots/${id}`, patch),
+  remove: (id: string) => call<{ deleted: string }>("DELETE", `/robots/${id}`),
+};
+
+export const sceneApi = {
+  /** The API's settings: the floor's size (FLOOR_SIZE). */
+  config: () => call<{ floorSize: number; floorHalf: number }>("GET", "/config"),
+  /** Everything in the scene but the arm: shapes, belts and their stations, bins, robots. */
+  clear: () => call<{ cleared: { shapes: number; conveyors: number; bins: number; robots: number } }>("DELETE", "/scene"),
 };

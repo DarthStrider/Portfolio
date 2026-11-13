@@ -608,8 +608,26 @@ export function createShapes({ root, scene, camera, canvas, arm }: Options) {
     }, `Saved where ${moves.length} shape${moves.length === 1 ? "" : "s"} ended up.`);
   }
 
+  /**
+   * An automated robot put a shape down (belts stopped): show it there now and save it, quietly
+   * (robots work all the time; a message for every item would bury everything else).
+   */
+  async function placeShape(id: string, at: { x: number; z: number }, rotationY: number): Promise<void> {
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    const position = { x: round(at.x), z: round(at.z) };
+    const turned = Math.round((((rotationY % 360) + 540) % 360 - 180) * 10) / 10;
+    shapes = shapes.map((s) => (s.id === id ? { ...s, position, rotationY: turned } : s));
+    refresh();
+    try {
+      await shapesApi.update(id, { position, rotationY: turned });
+    } catch (err) {
+      message = { text: `Couldn't save where a robot put ${shapes.find((s) => s.id === id)?.name ?? "an item"}: ${(err as Error).message}`, error: true };
+      render();
+    }
+  }
+
   return {
-    layer, handleClick, handleHover, handleKey, setSurface, setRunning, saveMoves, refresh, act, pickFinished,
+    layer, handleClick, handleHover, handleKey, setSurface, setRunning, saveMoves, refresh, act, pickFinished, placeShape,
     /** Who carries out a Pick: the robot, in main.ts. */
     onPick(fn: PickHandler) {
       pickHandler = fn;

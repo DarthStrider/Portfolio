@@ -52,6 +52,8 @@ services:
     profiles: [postgres]
     environment:
       DB: postgres
+      # The floor's width in meters (default 20): set FLOOR_SIZE when starting, e.g. FLOOR_SIZE=30 npm start
+      FLOOR_SIZE: ${FLOOR_SIZE:-}
       PGHOST: postgres
       PGUSER: inventory
       PGPASSWORD: inventory-dev-password
@@ -65,6 +67,8 @@ services:
     profiles: [mongo]
     environment:
       DB: mongo
+      # The floor's width in meters (default 20): set FLOOR_SIZE when starting, e.g. FLOOR_SIZE=30 npm start
+      FLOOR_SIZE: ${FLOOR_SIZE:-}
       MONGO_HOST: mongo
       MONGO_USER: inventory
       MONGO_PASSWORD: inventory-dev-password

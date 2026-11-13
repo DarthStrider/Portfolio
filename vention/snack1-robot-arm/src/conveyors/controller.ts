@@ -91,6 +91,9 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
   /** Where each stored item was when the run started: shape id -> bin id. */
   let storedAtStart = new Map<string, string>();
   const listeners: ((belts: readonly Conveyor[]) => void)[] = [];
+  const runListeners: ((running: boolean) => void)[] = [];
+  /** Items a robot is about to pick up: they stay put while its gripper comes down. */
+  const frozen = new Set<string>();
 
   // Shapes stand on whichever belt is under them, and can be placed onto one.
   shapes.setSurface({
@@ -222,6 +225,8 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
       started.set(s.id, { ...s.position });
     }
     shapes.setRunning(true);
+    frozen.clear();
+    for (const fn of runListeners) fn(true);
     message = null;
     render();
   }
@@ -248,6 +253,8 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     const catches = [...storedNow].filter(([id, bin]) => storedAtStart.get(id) !== bin).map(([shapeId, binId]) => ({ binId, shapeId }));
     const made = joins;
     bodies = null;
+    frozen.clear();
+    for (const fn of runListeners) fn(false);
     joins = [];
     line?.stations.reset();
     line?.frame(0); // lights back to idle
@@ -285,7 +292,7 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     for (let left = dt; left > 1e-9; left -= MAX_STEP) {
       const h = Math.min(MAX_STEP, left);
       st?.prepare(bodies);
-      step(bodies.values(), belts, h, options);
+      step(frozen.size ? [...bodies.values()].filter((b) => !frozen.has(b.id!)) : bodies.values(), belts, h, options);
       for (const j of st?.afterStep(h) ?? []) {
         // The attached shape stops being a free body: from now on it rides on the base.
         bodies.delete(j.attachedId);
@@ -657,6 +664,31 @@ export function createConveyors({ root, runButton, scene, camera, canvas, shapes
     layer, update, isActive, isExtending, handleClick, handleHover, handlePick, hoversBelt, handleKey,
     get running() {
       return !!bodies;
+    },
+    /** Called when the belts start (true) and stop (false). */
+    onRunChange(fn: (running: boolean) => void) {
+      runListeners.push(fn);
+    },
+    /** While running: the free items on the floor or on belts, where they are now. */
+    items(): { id: string; x: number; z: number; y: number }[] {
+      return bodies ? [...bodies.values()].map((b) => ({ id: b.id!, x: b.x, z: b.z, y: b.y })) : [];
+    },
+    /** While running: keep an item where it is (a robot is coming for it), or let it go again. */
+    freeze(id: string, on: boolean) {
+      if (on) frozen.add(id);
+      else frozen.delete(id);
+    },
+    /** While running: a robot has picked the item up; it's off the belts until put down. */
+    take(id: string) {
+      frozen.delete(id);
+      bodies?.delete(id);
+    },
+    /** While running: a robot put the item down at (x, z); it lands on whatever is there. */
+    put(id: string, x: number, z: number) {
+      if (!bodies) return;
+      const s = shapes.shapes.find((sh) => sh.id === id);
+      bodies.set(id, { id, x, z, y: supportHeight(belts, x, z), vx: 0, vy: 0, vz: 0, size: s ? Math.max(s.size.x, s.size.z) : 0.1 });
+      if (!started.has(id) && s) started.set(id, { ...s.position });
     },
     /** The belts as last loaded. */
     get belts(): readonly Conveyor[] {

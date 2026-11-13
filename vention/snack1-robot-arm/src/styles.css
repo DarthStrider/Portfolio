@@ -327,3 +327,21 @@ button:disabled { opacity: 0.45; cursor: default; }
   #view-pad { left: auto; right: 8px; top: 8px; bottom: auto; transform: none; }
   .view-pad { flex-direction: column; }
 }
+
+/* ---- Robots tab, Clear scene ---- */
+.tabs { grid-template-columns: repeat(6, 1fr); }
+.tabs button { font-size: 11.5px; }
+.runbar { grid-template-columns: 1fr auto; gap: 8px; }
+#btn-clear { font-weight: 500; }
+#btn-clear.danger { background: #b91c1c; border-color: #ef4444; color: #fff; }
+.robot-swatch { background: #2563eb !important; border-radius: 50% !important; }
+.robot-status { color: var(--warm) !important; }
+.robot-rules { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.robot-editor .target { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 12px; }
+.robot-editor .target label { display: flex; gap: 6px; align-items: center; flex-direction: row; }
+.robot-editor .target select { width: auto; }
+.robot-editor .target input[type="number"] { width: 64px; }
+.robot-editor .target .at { color: var(--muted); }
+.robot-editor .target button { padding: 2px 8px; font-size: 12px; }
+.otherwise-row { margin-top: 8px; }
+.robot-editor h2 small { font-weight: 400; color: var(--muted); }
