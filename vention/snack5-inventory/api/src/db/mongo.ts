@@ -25,7 +25,7 @@ import type {
   InventoryRepo, Line, Movement, MovementKind, Part, PartFilter, Reservation, ReserveResult, SeedPart, Shortage,
 } from "../domain/types.ts";
 import type { NewShape, Shape, ShapePatch } from "../domain/shapes.ts";
-import type { Conveyor, ConveyorPatch, NewConveyor } from "../domain/conveyors.ts";
+import { withSectionDefaults, type Conveyor, type ConveyorPatch, type ConveyorUpdate, type NewConveyor } from "../domain/conveyors.ts";
 import type { NewSplitter, Splitter, SplitterPatch } from "../domain/splitters.ts";
 import type { PartPatch } from "../domain/newPart.ts";
 import type {
@@ -46,8 +46,9 @@ interface ReservationDoc {
 interface CounterDoc { _id: string; value: number }
 /** A shape is stored almost exactly as the API returns it: documents fit nested data like size and position. */
 interface ShapeDoc extends Omit<Shape, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
-/** Conveyors too: the nested position stays nested. */
-interface ConveyorDoc extends Omit<Conveyor, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
+/** Conveyors too: the nested position stays nested. Documents saved before lines existed have no section fields. */
+interface ConveyorDoc extends Omit<Conveyor, "id" | "createdAt" | "updatedAt" | "kind" | "turn" | "radius" | "lineId" | "lineIndex">,
+  Partial<Pick<Conveyor, "kind" | "turn" | "radius" | "lineId" | "lineIndex">> { _id: string; createdAt: Date; updatedAt: Date }
 /** A splitter's rules are nested lists of objects: a document holds them as they are. */
 interface SplitterDoc extends Omit<Splitter, "id" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
 interface BinDoc extends Omit<Bin, "id" | "count" | "createdAt" | "updatedAt"> { _id: string; createdAt: Date; updatedAt: Date }
@@ -269,7 +270,7 @@ export class MongoRepo implements InventoryRepo {
 
   async createConveyor(c: NewConveyor): Promise<Conveyor> {
     const now = new Date();
-    const doc: ConveyorDoc = { ...c, _id: randomUUID(), createdAt: now, updatedAt: now };
+    const doc: ConveyorDoc = { ...withSectionDefaults(c), _id: randomUUID(), createdAt: now, updatedAt: now };
     await this.conveyors.insertOne(doc);
     return toConveyor(doc);
   }
@@ -278,6 +279,20 @@ export class MongoRepo implements InventoryRepo {
     const doc = await this.conveyors.findOneAndUpdate({ _id: id }, { $set: { ...patch, updatedAt: new Date() } }, { returnDocument: "after" });
     if (!doc) throw new NotFoundError(`No conveyor ${id}`);
     return toConveyor(doc);
+  }
+
+  async updateConveyors(updates: readonly ConveyorUpdate[]): Promise<Conveyor[]> {
+    // A standalone MongoDB has no multi-document transactions, so: check every id exists,
+    // then write them all in one ordered bulk request. Only a crash between the two could
+    // leave a line half moved, and the next move of the line puts every section right again.
+    const ids = updates.map((u) => u.id);
+    const found = new Set((await this.conveyors.find({ _id: { $in: ids } }, { projection: { _id: 1 } }).toArray()).map((d) => d._id));
+    const missing = ids.find((id) => !found.has(id));
+    if (missing) throw new NotFoundError(`No conveyor ${missing}`);
+    const now = new Date();
+    await this.conveyors.bulkWrite(updates.map(({ id, patch }) => ({ updateOne: { filter: { _id: id }, update: { $set: { ...patch, updatedAt: now } } } })));
+    const byId = new Map((await this.conveyors.find({ _id: { $in: ids } }).toArray()).map((d) => [d._id, toConveyor(d)]));
+    return ids.map((id) => byId.get(id)!);
   }
 
   async deleteConveyor(id: string): Promise<void> {
@@ -626,6 +641,7 @@ function toConveyor(d: ConveyorDoc): Conveyor {
   return {
     id: d._id, name: d.name, length: d.length, width: d.width, height: d.height, speed: d.speed,
     position: d.position, rotationY: d.rotationY,
+    kind: d.kind ?? "straight", turn: d.turn ?? 0, radius: d.radius ?? 0, lineId: d.lineId ?? null, lineIndex: d.lineIndex ?? 0,
     createdAt: d.createdAt.toISOString(), updatedAt: d.updatedAt.toISOString(),
   };
 }

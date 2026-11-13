@@ -1,5 +1,5 @@
 import type { NewShape, Shape, ShapePatch } from "./shapes.ts";
-import type { Conveyor, ConveyorPatch, NewConveyor } from "./conveyors.ts";
+import type { Conveyor, ConveyorPatch, ConveyorUpdate, NewConveyor } from "./conveyors.ts";
 import type { NewSplitter, Splitter, SplitterPatch } from "./splitters.ts";
 import type { PartPatch } from "./newPart.ts";
 import type { Bin, BinPatch, BinResult, LoadLine, NewBin } from "./bins.ts";
@@ -148,6 +148,8 @@ export interface InventoryRepo {
   createConveyor(conveyor: NewConveyor): Promise<Conveyor>;
   /** Throws NotFoundError for an unknown id. */
   updateConveyor(id: string, patch: ConveyorPatch): Promise<Conveyor>;
+  /** Several at once, all or none: NotFoundError (and nothing changed) if any id is unknown. */
+  updateConveyors(updates: readonly ConveyorUpdate[]): Promise<Conveyor[]>;
   /** Throws NotFoundError for an unknown id. */
   deleteConveyor(id: string): Promise<void>;
 

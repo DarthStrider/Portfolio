@@ -329,7 +329,7 @@ export function createBinPanel(o: Options) {
   function render(force = false) {
     if (!force && host.contains(document.activeElement) && document.activeElement?.tagName === "INPUT") return renderList();
     const bins = o.bins();
-    const belts = o.belts();
+    const belts = o.belts().filter((b) => b.kind === "straight"); // bins feed straight sections
     const machines = o.machines();
     const owners: [string, string][] = [
       ...SHAPE_KINDS.map((k): [string, string] => [`kind:${k}`, `Plain ${plural(k)}`]),

@@ -8,7 +8,7 @@ import { isQty, isSku } from "./domain/design.ts";
 import { NotFoundError, ValidationError } from "./domain/errors.ts";
 import { parseNewPart, parsePartPatch } from "./domain/newPart.ts";
 import { parseNewShape, parseShapePatch } from "./domain/shapes.ts";
-import { parseConveyorPatch, parseNewConveyor } from "./domain/conveyors.ts";
+import { parseConveyorPatch, parseConveyorUpdates, parseNewConveyor } from "./domain/conveyors.ts";
 import { parseNewSplitter, parseSplitterPatch } from "./domain/splitters.ts";
 import {
   DEFAULT_POINTS, isOwner, parseMachinePatch, parseMergerPatch, parseNewAssembly, parseNewMachine, parseNewMerger, parsePoints,
@@ -93,6 +93,8 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
   // ---- Conveyor belts in the robot arm's scene ----
   route("GET", "/api/conveyors", async () => [200, await repo.listConveyors()]);
   route("POST", "/api/conveyors", async ({ body }) => [201, await repo.createConveyor(parseNewConveyor(body))]);
+  // Several belts at once, all or none: how a line of sections moves, turns or changes speed as one.
+  route("PATCH", "/api/conveyors", async ({ body }) => [200, await repo.updateConveyors(parseConveyorUpdates(body))]);
   route("PATCH", "/api/conveyors/:id", async ({ params, body }) => [200, await repo.updateConveyor(params.id, parseConveyorPatch(body))]);
   route("DELETE", "/api/conveyors/:id", async ({ params }) => {
     await repo.deleteConveyor(params.id);
@@ -104,6 +106,7 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
   async function checkFits(conveyorId: string, along: number) {
     const belt = (await repo.listConveyors()).find((c) => c.id === conveyorId);
     if (!belt) throw new ValidationError([`No conveyor ${conveyorId}`]);
+    if (belt.kind !== "straight") throw new ValidationError([`${belt.name} is a ${belt.kind}: stations go on straight sections`]);
     if (along > belt.length) throw new ValidationError([`along must be at most ${belt.length} m, the length of ${belt.name}`]);
   }
   route("GET", "/api/splitters", async () => [200, await repo.listSplitters()]);
@@ -146,6 +149,7 @@ export function createApp(repo: InventoryRepo, version = "1.0.0") {
   async function belt(id: string) {
     const b = (await repo.listConveyors()).find((c) => c.id === id);
     if (!b) throw new ValidationError([`No conveyor ${id}`]);
+    if (b.kind !== "straight") throw new ValidationError([`${b.name} is a ${b.kind}: a merger's feeders must be straight sections`]);
     return b;
   }
   route("GET", "/api/mergers", async () => [200, await repo.listMergers()]);

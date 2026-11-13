@@ -9,7 +9,8 @@ import type { Bin, Machine, Merger } from "../src/line/types";
 
 const T = "2026-01-01T00:00:00Z";
 const belt = (id: string, over: Partial<Conveyor>): Conveyor => ({
-  id, name: id, length: 2, width: 0.4, height: 0.3, speed: 0.5, position: { x: 0, z: 0 }, rotationY: 0, createdAt: T, updatedAt: T, ...over,
+  id, name: id, length: 2, width: 0.4, height: 0.3, speed: 0.5, position: { x: 0, z: 0 }, rotationY: 0,
+  kind: "straight", turn: 0, radius: 0, lineId: null, lineIndex: 0, createdAt: T, updatedAt: T, ...over,
 });
 // Main runs +x from x = -1 to 1. The feeder comes in from +z, running toward -z (turned 90°),
 // and ends at the main belt's +z edge (z = 0.2), right at x = 0: the merge point, along = 1.

@@ -27,6 +27,7 @@ repository interface and pass the same contract tests.
 - [x] Bins: hold the kinds of object you list; loading takes parts from stock, unloading gives them back; items caught off the line are stored, and a part is never taken from stock twice
 - [x] Edit a part's name, category, location or reorder level (stock only changes through receive and consume, so the ledger stays complete)
 - [x] Conveyor belts for the same scene: size, speed (forward or reversed), position and angle, so a line layout is saved with the parts it uses
+- [x] Conveyor lines: each belt is a straight, curve or corner transfer section, with a line id and its place in the line. A line moves, turns or splits with one all-or-none `PATCH /api/conveyors`
 - [x] Switchable storage: `DB=postgres`, `DB=mongo`, or `DB=memory` (no database at all)
 - [x] Docker Compose profiles and Kubernetes overlays for each database
 
@@ -149,7 +150,9 @@ replica set, the same steps could run inside a multi-document transaction instea
 | DELETE | `/api/shapes/{id}` | | `{ "deleted": id }`, or 404 |
 | GET | `/api/conveyors` | | Conveyor belts in the robot arm's scene, oldest first |
 | POST | `/api/conveyors` | `{ "name": "Infeed", "length": 1.5, "width": 0.3, "height": 0.3, "speed": 0.2, "position": { "x": 0.7, "z": -0.6 }, "rotationY": 0 }` | 201 + belt (meters, m/s, degrees; speed defaults to 0.2, rotationY to 0) |
-| PATCH | `/api/conveyors/{id}` | `name`, `position`, `rotationY` or `speed` | Updated belt (size can't change: make a new belt) |
+| POST | `/api/conveyors` (a section) | add `"kind": "curve", "turn": 90, "radius": 0.5` (or `"transfer"`, `"turn": -90`), `"lineId": "<uuid>", "lineIndex": 1` | 201 + section. A curve's length is its arc and a transfer's its width; both are computed. `kind` defaults to `straight`, `lineId` to null |
+| PATCH | `/api/conveyors/{id}` | `name`, `position`, `rotationY`, `speed`, `lineId` or `lineIndex` | Updated belt (size can't change: make a new belt) |
+| PATCH | `/api/conveyors` | `{ "updates": [{ "id": "…", "position": {…}, "rotationY": 90 }, …] }` (1–200) | Every updated belt, or an error and nothing changed (one transaction in PostgreSQL) |
 | DELETE | `/api/conveyors/{id}` | | `{ "deleted": id }`, or 404 |
 | GET | `/api/splitters` | | Splitters (diverter gates on belts) with their rules, oldest first |
 | POST | `/api/splitters` | `{ "name": "Sort gate", "conveyorId": "…", "along": 1.2, "rules": [{ "conditions": [{ "field": "part.category", "op": "eq", "value": "plate" }], "exit": "left" }], "otherwise": "straight" }` | 201 + splitter (`along` in meters from the belt's start, at most its length) |

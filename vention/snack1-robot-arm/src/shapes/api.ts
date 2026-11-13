@@ -50,6 +50,8 @@ export const conveyorsApi = {
   list: () => call<Conveyor[]>("GET", "/conveyors"),
   create: (belt: NewConveyor) => call<Conveyor>("POST", "/conveyors", belt),
   update: (id: string, patch: ConveyorPatch) => call<Conveyor>("PATCH", `/conveyors/${id}`, patch),
+  /** Several belts at once, all or none: a line moving, turning or splitting. */
+  updateMany: (updates: readonly ({ id: string } & ConveyorPatch)[]) => call<Conveyor[]>("PATCH", "/conveyors", { updates }),
   remove: (id: string) => call<{ deleted: string }>("DELETE", `/conveyors/${id}`),
 };
 

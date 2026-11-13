@@ -156,6 +156,34 @@ test("conveyors: create with defaults, validate, patch, delete", async () => {
   assert.deepEqual((await call("GET", "/api/conveyors")).body, []);
 });
 
+test("conveyor sections: a curve's length is its arc, a transfer is square, shapes are checked", async () => {
+  const curve = await call("POST", "/api/conveyors", { name: "Bend", width: 0.3, height: 0.3, position: { x: 1, z: 0 }, kind: "curve", turn: -90, radius: 0.5 });
+  assert.equal(curve.status, 201);
+  assert.ok(Math.abs(curve.body.length - (Math.PI / 2) * 0.5) < 1e-6); // the length sent (none) is replaced by the arc
+  const transfer = await call("POST", "/api/conveyors", { name: "Corner", width: 0.4, height: 0.3, position: { x: 0, z: 1 }, kind: "transfer", turn: 90 });
+  assert.deepEqual([transfer.status, transfer.body.length, transfer.body.radius], [201, 0.4, 0]);
+  const bad = await call("POST", "/api/conveyors", { name: "Odd", width: 0.6, height: 0.3, position: { x: 0, z: 0 }, kind: "curve", turn: 30, radius: 0.2, lineId: "line-1" });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.problems.length, 3); // turn, radius (under half the width + 5 cm), lineId
+  assert.match(bad.body.problems.join(" "), /turn must be one of -90, -45, 45, 90/);
+  const twisted = await call("POST", "/api/conveyors", { name: "Twist", length: 1, width: 0.3, height: 0.3, position: { x: 0, z: 0 }, turn: 45 });
+  assert.equal(twisted.status, 400); // a straight section has no turn
+
+  // Stations only go on straight sections.
+  const gate = await call("POST", "/api/splitters", { name: "On a bend", conveyorId: curve.body.id, along: 0.2, rules: [] });
+  assert.equal(gate.status, 400);
+  assert.match(gate.body.problems[0], /stations go on straight sections/);
+
+  // PATCH /api/conveyors: several at once, all or none, each checked like a single PATCH.
+  const both = await call("PATCH", "/api/conveyors", { updates: [{ id: curve.body.id, speed: 0.4 }, { id: transfer.body.id, speed: 0.4, lineIndex: 1 }] });
+  assert.deepEqual([both.status, both.body.map((c: { speed: number }) => c.speed)], [200, [0.4, 0.4]]);
+  const refused = await call("PATCH", "/api/conveyors", { updates: [{ id: curve.body.id, speed: 3 }, { id: curve.body.id, speed: 0 }, { speed: 0 }] });
+  assert.equal(refused.status, 400);
+  assert.equal(refused.body.problems.length, 3); // speed out of range, a repeated id, a missing id
+  assert.equal((await call("PATCH", "/api/conveyors", { updates: [] })).status, 400);
+  for (const c of [curve, transfer]) await call("DELETE", `/api/conveyors/${c.body.id}`);
+});
+
 test("splitters: validate rules, fit on the belt, patch, delete", async () => {
   const belt = (await call("POST", "/api/conveyors", { name: "Sort belt", length: 1.6, width: 0.4, height: 0.3, position: { x: 0.8, z: 0 } })).body;
   const rule = { conditions: [{ field: "color", op: "eq", value: " #E11D48 " }], exit: "left" };

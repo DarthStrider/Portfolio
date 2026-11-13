@@ -9,12 +9,17 @@
  *   lower belt (which carries it on).
  * - passing a splitter's gate, it's sent left, right or straight on by the splitter's rules
  *   (decided by the caller); sent sideways, it slides off the belt's side at an angle.
+ * - on a curve, it goes round with the belt, keeping its distance from the curve's center;
+ *   on a transfer, it rides in to the middle, then out to the side.
  * Shapes don't collide with each other or with a belt's sides. Snack 3 is where real contact
  * physics lives; here the point is layout and flow.
  */
+import { curveFrame, headingOf, wrap } from "./sections";
 import type { Conveyor } from "./types";
 
-type Belt = Pick<Conveyor, "length" | "width" | "height" | "speed" | "position" | "rotationY"> & { id?: string };
+/** Belts without section fields (tests, older code) are straight. */
+type Belt = Pick<Conveyor, "length" | "width" | "height" | "speed" | "position" | "rotationY"> &
+  Partial<Pick<Conveyor, "kind" | "turn" | "radius">> & { id?: string };
 
 /** A splitter's gate: on which belt, and how far from that belt's start (its -u end). */
 export interface Gate {
@@ -43,8 +48,68 @@ export function toBelt(b: Belt, x: number, z: number): { u: number; v: number } 
 }
 
 export function isOver(b: Belt, x: number, z: number): boolean {
+  if (b.kind === "curve") {
+    const at = onCurve(b, x, z);
+    return Math.abs(at.r - b.radius!) <= b.width / 2 + EPS && at.progress >= -EPS && at.progress <= Math.abs(b.turn!) * DEG * b.radius! + EPS;
+  }
   const { u, v } = toBelt(b, x, z);
-  return Math.abs(u) <= b.length / 2 + EPS && Math.abs(v) <= b.width / 2 + EPS;
+  const along = b.kind === "transfer" ? b.width : b.length;
+  return Math.abs(u) <= along / 2 + EPS && Math.abs(v) <= b.width / 2 + EPS;
+}
+
+/**
+ * Where a point is on a curve: `r`, its distance from the curve's center, and `progress`,
+ * how far round from the start it is, in meters at the middle of the belt. `angle` is the
+ * heading from the center to the point.
+ */
+export function onCurve(b: Belt, x: number, z: number): { r: number; angle: number; progress: number } {
+  const { side, startAngle } = curveFrame({ rotationY: b.rotationY, turn: b.turn! });
+  const dx = x - b.position.x;
+  const dz = z - b.position.z;
+  const angle = headingOf(dx, dz);
+  return { r: Math.hypot(dx, dz), angle, progress: side * wrap(angle - startAngle) * DEG * b.radius! };
+}
+
+/**
+ * Carries a body along a curve or across a transfer for dt seconds; returns its velocity,
+ * kept in case it rides off the end and falls.
+ *
+ * A curve turns like a rigid ring: every point on it goes round the center at the same
+ * angular speed, speed / radius, so an item keeps its distance from the center (which
+ * stepping along a tangent wouldn't: it would drift outward a little every step).
+ *
+ * A transfer carries an item in to the middle line, then pushes it out to the side the line
+ * turns to. Run backwards, it does the opposite: in from that side to the middle, then back
+ * the way the line came.
+ */
+export function carryOnSection(b: Belt, body: { x: number; z: number }, dt: number): { vx: number; vz: number } {
+  if (b.kind === "curve") {
+    const { side } = curveFrame({ rotationY: b.rotationY, turn: b.turn! });
+    const { r, angle } = onCurve(b, body.x, body.z);
+    const omega = (side * b.speed) / b.radius!; // radians per second, anticlockwise positive
+    const a = angle * DEG + omega * dt;
+    body.x = b.position.x + r * Math.cos(a);
+    body.z = b.position.z - r * Math.sin(a);
+    return { vx: -r * omega * Math.sin(a), vz: -r * omega * Math.cos(a) };
+  }
+  // Transfer: u along the way in, v across. The way out is -v for a left turn, +v for a right one.
+  const out = b.turn! > 0 ? -1 : 1;
+  const { u, v } = toBelt(b, body.x, body.z);
+  const speed = Math.abs(b.speed);
+  let nu = u;
+  let nv = v;
+  let du = 0;
+  let dv = 0;
+  if (b.speed >= 0) {
+    if (u < -EPS) [nu, du] = [Math.min(0, u + speed * dt), speed];
+    else [nv, dv] = [v + out * speed * dt, out * speed];
+  } else if (v * out > EPS) [nv, dv] = [out > 0 ? Math.max(0, v - speed * dt) : Math.min(0, v + speed * dt), -out * speed];
+  else [nu, du] = [u - speed * dt, -speed];
+  const p = fromBelt(b, nu, nv);
+  body.x = p.x;
+  body.z = p.z;
+  const t = b.rotationY * DEG;
+  return { vx: du * Math.cos(t) + dv * Math.sin(t), vz: -du * Math.sin(t) + dv * Math.cos(t) };
 }
 
 /** The highest belt under (x, z) whose top is at or below maxY, if any. */
@@ -182,6 +247,17 @@ export function step(bodies: Iterable<Body>, belts: readonly Belt[], dt: number,
     if (!belt || Math.abs(belt.height - body.y) > 1e-4) {
       body.vx = body.vz = 0; // resting on the floor
       body.divert = undefined;
+      continue;
+    }
+    // Curves and transfers carry things their own way, and have no gates or stations.
+    if (belt.kind === "curve" || belt.kind === "transfer") {
+      body.divert = undefined;
+      body.heldAt = undefined;
+      const v = carryOnSection(belt, body, dt);
+      body.vx = v.vx;
+      body.vz = v.vz;
+      body.x = Math.max(-floorLimit, Math.min(floorLimit, body.x));
+      body.z = Math.max(-floorLimit, Math.min(floorLimit, body.z));
       continue;
     }
     // Sent sideways by a gate on this belt: keep sliding off. On another belt, ride it normally.

@@ -24,6 +24,13 @@ runs or uses the project, MINOR for new features, PATCH for fixes.
 
 ### Added
 
+- Conveyor lines. Select a belt and extend it one section at a time: a straight of a typed length
+  or dragged out with the mouse, a 45° or 90° curve, or a square corner transfer, each placed
+  exactly at the end of the last. Move, turn and reverse act on the whole line; deleting a middle
+  section splits it. Items go round curves at a constant radius and change direction on
+  transfers. Stations (splitters, mergers, machines, bins) stay on straight sections.
+  Needs Snack 5's API with conveyor sections.
+- `src/conveyors/sections.ts` and `tests/sections.test.ts`.
 - Pick and place. **Pick** on a shape, click where it should go, and the arm does it: inverse
   kinematics (from Snack 2) for a gripper pointing straight down, a plan checked for reach and
   joint limits before anything moves, then descend, grip, lift, carry, lower, let go and return

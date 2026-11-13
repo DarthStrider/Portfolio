@@ -393,7 +393,7 @@ export function createLine({ root, binsRoot, scene, camera, canvas, shapes, conv
   }
 
   function render() {
-    const bs = belts();
+    const bs = belts().filter((b) => b.kind === "straight"); // stations go on straight sections
     const beltOptions: [string, string][] = [["", "—"], ...bs.map((b): [string, string] => [b.id, b.name])];
     // Merger form
     fillSelect('[data-m="kind"]', [["side", "Side: feeder joins a belt"], ["y", "Y: two belts into one"]], mDraft.kind);
