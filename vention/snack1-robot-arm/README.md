@@ -10,6 +10,8 @@ click, turning them on the way if you ask.
 
 ## Features
 
+- [x] A four-finger claw (each finger with a root hinge and an elbow), built by hand as glTF; **G** closes it on what's between its fingers and holds it
+- [x] A solid world: the arm, the claw, what it holds and the automated robots stop before going into any shape, belt, bin or the floor
 - [x] 5-joint arm (base yaw, shoulder, elbow, wrist, and a roll that turns the gripper about its own axis) built as an `Object3D` hierarchy; each joint rotates on its own axis, within its limits
 - [x] Forward kinematics: the tool center point's world position shown live, from the scene graph **and** from a hand-written FK function, with the difference between them
 - [x] Gripper loaded as glTF; its finger nodes are found by name and slid open and closed, or to an exact gap
@@ -86,7 +88,7 @@ app with `$env:VITE_INVENTORY_API="http://localhost:8080"; npm run dev`.
 - **Move** on a shape, then click the floor to move it there. Click a shape in the scene or list to select it; <kbd>Delete</kbd> removes it.
 - Each shape shows **in reach**, **out of reach**, **too close** or **hits the base**. In reach means the arm can pick it up from above, with the gripper pointing straight down; the blue ring on the floor is how far out that is for something small on the floor.
 - **Pick** on a shape, then click the floor (or a belt) where the robot should put it. A see-through copy follows the mouse; <kbd>Q</kbd> and <kbd>E</kbd> turn it 15° at a time, and the robot turns the shape by that much on the way. The arm panel shows each step; **Stop**, or any manual control, ends it early and the shape goes back to where it was. When it's done, the new position and turn are saved.
-- The gripper opens to 12.6 cm. A box is gripped across whichever pair of sides fits (the roll joint turns the fingers to face them); round shapes from any side. **Pick** is greyed out, with the reason as its tooltip, for shapes it can't reach or hold.
+- The claw opens to 16 cm. Its four fingers close together, so a box is held across its longer side (the roll joint turns the fingers square to its faces); round shapes from any side. **Pick** is greyed out, with the reason as its tooltip, for shapes it can't reach or hold.
 - Changes from another browser show up within a few seconds (the panel re-reads the list every 4 s).
 
 ### Conveyors (also saved by Snack 5's API)
@@ -175,7 +177,8 @@ PL-200 plate shares them, as does every plain cylinder. Until you change them, e
 | <kbd>1</kbd>–<kbd>5</kbd>, or click a blue joint | Select a joint |
 | <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> (hold), or the ◀ ▶ buttons | Rotate the selected joint |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Previous / next joint |
-| <kbd>G</kbd> / <kbd>Space</kbd> / <kbd>T</kbd> / <kbd>R</kbd> | Gripper, demo, trail, reset |
+| <kbd>G</kbd> | Close the claw. With an item between its fingers (claw pointing down, belts stopped), the fingers stop on its surface and it's held; press again to let go, and it drops onto the belt, bin or floor below (saved) |
+| <kbd>Space</kbd> / <kbd>T</kbd> / <kbd>R</kbd> | Demo, trail, reset |
 | **Pick**, then click the floor; <kbd>Q</kbd> / <kbd>E</kbd> while choosing | Pick and place a shape; turn it 15° |
 | Drag / scroll / right-drag | Orbit / zoom / pan |
 | <kbd>I</kbd> <kbd>K</kbd> / <kbd>J</kbd> <kbd>L</kbd> (hold), or ▲ ▼ / ◀ ▶ on the pad | Move the camera forward, back, left, right along the floor |
@@ -193,8 +196,11 @@ src/
 │   ├── kinematics.ts    hand-written forward kinematics (no Three.js import)
 │   ├── ik.ts            inverse kinematics for a top-down grasp, and which way the fingers face (pure)
 │   ├── RobotArm.ts      builds the Object3D hierarchy from the specs
-│   ├── gripperSpec.ts   the gripper's measurements (pure data)
-│   └── Gripper.ts       loads gripper.glb, drives the finger nodes
+│   ├── claw.ts          the four-finger claw's geometry: gap ↔ finger angle, finger segments (pure, unit-tested)
+│   ├── gripperSpec.ts   the claw's measurements the planner needs (pure data)
+│   ├── Gripper.ts       loads gripper.glb, turns each finger's two joints
+│   ├── collision.ts     solid world: boxes for shapes, belts and bins, capsules for the arm (pure, unit-tested)
+│   └── solid.ts         gathers the obstacles from the scene; would this arm hit something now?
 ├── pick/
 │   ├── grasp.ts         how to hold each kind of shape: width, height, finger direction (pure)
 │   └── program.ts       plans a pick and place as robot steps, and plays them (pure, unit-tested)

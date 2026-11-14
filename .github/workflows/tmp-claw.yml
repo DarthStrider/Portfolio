@@ -1,0 +1,18 @@
+name: tmp claw check
+on: push
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      - run: (cd vention/snack5-inventory/api && DB=memory PORT=8081 nohup node src/server.ts > /tmp/api.log 2>&1 &)
+      - run: npm ci && npm run build:gripper && git diff --stat -- public/models/gripper.glb
+        working-directory: vention/snack1-robot-arm
+      - run: (VITE_INVENTORY_API=http://localhost:8081 nohup npx vite --port 5173 --strictPort > /tmp/vite.log 2>&1 &)
+        working-directory: vention/snack1-robot-arm
+      - run: mkdir /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@latest && npx playwright install --with-deps chromium
+      - run: sleep 5 && cp .github/ci-tmp/claw-check.mjs /tmp/pw/ && cd /tmp/pw && node claw-check.mjs
+      - if: always()
+        run: for f in /tmp/shots/*.jpg; do base64 -w 3000 "$f" | sed "s|^|B64 $(basename $f .jpg) |"; done

@@ -1,26 +1,34 @@
 /**
- * Writes public/models/gripper.glb: a two-finger parallel gripper as a binary glTF 2.0 file.
+ * Writes public/models/gripper.glb: a four-finger claw as a binary glTF 2.0 file.
  *
  * No dependencies: geometry, buffer layout and the GLB container are built by hand, which
- * keeps the asset reproducible from source. Run with `npm run build:gripper`.
+ * keeps the asset reproducible from source. Run with `npm run build:gripper`. Every
+ * measurement comes from src/arm/claw.ts, which the app and the planner use too.
  *
  * Node hierarchy (names matter, Gripper.ts looks them up):
  *   Gripper
  *   ├── Palm
- *   ├── FingerLeft   (origin at the finger root, slides along X)
- *   └── FingerRight
+ *   ├── Mount0 (turned 0° about the axis)
+ *   │   └── Finger0   upper finger, hinged at the palm: turns about its Z to open
+ *   │       └── Knuckle0  the elbow: lower finger with the pad, turns back the same
+ *   ├── Mount1 (90°) … Mount3 (270°)
  *
  * Units are meters, +Y points away from the wrist flange, matching the glTF convention.
+ * The file is written with the claw fully open.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { angleForGap, HINGE_Y, LOWER, PAD_FROM, PAD_INSET, PAD_TO, ROOT_RADIUS, UPPER } from "../src/arm/claw";
+import { GAP_OPEN } from "../src/arm/gripperSpec";
 
 type V3 = [number, number, number];
 
 interface Box {
   center: V3;
   size: V3;
+  /** Turn about Z, degrees (the claw's curled tips). */
+  rotZ?: number;
 }
 
 // For each face: outward normal n, and in-plane axes u, v with u × v = n,
@@ -40,14 +48,17 @@ function boxesToMesh(boxes: Box[]) {
   const positions: number[] = [];
   const normals: number[] = [];
   const indices: number[] = [];
-  for (const { center, size } of boxes) {
+  for (const { center, size, rotZ = 0 } of boxes) {
+    const c = Math.cos((rotZ * Math.PI) / 180);
+    const s = Math.sin((rotZ * Math.PI) / 180);
+    const turn = (p: V3): V3 => [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]];
     for (const { n, u, v } of FACES) {
       const first = positions.length / 3;
       for (const [su, sv] of CORNERS) {
-        for (let k = 0; k < 3; k++) {
-          positions.push(center[k] + ((n[k] + su * u[k] + sv * v[k]) * size[k]) / 2);
-        }
-        normals.push(...n);
+        const local: V3 = [0, 1, 2].map((k) => ((n[k] + su * u[k] + sv * v[k]) * size[k]) / 2) as V3;
+        const p = turn(local);
+        positions.push(center[0] + p[0], center[1] + p[1], center[2] + p[2]);
+        normals.push(...turn(n));
       }
       indices.push(first, first + 1, first + 2, first, first + 2, first + 3);
     }
@@ -59,16 +70,23 @@ function boxesToMesh(boxes: Box[]) {
 
 const palm: Box[] = [
   { center: [0, 0.01, 0], size: [0.09, 0.02, 0.09] }, // mounting flange
-  { center: [0, 0.04, 0], size: [0.18, 0.04, 0.07] }, // body, top face at y = 0.06
+  { center: [0, 0.04, 0], size: [0.13, 0.04, 0.13] }, // body: its underside is HINGE_Y
 ];
 
-/** side = +1 for the left finger (pad faces +X, toward the center), -1 for the right. */
-function finger(side: 1 | -1): Box[] {
-  return [
-    { center: [0, 0.035, 0], size: [0.02, 0.07, 0.05] }, // finger
-    { center: [side * 0.016, 0.055, 0], size: [0.012, 0.03, 0.044] }, // grip pad
-  ];
-}
+/** Upper finger, in its own frame: from the root hinge (origin) up its +Y to the elbow. */
+const upper: Box[] = [
+  { center: [0, 0, 0], size: [0.02, 0.02, 0.026] }, // root hinge barrel
+  { center: [0, UPPER / 2, 0], size: [0.016, UPPER, 0.022] },
+];
+const elbow: Box[] = [{ center: [0, UPPER, 0], size: [0.024, 0.024, 0.028] }]; // the elbow joint
+
+/** Lower finger, from the elbow (origin): the bar, the curled tip, and the pad on the inside (-X). */
+const lower: Box[] = [
+  { center: [0, LOWER / 2, 0], size: [0.016, LOWER, 0.022] },
+  { center: [-0.006, LOWER + 0.006, 0], size: [0.014, 0.024, 0.02], rotZ: 35 }, // curls in toward the axis
+];
+const padFace = -PAD_INSET;
+const padBox: Box[] = [{ center: [padFace + 0.003, (PAD_FROM + PAD_TO) / 2, 0], size: [0.006, PAD_TO - PAD_FROM, 0.02] }];
 
 // ---- glTF JSON + binary buffer ----
 
@@ -100,7 +118,12 @@ function addAccessor(accessor: object): number {
   return accessors.length - 1;
 }
 
-function addMesh(name: string, boxes: Box[], material: number): number {
+function addMesh(name: string, parts: { boxes: Box[]; material: number }[]): number {
+  meshes.push({ name, primitives: parts.map(({ boxes, material }) => primitive(boxes, material)) });
+  return meshes.length - 1;
+}
+
+function primitive(boxes: Box[], material: number) {
   const { positions, normals, indices } = boxesToMesh(boxes);
   const pos = new Float32Array(positions);
   const count = pos.length / 3;
@@ -125,27 +148,45 @@ function addMesh(name: string, boxes: Box[], material: number): number {
     componentType: UNSIGNED_SHORT, count: indices.length, type: "SCALAR",
   });
 
-  meshes.push({ name, primitives: [{ attributes: { POSITION: position, NORMAL: normal }, indices: index, material }] });
-  return meshes.length - 1;
+  return { attributes: { POSITION: position, NORMAL: normal }, indices: index, material };
 }
 
 const ANODIZED = 0;
 const ACCENT = 1;
-const palmMesh = addMesh("Palm", palm, ANODIZED);
-const leftMesh = addMesh("FingerLeft", finger(1), ACCENT);
-const rightMesh = addMesh("FingerRight", finger(-1), ACCENT);
+const RUBBER = 2;
+const palmMesh = addMesh("Palm", [{ boxes: palm, material: ANODIZED }]);
+// One mesh for all four upper fingers, one for the lower ones: glTF nodes can share a mesh.
+const upperMesh = addMesh("UpperFinger", [{ boxes: upper, material: ACCENT }, { boxes: elbow, material: ANODIZED }]);
+const lowerMesh = addMesh("LowerFinger", [{ boxes: lower, material: ACCENT }, { boxes: padBox, material: RUBBER }]);
 
-const OPEN_X = 0.085; // fully open: 12.6 cm between the grip pads (src/arm/Gripper.ts)
+/** A unit quaternion turning `deg` about an axis. */
+const quat = (axis: "y" | "z", deg: number): number[] => {
+  const h = (deg * Math.PI) / 360;
+  return axis === "y" ? [0, Math.sin(h), 0, Math.cos(h)] : [0, 0, Math.sin(h), Math.cos(h)];
+};
+
+const OPEN = angleForGap(GAP_OPEN); // written fully open; Gripper.ts sets the angle every frame
+const nodes: object[] = [
+  { name: "Gripper", children: [1, 2, 5, 8, 11] },
+  { name: "Palm", mesh: palmMesh },
+];
+for (let k = 0; k < 4; k++) {
+  const mount = nodes.length;
+  nodes.push(
+    // Turning the mount turns the finger's "outward" (+X) to its side of the claw.
+    { name: `Mount${k}`, rotation: quat("y", k * 90), children: [mount + 1] },
+    // Opening swings the upper finger outward: a turn of -θ about its Z takes +Y toward +X.
+    { name: `Finger${k}`, mesh: upperMesh, translation: [ROOT_RADIUS, HINGE_Y, 0], rotation: quat("z", -OPEN), children: [mount + 2] },
+    // The elbow turns back by +θ, so the lower finger and its pad stay upright.
+    { name: `Knuckle${k}`, mesh: lowerMesh, translation: [0, UPPER, 0], rotation: quat("z", OPEN) },
+  );
+}
+
 const gltf = {
   asset: { version: "2.0", generator: "robot-arm/scripts/build-gripper.ts" },
   scene: 0,
   scenes: [{ name: "Gripper", nodes: [0] }],
-  nodes: [
-    { name: "Gripper", children: [1, 2, 3] },
-    { name: "Palm", mesh: palmMesh },
-    { name: "FingerLeft", mesh: leftMesh, translation: [-OPEN_X, 0.06, 0] },
-    { name: "FingerRight", mesh: rightMesh, translation: [OPEN_X, 0.06, 0] },
-  ],
+  nodes,
   meshes,
   materials: [
     {
@@ -155,6 +196,10 @@ const gltf = {
     {
       name: "Accent",
       pbrMetallicRoughness: { baseColorFactor: [0.95, 0.42, 0.08, 1], metallicFactor: 0.1, roughnessFactor: 0.55 },
+    },
+    {
+      name: "Rubber",
+      pbrMetallicRoughness: { baseColorFactor: [0.08, 0.08, 0.09, 1], metallicFactor: 0, roughnessFactor: 0.9 },
     },
   ],
   accessors,

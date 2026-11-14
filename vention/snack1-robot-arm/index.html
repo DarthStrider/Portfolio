@@ -45,7 +45,7 @@
 
       <div class="toggles">
         <button type="button" id="btn-demo" aria-pressed="true">Demo</button>
-        <button type="button" id="btn-gripper" aria-pressed="true">Gripper open</button>
+        <button type="button" id="btn-gripper" aria-pressed="true" title="Close on what's between the fingers and hold it; again to let go (G)">Claw open</button>
         <button type="button" id="btn-trail" aria-pressed="true">Trail</button>
         <button type="button" id="btn-reset">Reset</button>
       </div>
@@ -56,9 +56,10 @@
           <li><kbd>1</kbd>–<kbd>5</kbd> or click a blue joint: select</li>
           <li><kbd>←</kbd> <kbd>→</kbd> (or <kbd>A</kbd> <kbd>D</kbd>): rotate selected joint</li>
           <li><kbd>↑</kbd> <kbd>↓</kbd>: previous / next joint</li>
-          <li><kbd>G</kbd> gripper · <kbd>Space</kbd> demo · <kbd>T</kbd> trail · <kbd>R</kbd> reset</li>
+          <li><kbd>G</kbd> claw: grab what's between the fingers, again to let go · <kbd>Space</kbd> demo · <kbd>T</kbd> trail · <kbd>R</kbd> reset</li>
           <li>Shapes tab → <strong>Pick</strong>, then click where the robot should put it; <kbd>Q</kbd> <kbd>E</kbd> turn it on the way</li>
           <li>Drag to orbit, scroll to zoom, right-drag to pan</li>
+          <li>Everything is solid: the arm stops before it goes into a shape, belt, bin or the floor</li>
           <li>Camera: <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> move · <kbd>U</kbd> <kbd>O</kbd> orbit · <kbd>+</kbd> <kbd>−</kbd> zoom · <kbd>F</kbd> fit all · <kbd>V</kbd> top view · <kbd>H</kbd> home, or the pad at the bottom</li>
         </ul>
       </details>
