@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { clamp, DEG, type ArmDimensions } from "./kinematics";
 import type { JointSpec } from "./jointSpecs";
+import type { Capsule, V3 } from "./collision";
+import { HINGE_Y } from "./claw";
 
 const HOUSING_COLOR = 0x2563eb;
 const SELECTED_GLOW = 0x60a5fa;
@@ -61,6 +63,37 @@ export class RobotArm {
 
   anglesRad(): number[] {
     return this.angles.map((a) => a * DEG);
+  }
+
+  /**
+   * The arm's links as capsules, in world space, for collision checks: the column, the
+   * upper arm, the forearm and the wrist link, each as thick as its mesh.
+   */
+  linkCapsules(): Capsule[] {
+    this.root.updateWorldMatrix(true, true);
+    const at = (o: THREE.Object3D): V3 => {
+      const v = o.getWorldPosition(new THREE.Vector3());
+      return { x: v.x, y: v.y, z: v.z };
+    };
+    const [, shoulder, elbow, wrist, roll] = this.joints;
+    return [
+      { part: "upper arm", a: at(shoulder), b: at(elbow), r: 0.05 },
+      { part: "forearm", a: at(elbow), b: at(wrist), r: 0.042 },
+      { part: "wrist", a: at(wrist), b: at(roll), r: 0.04 },
+    ];
+  }
+
+  /** Points across the claw's palm (its underside and middle), in world space. */
+  palmPoints(): { part: string; p: V3 }[] {
+    this.toolMount.updateWorldMatrix(true, false);
+    const out: { part: string; p: V3 }[] = [];
+    for (const y of [0.035, HINGE_Y]) {
+      for (const x of [-0.065, 0, 0.065]) for (const z of [-0.065, 0, 0.065]) {
+        const v = this.toolMount.localToWorld(new THREE.Vector3(x, y, z));
+        out.push({ part: "palm", p: { x: v.x, y: v.y, z: v.z } });
+      }
+    }
+    return out;
   }
 
   /** Makes the selected joint's housing glow; pass null to clear. */

@@ -31,6 +31,7 @@ import { conditionRow, editCondition, esc } from "../splitters/conditions";
 import type { Condition } from "../splitters/types";
 import { decide, describeTarget, inZone, placeFor, toLocal, toWorld, type Drop } from "./cell";
 import { RobotLayer, ROBOT_REACH } from "./RobotLayer";
+import type { SolidWorld } from "../arm/solid";
 import type { Robot, RobotRule, Target } from "./types";
 
 const POLL_MS = 4000;
@@ -45,6 +46,8 @@ interface Options {
   shapes: ReturnType<typeof createShapes>;
   conveyors: ReturnType<typeof createConveyors>;
   line: ReturnType<typeof createLine>;
+  /** What the arms can bump into. */
+  solid: SolidWorld;
   /** The shape the main arm is busy with, if any: robots leave it alone. */
   mainArmShape: () => string | null;
   gripperUrl: string;
@@ -266,10 +269,24 @@ export function createRobots(o: Options) {
     const job = rt.job!;
     const view = layer.view(r.id)!;
     const gripper = view.gripper!;
-    const state: ArmState = { joints: [...view.arm.anglesDeg], gap: gripper.gap };
+    const was = { joints: [...view.arm.anglesDeg], gap: gripper.gap };
+    const state: ArmState = { joints: [...was.joints], gap: was.gap };
     const events = job.player.update(dt, state);
+    // Solid world: a move that would go into something (another item, a belt, a bin) isn't made.
+    const ignore = new Set([job.shapeId]);
+    const holding = job.holding ? job.shapeId : null;
+    const before = o.solid.hit(view.arm, gripper, ignore, { holding });
     state.joints.forEach((a, i) => view.arm.setAngle(i, a));
     gripper.setGap(state.gap);
+    const after = before ? null : o.solid.hit(view.arm, gripper, ignore, { holding });
+    if (after) {
+      was.joints.forEach((a, i) => view.arm.setAngle(i, a));
+      gripper.setGap(was.gap);
+      const from = job.from;
+      cancel(r.id, `Stopped: its ${after.part} would hit ${after.what}.`);
+      rt.refused.set(job.shapeId, from); // left alone until it moves
+      return;
+    }
     for (const event of events) {
       if (event === "grab") {
         shapes.layer.hold(job.shapeId, gripper.object);

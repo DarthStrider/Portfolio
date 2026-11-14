@@ -4,7 +4,7 @@ import { DEG, forwardKinematics } from "../src/arm/kinematics";
 import { fingerYaw, wrapDeg } from "../src/arm/ik";
 import { ARM, JOINTS, ROLL } from "../src/arm/jointSpecs";
 import { GAP_OPEN, PALM_ABOVE_TCP, FINGERTIP_BELOW_TCP } from "../src/arm/gripperSpec";
-import { graspFor, MAX_GRIP } from "../src/pick/grasp";
+import { contactGap, graspFor, MAX_GRIP } from "../src/pick/grasp";
 import { planPickPlace, ProgramPlayer, type ArmState, type PickRequest, type PlayerEvent } from "../src/pick/program";
 import type { ShapeKind } from "../src/shapes/types";
 
@@ -14,16 +14,19 @@ const shape = (kind: ShapeKind, w: number, h: number, d = w, at = { x: 0.55, z: 
 
 // ---- Grasping ----
 
-test("a box is gripped across its narrower side that fits, with the fingers facing that way", () => {
-  const across = graspFor(shape("box", 0.08, 0.1, 0.3, undefined, 20));
-  assert.ok(across.ok);
-  assert.equal(across.width, 0.08);
-  assert.equal(across.fingerYaw, 20); // closing along the box's X sides
+test("the claw closes on a box until the pair across its longer side touches, fingers square to its faces", () => {
+  const long = graspFor(shape("box", 0.08, 0.1, 0.12, undefined, 20));
+  assert.ok(long.ok);
+  assert.ok(Math.abs(long.width - 0.12) < 1e-9); // the 12 cm side stops the claw; the 8 cm pair doesn't touch
+  assert.equal(long.fingerYaw, 20);
+  const square = graspFor(shape("box", 0.06, 0.1, 0.06, undefined, -35));
+  assert.ok(square.ok && Math.abs(square.width - 0.06) < 1e-9); // a square box: all four fingers touch
+});
 
-  const deep = graspFor(shape("box", 0.3, 0.1, 0.06, undefined, 20));
-  assert.ok(deep.ok);
-  assert.equal(deep.width, 0.06);
-  assert.equal(deep.fingerYaw, 110); // along its Z sides: a quarter turn further
+test("turned 45° to a box, the claw would close on its corners: a wider reach", () => {
+  const box = shape("box", 0.06, 0.1, 0.06);
+  assert.ok(Math.abs(contactGap(box, 0, 0.05) - 0.06) < 1e-9);
+  assert.ok(Math.abs(contactGap(box, 45, 0.05) - 0.06 * Math.SQRT2) < 1e-9);
 });
 
 test("shapes wider than the open gripper, or thinner than the closed one, are refused with a reason", () => {
@@ -74,7 +77,7 @@ test("a plan picks, carries and places, and says where the shape ends up facing"
   assert.ok(plan.ok, plan.ok ? "" : plan.reason);
   assert.deepEqual(plan.steps.map((s) => s.kind), ["gripper", "moveJ", "moveL", "gripper", "moveL", "moveJ", "moveL", "gripper", "moveL", "home"]);
   assert.equal(plan.rotationY, 60);
-  assert.equal(plan.width, 0.06);
+  assert.ok(Math.abs(plan.width - 0.1) < 1e-9); // the claw closes on the box's 10 cm side
   assert.ok(plan.steps.some((s) => s.kind === "gripper" && s.grab));
   assert.ok(plan.steps.some((s) => s.kind === "gripper" && s.release));
 });
@@ -117,7 +120,7 @@ test("running the program grabs at the shape, lets go at the spot, turned as ask
   assert.ok(g.ok);
   const atGrab = tcp(grab.joints);
   assert.ok(Math.hypot(atGrab.x - 0.55, atGrab.y - g.height, atGrab.z - 0.1) < 1e-6);
-  assert.ok(Math.abs(grab.gap - 0.06) < 1e-9);
+  assert.ok(Math.abs(grab.gap - 0.1) < 1e-9);
   // Let go just above the spot...
   const atRelease = tcp(release.joints);
   assert.ok(Math.hypot(atRelease.x - req.to.x, atRelease.z - req.to.z) < 1e-6);

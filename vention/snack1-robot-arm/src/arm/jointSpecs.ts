@@ -1,4 +1,5 @@
 import type { ArmDimensions } from "./kinematics";
+import { TCP_Y } from "./claw";
 
 export type Axis = "x" | "y" | "z";
 
@@ -18,7 +19,7 @@ export const ARM: ArmDimensions = {
   upperArm: 0.45,
   forearm: 0.4,
   wrist: 0.12,
-  tool: 0.115,
+  tool: TCP_Y, // the claw's pads (src/arm/claw.ts): longer than the old two-finger gripper's 0.115
 };
 
 /**
@@ -49,9 +50,9 @@ export const ROLL = 4;
  */
 const DEMO_MOTION = [
   { amplitude: 70, frequency: 0.07 },
-  { amplitude: 20, frequency: 0.11 },
-  { amplitude: 18, frequency: 0.13 },
-  { amplitude: 30, frequency: 0.17 },
+  { amplitude: 12, frequency: 0.11 }, // smaller swings than with the old gripper: the claw is 6 cm longer
+  { amplitude: 12, frequency: 0.13 },
+  { amplitude: 24, frequency: 0.17 },
   { amplitude: 90, frequency: 0.05 },
 ] as const;
 

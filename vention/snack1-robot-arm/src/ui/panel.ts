@@ -124,7 +124,7 @@ export function createPanel(specs: readonly JointSpec[], handlers: PanelHandlers
 
     setGripperOpen(open: boolean) {
       gripper.setAttribute("aria-pressed", String(open));
-      setText(gripper, open ? "Gripper open" : "Gripper closed");
+      setText(gripper, open ? "Claw open" : "Claw closed");
     },
 
     setTrail(on: boolean) {

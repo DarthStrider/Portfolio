@@ -15,6 +15,12 @@ import { createRobots } from "./robots/controller";
 import { setFloorHalf } from "./scene/floor";
 import { sceneApi } from "./shapes/api";
 import { planPickPlace, ProgramPlayer, type ArmState } from "./pick/program";
+import { contactGap, MIN_GRIP } from "./pick/grasp";
+import { createSolidWorld } from "./arm/solid";
+import { PAD_FROM, PAD_TO } from "./arm/claw";
+import { supportHeight } from "./conveyors/transport";
+import { BIN_SIZE } from "./line/types";
+import { binsApi } from "./shapes/api";
 
 const JOG_SPEED = 60; // degrees per second while a key or jog button is held
 const DEMO_SMOOTHING = 3; // higher = joints follow the demo path more tightly
@@ -51,9 +57,12 @@ const line = createLine({
 
 // Automated robots: extra arms that pick items up from their zone and put them where their rules say.
 // (`program`, the main arm's pick, is declared below; it's only read once things are running.)
+// Everything the arms can bump into: shapes where they're drawn, belts and bins (src/arm/solid.ts).
+const solid = createSolidWorld({ shapes: () => shapes.shapes, layer: shapes.layer, belts: () => belts.belts, bins: () => line.bins });
+
 const robots = createRobots({
-  root: document.getElementById("robots-panel")!, scene, camera, canvas, shapes, conveyors: belts, line,
-  mainArmShape: () => program?.shapeId ?? null,
+  root: document.getElementById("robots-panel")!, scene, camera, canvas, shapes, conveyors: belts, line, solid,
+  mainArmShape: () => program?.shapeId ?? hand?.id ?? null,
   gripperUrl: `${import.meta.env.BASE_URL}models/gripper.glb`,
 });
 
@@ -181,7 +190,146 @@ function setDemo(on: boolean) {
 function toggleGripper() {
   stopProgram("Stopped: you took over the gripper.");
   setDemo(false); // otherwise the demo would immediately override it
-  setGripperOpen(!(gripper?.isOpen ?? true));
+  if (!gripper) return;
+  if (gripper.isOpen) closeClaw();
+  else openClaw();
+}
+
+// ---- Grabbing with G ----
+
+/**
+ * What the claw holds after G closed it on something: "closing" until the fingers reach its
+ * surface, then "holding" (its mesh rides with the claw) until G opens it again.
+ */
+let hand: { id: string; name: string; phase: "closing" | "holding" } | null = null;
+
+/** The item between the open fingers, if any, and how far apart the pads are when they touch it. */
+function itemInClaw(): { id: string; name: string; width: number } | null {
+  if (!gripper) return null;
+  arm.toolMount.updateWorldMatrix(true, false);
+  // Only straight down (within about 25°): the claw grips across a horizontal width.
+  const axis = new THREE.Vector3(0, 1, 0).transformDirection(arm.toolMount.matrixWorld);
+  if (axis.y > -0.9) return null;
+  const tcp = arm.tcp.getWorldPosition(new THREE.Vector3());
+  const padsLow = tcp.y - (PAD_TO - PAD_FROM) / 2;
+  const padsHigh = tcp.y + (PAD_TO - PAD_FROM) / 2;
+  const d = gripper.fingerDirections()[0];
+  const fingerYaw = (Math.atan2(-d.z, d.x) * 180) / Math.PI;
+  let best: { id: string; name: string; width: number; off: number } | null = null;
+  const c = new THREE.Vector3();
+  for (const s of shapes.shapes) {
+    const mesh = shapes.layer.meshOf(s.id);
+    if (!mesh || !mesh.visible || mesh.parent !== shapes.layer.root || s.attachedTo) continue;
+    mesh.getWorldPosition(c);
+    const bottom = c.y - s.size.y / 2;
+    const top = c.y + s.size.y / 2;
+    if (Math.min(top, padsHigh) - Math.max(bottom, padsLow) < 0.008) continue; // the pads must reach its side
+    const off = Math.hypot(c.x - tcp.x, c.z - tcp.z);
+    if (off > Math.min(s.size.x, s.size.z) / 2) continue; // the claw's axis must go through it
+    const width = contactGap({ kind: s.kind, size: s.size, rotationY: (mesh.rotation.y * 180) / Math.PI }, fingerYaw, tcp.y - bottom);
+    if (width > gripper.gap + 0.002) continue; // it isn't between the fingers (they'd be in it)
+    if (!best || off < best.off) best = { id: s.id, name: s.name, width, off };
+  }
+  return best;
+}
+
+function closeClaw() {
+  if (!gripper) return;
+  const item = shapes.running ? null : itemInClaw();
+  if (item && item.width >= MIN_GRIP) {
+    // Close until the pads meet its surface; it's held once they get there (see the frame loop).
+    hand = { id: item.id, name: item.name, phase: "closing" };
+    gripper.closeTo(item.width);
+  } else {
+    if (item) panel.showStatus(`${item.name} is too thin for the claw to hold.`);
+    else if (shapes.running) panel.showStatus("The claw only picks things up with G while the belts are stopped.");
+    gripper.setOpen(false);
+  }
+  panel.setGripperOpen(false);
+}
+
+function openClaw() {
+  if (!gripper) return;
+  if (hand?.phase === "holding") putDown(hand.id);
+  hand = null;
+  setGripperOpen(true);
+}
+
+/** The claw has reached the item's surface: it's held, centered between the fingers as a real claw would push it. */
+function takeHold() {
+  if (!hand || !gripper) return;
+  const mesh = shapes.layer.meshOf(hand.id);
+  if (!mesh) return void (hand = null);
+  const tcp = arm.tcp.getWorldPosition(new THREE.Vector3());
+  mesh.position.x = tcp.x;
+  mesh.position.z = tcp.z;
+  shapes.layer.hold(hand.id, gripper.object);
+  hand.phase = "holding";
+  panel.showStatus(`Holding ${hand.name}. Move the arm, then press G to let go.`);
+}
+
+/** Let go: it drops straight down onto what's below, a belt, a bin or the floor, and that's saved. */
+function putDown(id: string) {
+  const mesh = shapes.layer.meshOf(id);
+  shapes.layer.release(id);
+  if (!mesh) return;
+  const at = mesh.getWorldPosition(new THREE.Vector3());
+  const yaw = new THREE.Euler().setFromQuaternion(mesh.getWorldQuaternion(new THREE.Quaternion()), "YXZ").y;
+  const where = { x: at.x, z: at.z };
+  const name = shapes.shapes.find((s) => s.id === id)?.name ?? "It";
+  const bin = line.bins.find((b) => {
+    const dx = at.x - b.position.x;
+    const dz = at.z - b.position.z;
+    const r = (b.rotationY * Math.PI) / 180;
+    return Math.abs(dx * Math.cos(r) - dz * Math.sin(r)) <= BIN_SIZE.x / 2 && Math.abs(dx * Math.sin(r) + dz * Math.cos(r)) <= BIN_SIZE.z / 2;
+  });
+  void (async () => {
+    await shapes.placeShape(id, where, (yaw * 180) / Math.PI);
+    if (bin) {
+      try {
+        await binsApi.catch(bin.id, id);
+        panel.showStatus(`${name} went into ${bin.name}.`);
+      } catch (err) {
+        panel.showStatus(`${name} wasn't stored in ${bin.name}: ${(err as Error).message}`);
+      }
+      await Promise.all([shapes.reload(), line.reload()]);
+    } else {
+      const on = supportHeight(belts.belts, at.x, at.z) > 0 ? "on the belt" : "on the floor";
+      panel.showStatus(`Put ${name} down ${on}.`);
+    }
+  })();
+}
+
+// ---- Solid: the arm stops before it goes into anything ----
+
+let lastBlock = "";
+
+/** What the main arm would hit as it stands now (the item it holds or is closing on is allowed). */
+function mainHit(gap?: number) {
+  const ignore = new Set<string>();
+  if (hand) ignore.add(hand.id);
+  if (program) ignore.add(program.shapeId);
+  const holding = hand?.phase === "holding" ? hand.id : program?.holding ? program.shapeId : null;
+  return solid.hit(arm, gripper, ignore, { gap, holding });
+}
+
+/**
+ * Tries a move: `apply` changes the arm, `undo` puts it back. If the move would go into
+ * something it wasn't already touching, it's undone. Returns what blocked it, or null.
+ */
+function guarded(apply: () => void, undo: () => void): string | null {
+  const before = mainHit();
+  apply();
+  const after = mainHit();
+  if (!after || before) {
+    lastBlock = "";
+    return null;
+  }
+  undo();
+  const text = `Blocked: the ${after.part} would hit ${after.what}.`;
+  if (text !== lastBlock) panel.showStatus(text);
+  lastBlock = text;
+  return text;
 }
 
 function setGripperOpen(open: boolean) {
@@ -200,6 +348,8 @@ function setTrail(on: boolean) {
 function reset() {
   stopProgram("Stopped.");
   setDemo(false);
+  if (hand?.phase === "holding") putDown(hand.id);
+  hand = null;
   JOINTS.forEach((spec, i) => arm.setAngle(i, spec.home));
   setGripperOpen(true);
   trail.clear();
@@ -246,9 +396,23 @@ function runProgram(dt: number) {
   }
   const { player, shapeId } = program;
   const commanded = armState();
+  const was = { joints: [...arm.anglesDeg], gap: gripper.gap };
   const events = player.update(dt, commanded);
-  commanded.joints.forEach((angle, i) => arm.setAngle(i, angle));
-  gripper.setGap(commanded.gap);
+  const g = gripper;
+  const blocked = guarded(
+    () => {
+      commanded.joints.forEach((angle, i) => arm.setAngle(i, angle));
+      g.setGap(commanded.gap);
+    },
+    () => {
+      was.joints.forEach((angle, i) => arm.setAngle(i, angle));
+      g.setGap(was.gap);
+    },
+  );
+  if (blocked) {
+    stopProgram(blocked.replace("Blocked:", "Stopped:"));
+    return;
+  }
 
   for (const event of events) {
     if (event === "grab") {
@@ -398,20 +562,32 @@ renderer.setAnimationLoop((time) => {
     // Frame-rate independent easing toward the demo path, so toggling the demo
     // on from any pose glides there instead of jumping.
     const k = 1 - Math.exp(-DEMO_SMOOTHING * dt);
-    JOINTS.forEach((_, i) => {
-      const current = arm.getAngle(i);
-      arm.setAngle(i, current + (demoTarget(i, state.demoTime) - current) * k);
-    });
+    const was = [...arm.anglesDeg];
+    guarded(
+      () => JOINTS.forEach((_, i) => arm.setAngle(i, was[i] + (demoTarget(i, state.demoTime) - was[i]) * k)),
+      () => was.forEach((a, i) => arm.setAngle(i, a)),
+    );
     setGripperOpen(demoGripperOpen(state.demoTime));
   } else {
     const direction = keyboardDirection() + state.jog;
     if (direction !== 0) {
       const i = state.selected;
-      arm.setAngle(i, arm.getAngle(i) + Math.sign(direction) * JOG_SPEED * dt);
+      const was = arm.getAngle(i);
+      guarded(() => arm.setAngle(i, was + Math.sign(direction) * JOG_SPEED * dt), () => arm.setAngle(i, was));
     }
   }
 
-  gripper?.update(dt);
+  if (gripper && !program) {
+    // Opening wide can bump into something beside the claw: the fingers stop there.
+    const g = gripper;
+    const was = g.gap;
+    const open = g.isOpen;
+    guarded(() => g.update(dt), () => {
+      g.setGap(was); // stop where it was…
+      if (!open) g.closeTo(was); // …still counting as closed if it was closing
+    });
+    if (hand?.phase === "closing" && !g.moving) takeHold();
+  }
   belts.update(dt); // moves shapes riding the belts while running
   splitters.update(dt); // swings the gates' flaps
   robots.update(dt); // the automated robots, always at work

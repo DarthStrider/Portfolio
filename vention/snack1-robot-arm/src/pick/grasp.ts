@@ -3,9 +3,10 @@
  * they grip, and which way they face. Pure math on the shape and the gripper's
  * measurements, so it's unit-tested (tests/pick.test.ts).
  *
- * The gripper always comes down from above with its fingers level, so a shape is gripped
- * across a horizontal width: a box across one pair of its sides, a round shape across its
- * diameter at the grip height.
+ * The claw always comes down from above, its four fingers level and 90° apart, and they
+ * all close together, so they stop when the first pair touches: a box is held across its
+ * longer side (the fingers square to its faces, so the other pair has the shorter side
+ * between them), a round shape across its diameter at the grip height.
  */
 import { FINGERTIP_BELOW_TCP, GAP_CLOSED, GAP_OPEN, PALM_ABOVE_TCP } from "../arm/gripperSpec";
 import type { Shape } from "../shapes/types";
@@ -55,14 +56,11 @@ export function graspFor(shape: Graspable): Grasp {
 
   switch (shape.kind) {
     case "box": {
-      // Across the box's width (its X sides) or its depth (Z sides): the narrower one that fits.
-      const options = [
-        { width: w, fingerYaw: shape.rotationY },
-        { width: d, fingerYaw: shape.rotationY + 90 },
-      ].filter((o) => o.width >= MIN_GRIP && o.width <= MAX_GRIP);
-      if (options.length === 0) return Math.min(w, d) < MIN_GRIP ? tooThin : tooWide(`${cm(w)} × ${cm(d)}`);
-      const best = options.reduce((a, b) => (b.width < a.width ? b : a));
-      return { ok: true, height, ...best };
+      // Fingers square to the faces: the pair across the longer side touches first.
+      const width = contactGap(shape, shape.rotationY, height);
+      if (width > MAX_GRIP) return tooWide(`${cm(w)} × ${cm(d)}`);
+      if (width < MIN_GRIP) return tooThin;
+      return { ok: true, height, width, fingerYaw: shape.rotationY };
     }
     case "cylinder":
       return w > MAX_GRIP ? tooWide(`⌀ ${cm(w)}`) : w < MIN_GRIP ? tooThin : { ok: true, width: w, height, fingerYaw: null };
@@ -80,5 +78,39 @@ export function graspFor(shape: Graspable): Grasp {
       if (width > MAX_GRIP) return tooWide(`⌀ ${cm(width)} at the grip`);
       return width < MIN_GRIP ? tooThin : { ok: true, width, height, fingerYaw: null };
     }
+  }
+}
+
+/**
+ * Where the claw's fingers first touch a shape centered on its axis, as the gap between
+ * opposite pads: the shape's widest reach along any of the four finger directions. Finger 0
+ * points along `fingerYaw` (degrees, like rotationY); `height` is the pads' height above the
+ * shape's base (round shapes narrow toward their top or tip).
+ */
+export function contactGap(shape: Graspable, fingerYaw: number, height: number): number {
+  const { x: w, y: h, z: d } = shape.size;
+  const DEG = Math.PI / 180;
+  switch (shape.kind) {
+    case "box": {
+      // A box's support along a direction: its half-sizes along its own axes, projected.
+      const r = shape.rotationY * DEG;
+      let most = 0;
+      for (let k = 0; k < 4; k++) {
+        const a = (fingerYaw + 90 * k) * DEG;
+        const along = Math.abs(Math.cos(a - r)); // toward its X faces
+        const across = Math.abs(Math.sin(a - r)); // toward its Z faces
+        most = Math.max(most, along * (w / 2) + across * (d / 2));
+      }
+      return 2 * most;
+    }
+    case "cylinder":
+      return w;
+    case "sphere": {
+      const rad = w / 2;
+      const off = height - rad;
+      return 2 * Math.sqrt(Math.max(0, rad * rad - off * off));
+    }
+    case "cone":
+      return w * Math.max(0, 1 - height / h);
   }
 }

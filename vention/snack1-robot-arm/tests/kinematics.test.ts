@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEG, forwardKinematics, maxReach, type Vec3 } from "../src/arm/kinematics";
+import { FINGERTIP_BELOW_TCP } from "../src/arm/gripperSpec"; // the claw's fingertips reach past the TCP
 import { ARM, JOINTS, demoTarget } from "../src/arm/jointSpecs";
 
 const H = ARM.baseHeight + ARM.shoulderHeight; // shoulder joint height
@@ -84,7 +85,6 @@ test("never reaches farther than the stretched arm", () => {
 });
 
 test("demo motion stays within joint limits and keeps the gripper above the floor", () => {
-  const FINGERTIP_BELOW_TCP = 0.015; // fingertips extend a little past the TCP
   let lowest = Infinity;
   for (let t = 0; t < 600; t += 0.05) {
     const anglesDeg = JOINTS.map((_, i) => demoTarget(i, t));
