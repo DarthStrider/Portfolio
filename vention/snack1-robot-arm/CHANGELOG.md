@@ -24,6 +24,16 @@ runs or uses the project, MINOR for new features, PATCH for fixes.
 
 ### Added
 
+- A four-finger claw replaces the two-finger gripper: each finger has a root hinge and an elbow,
+  linked so the pads stay upright; it opens to 16 cm (was 12.6) and is 6 cm longer, so the arm's
+  tool length, the planner and the demo follow it. Its geometry is `src/arm/claw.ts`, shared by
+  the GLB builder, the model and the planner. A box is now held across its longer side.
+- A solid world (`src/arm/collision.ts`, `src/arm/solid.ts`): the arm, the claw, what it holds and
+  the automated robots stop before going into any shape, belt, bin or the floor, with a message
+  saying what would have been hit. Pick stops; a robot leaves that item alone.
+- **G** grabs: with the claw pointing down over an item, the fingers close until they touch it and
+  it's held; **G** again drops it onto the belt, bin or floor below, and that's saved.
+- `tests/collision.test.ts`.
 - Automated robots (Robots tab): extra arms anywhere on the floor, each with a pick zone and rules
   that send each kind of item to a spot on the floor, a place on a belt, or a bin. They work all
   the time, with the belts running or not, using the same planner as **Pick**. Saved by Snack 5's
