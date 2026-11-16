@@ -1,0 +1,203 @@
+[
+  {
+    "title": "Spaghetti Aglio e Olio",
+    "description": "Classic Italian garlic and olive oil pasta, ready in 20 minutes.",
+    "servings": 2,
+    "prepTime": 5,
+    "cookTime": 15,
+    "sourceUrl": null,
+    "ingredients": [
+      { "name": "spaghetti", "quantity": 200, "unit": "g", "note": null },
+      { "name": "olive oil", "quantity": 0.33, "unit": "cup", "note": null },
+      { "name": "garlic", "quantity": 6, "unit": "clove", "note": "thinly sliced" },
+      { "name": "red pepper flakes", "quantity": 0.5, "unit": "tsp", "note": null },
+      { "name": "parsley", "quantity": 2, "unit": "tbsp", "note": "chopped" },
+      { "name": "salt", "quantity": null, "unit": null, "note": "to taste" }
+    ],
+    "steps": [
+      { "text": "Cook the spaghetti in salted boiling water until al dente; reserve 1/2 cup pasta water." },
+      { "text": "Gently fry the garlic in olive oil over low heat until golden." },
+      { "text": "Add red pepper flakes, then toss in the drained pasta with a splash of pasta water." },
+      { "text": "Finish with parsley and season with salt." }
+    ]
+  },
+  {
+    "title": "Huevos Rancheros",
+    "description": "Mexican breakfast of fried eggs on warm tortillas with a quick tomato salsa.",
+    "servings": 2,
+    "prepTime": 10,
+    "cookTime": 15,
+    "sourceUrl": null,
+    "ingredients": [
+      { "name": "corn tortillas", "quantity": 4, "unit": null, "note": null },
+      { "name": "eggs", "quantity": 4, "unit": null, "note": null },
+      { "name": "tomato", "quantity": 2, "unit": null, "note": "diced" },
+      { "name": "onion", "quantity": 0.5, "unit": null, "note": "finely chopped" },
+      { "name": "garlic", "quantity": 1, "unit": "clove", "note": "minced" },
+      { "name": "jalapeño", "quantity": 1, "unit": null, "note": "seeded and minced" },
+      { "name": "black beans", "quantity": 1, "unit": "cup", "note": "drained" },
+      { "name": "olive oil", "quantity": 1, "unit": "tbsp", "note": null },
+      { "name": "cilantro", "quantity": 2, "unit": "tbsp", "note": "chopped" },
+      { "name": "salt", "quantity": null, "unit": null, "note": "to taste" }
+    ],
+    "steps": [
+      { "text": "Soften the onion, garlic and jalapeño in half the oil, then add the tomato and simmer 5 minutes to make a salsa." },
+      { "text": "Warm the black beans in a small pot and season with salt." },
+      { "text": "Warm the tortillas in a dry pan." },
+      { "text": "Fry the eggs in the remaining oil until the whites are set." },
+      { "text": "Top each tortilla with beans, an egg and salsa, then sprinkle with cilantro." }
+    ]
+  },
+  {
+    "title": "Chana Masala",
+    "description": "Indian chickpea curry in a spiced tomato and onion sauce.",
+    "servings": 4,
+    "prepTime": 10,
+    "cookTime": 30,
+    "sourceUrl": null,
+    "ingredients": [
+      { "name": "chickpeas", "quantity": 2, "unit": "can", "note": "drained and rinsed" },
+      { "name": "onion", "quantity": 1, "unit": null, "note": "finely chopped" },
+      { "name": "garlic", "quantity": 3, "unit": "clove", "note": "minced" },
+      { "name": "ginger", "quantity": 1, "unit": "tbsp", "note": "grated" },
+      { "name": "tomato", "quantity": 400, "unit": "g", "note": "canned, crushed" },
+      { "name": "garam masala", "quantity": 2, "unit": "tsp", "note": null },
+      { "name": "ground cumin", "quantity": 1, "unit": "tsp", "note": null },
+      { "name": "ground turmeric", "quantity": 0.5, "unit": "tsp", "note": null },
+      { "name": "olive oil", "quantity": 2, "unit": "tbsp", "note": null },
+      { "name": "cilantro", "quantity": 2, "unit": "tbsp", "note": "chopped" },
+      { "name": "salt", "quantity": null, "unit": null, "note": "to taste" }
+    ],
+    "steps": [
+      { "text": "Cook the onion in oil over medium heat until golden, about 8 minutes." },
+      { "text": "Add garlic, ginger and the spices and stir for 1 minute until fragrant." },
+      { "text": "Add the tomato and simmer for 10 minutes until thickened." },
+      { "text": "Stir in the chickpeas and a splash of water, then simmer 10 minutes more." },
+      { "text": "Season with salt and finish with cilantro. Serve with rice or naan." }
+    ]
+  },
+  {
+    "title": "Miso Soup",
+    "description": "Simple Japanese soup with tofu, seaweed and green onion.",
+    "servings": 4,
+    "prepTime": 5,
+    "cookTime": 10,
+    "sourceUrl": null,
+    "ingredients": [
+      { "name": "dashi stock", "quantity": 4, "unit": "cup", "note": null },
+      { "name": "white miso paste", "quantity": 3, "unit": "tbsp", "note": null },
+      { "name": "silken tofu", "quantity": 200, "unit": "g", "note": "cubed" },
+      { "name": "dried wakame", "quantity": 1, "unit": "tbsp", "note": null },
+      { "name": "green onion", "quantity": 2, "unit": null, "note": "thinly sliced" }
+    ],
+    "steps": [
+      { "text": "Soak the wakame in warm water for 5 minutes, then drain." },
+      { "text": "Bring the dashi to a gentle simmer." },
+      { "text": "Dissolve the miso in a ladle of the hot dashi, then stir it back into the pot." },
+      { "text": "Add the tofu and wakame and heat through without boiling." },
+      { "text": "Serve topped with green onion." }
+    ]
+  },
+  {
+    "title": "Maple Pancakes",
+    "description": "Fluffy Canadian-style pancakes served with maple syrup.",
+    "servings": 4,
+    "prepTime": 10,
+    "cookTime": 15,
+    "sourceUrl": null,
+    "ingredients": [
+      { "name": "flour", "quantity": 1.5, "unit": "cup", "note": null },
+      { "name": "baking powder", "quantity": 1, "unit": "tbsp", "note": null },
+      { "name": "sugar", "quantity": 1, "unit": "tbsp", "note": null },
+      { "name": "salt", "quantity": 0.25, "unit": "tsp", "note": null },
+      { "name": "milk", "quantity": 1.25, "unit": "cup", "note": null },
+      { "name": "eggs", "quantity": 1, "unit": null, "note": null },
+      { "name": "butter", "quantity": 3, "unit": "tbsp", "note": "melted, plus more for the pan" },
+      { "name": "maple syrup", "quantity": null, "unit": null, "note": "for serving" }
+    ],
+    "steps": [
+      { "text": "Whisk the flour, baking powder, sugar and salt in a large bowl." },
+      { "text": "In another bowl, whisk the milk, egg and melted butter." },
+      { "text": "Pour the wet ingredients into the dry and stir until just combined; a few lumps are fine." },
+      { "text": "Cook 1/4 cup portions on a buttered pan over medium heat until bubbles form, then flip." },
+      { "text": "Serve warm with maple syrup." }
+    ]
+  },
+  {
+    "title": "Greek Salad",
+    "description": "Fresh Greek salad with tomato, cucumber, red onion, olives and feta.",
+    "servings": 4,
+    "prepTime": 15,
+    "cookTime": 0,
+    "sourceUrl": null,
+    "ingredients": [
+      { "name": "tomato", "quantity": 3, "unit": null, "note": "cut into wedges" },
+      { "name": "cucumber", "quantity": 1, "unit": null, "note": "sliced" },
+      { "name": "red onion", "quantity": 0.5, "unit": null, "note": "thinly sliced" },
+      { "name": "green bell pepper", "quantity": 1, "unit": null, "note": "sliced" },
+      { "name": "kalamata olives", "quantity": 0.5, "unit": "cup", "note": null },
+      { "name": "feta cheese", "quantity": 200, "unit": "g", "note": "in one block" },
+      { "name": "olive oil", "quantity": 3, "unit": "tbsp", "note": null },
+      { "name": "red wine vinegar", "quantity": 1, "unit": "tbsp", "note": null },
+      { "name": "dried oregano", "quantity": 1, "unit": "tsp", "note": null },
+      { "name": "salt", "quantity": null, "unit": null, "note": "to taste" }
+    ],
+    "steps": [
+      { "text": "Combine the tomato, cucumber, red onion, pepper and olives in a large bowl." },
+      { "text": "Whisk the olive oil, vinegar, oregano and a pinch of salt." },
+      { "text": "Pour the dressing over the vegetables and toss gently." },
+      { "text": "Place the feta on top and sprinkle with a little more oregano." }
+    ]
+  },
+  {
+    "title": "Hummus",
+    "description": "Smooth Middle Eastern chickpea dip, great as a snack with pita or vegetables.",
+    "servings": 6,
+    "prepTime": 10,
+    "cookTime": 0,
+    "sourceUrl": null,
+    "ingredients": [
+      { "name": "chickpeas", "quantity": 1, "unit": "can", "note": "drained, liquid reserved" },
+      { "name": "tahini", "quantity": 0.25, "unit": "cup", "note": null },
+      { "name": "lemon juice", "quantity": 3, "unit": "tbsp", "note": null },
+      { "name": "garlic", "quantity": 1, "unit": "clove", "note": null },
+      { "name": "olive oil", "quantity": 2, "unit": "tbsp", "note": "plus more for serving" },
+      { "name": "ground cumin", "quantity": 0.5, "unit": "tsp", "note": null },
+      { "name": "salt", "quantity": 0.5, "unit": "tsp", "note": null },
+      { "name": "paprika", "quantity": null, "unit": null, "note": "for garnish" }
+    ],
+    "steps": [
+      { "text": "Blend the tahini and lemon juice for 1 minute until creamy." },
+      { "text": "Add the garlic, olive oil, cumin and salt and blend again." },
+      { "text": "Add the chickpeas and blend, adding reserved liquid a spoonful at a time until smooth." },
+      { "text": "Serve drizzled with olive oil and sprinkled with paprika." }
+    ]
+  },
+  {
+    "title": "Chicken Stir-Fry",
+    "description": "Quick Chinese-style chicken and vegetable stir-fry with a soy-ginger sauce.",
+    "servings": 4,
+    "prepTime": 15,
+    "cookTime": 10,
+    "sourceUrl": null,
+    "ingredients": [
+      { "name": "chicken breast", "quantity": 500, "unit": "g", "note": "thinly sliced" },
+      { "name": "broccoli", "quantity": 2, "unit": "cup", "note": "small florets" },
+      { "name": "red bell pepper", "quantity": 1, "unit": null, "note": "sliced" },
+      { "name": "carrot", "quantity": 1, "unit": null, "note": "thinly sliced" },
+      { "name": "garlic", "quantity": 2, "unit": "clove", "note": "minced" },
+      { "name": "ginger", "quantity": 1, "unit": "tbsp", "note": "grated" },
+      { "name": "soy sauce", "quantity": 3, "unit": "tbsp", "note": null },
+      { "name": "cornstarch", "quantity": 1, "unit": "tsp", "note": "mixed with 2 tbsp water" },
+      { "name": "vegetable oil", "quantity": 2, "unit": "tbsp", "note": null },
+      { "name": "green onion", "quantity": 2, "unit": null, "note": "sliced" }
+    ],
+    "steps": [
+      { "text": "Stir-fry the chicken in half the oil over high heat until cooked through, then set aside." },
+      { "text": "Add the remaining oil, then the broccoli, pepper and carrot, and stir-fry 3 to 4 minutes." },
+      { "text": "Add the garlic and ginger and cook 30 seconds." },
+      { "text": "Return the chicken, add the soy sauce and cornstarch mixture, and toss until glossy." },
+      { "text": "Top with green onion and serve with rice." }
+    ]
+  }
+]

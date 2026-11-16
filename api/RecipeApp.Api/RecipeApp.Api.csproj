@@ -17,4 +17,9 @@
     <PackageReference Include="Scalar.AspNetCore" Version="3.0.0" />
   </ItemGroup>
 
+  <!-- Copy seed data next to the app so SeedData can read it -->
+  <ItemGroup>
+    <None Update="Data\seed-recipes.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

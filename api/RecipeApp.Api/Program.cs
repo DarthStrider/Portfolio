@@ -26,6 +26,14 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
+
+    //Apply migrations and seed sample data (development only)
+    using IServiceScope scope = app.Services.CreateScope();
+    AppDbContext db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    IRecipeService recipeService =scope.ServiceProvider.GetRequiredService<IRecipeService>();
+
+    await db.Database.MigrateAsync();
+    await SeedData.SeedAsync(db, recipeService);
 }
 else
 {
