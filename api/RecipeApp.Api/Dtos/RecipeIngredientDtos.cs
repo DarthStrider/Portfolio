@@ -1,11 +1,13 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace RecipeApp.Api.Dtos;
 
 //Client Sends
 public record RecipeIngredientLineRequest(
-    string Name,
-    decimal? Quantity,
-    string? Unit,
-    string? Note);
+    [Required, MaxLength(100)]string Name,
+    [Range(0,100000)]decimal? Quantity,
+    [MaxLength(50)]string? Unit,
+    [MaxLength(200)]string? Note);
 
 //API Sends Back
 public record RecipeIngredientLineDto(

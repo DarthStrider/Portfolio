@@ -28,6 +28,11 @@ public class RecipesController(IRecipeService recipes): ControllerBase
     [HttpPost]
     public async Task<ActionResult<RecipeDto>> Create(CreateRecipeRequest request)
     {
+        if(HasDuplicateIngredients(request.Ingredients))
+        {
+            return ValidationProblem(ModelState);
+        }
+
         RecipeDto createdRecipe =  await recipes.CreateAsync(request);
         return CreatedAtAction(nameof(GetById), new { id = createdRecipe.Id }, createdRecipe);
     }
@@ -36,6 +41,11 @@ public class RecipesController(IRecipeService recipes): ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, UpdateRecipeRequest request)
     {
+        if (HasDuplicateIngredients(request.Ingredients))
+        {
+            return ValidationProblem(ModelState);
+        }
+
         bool updated = await recipes.UpdateAsync(id, request);
         return updated ? NoContent() : NotFound();
     }
@@ -46,5 +56,17 @@ public class RecipesController(IRecipeService recipes): ControllerBase
     {
         bool deleted = await recipes.DeleteAsync(id);
         return deleted ? NoContent() : NotFound();
+    }
+
+    private bool HasDuplicateIngredients(List<RecipeIngredientLineRequest> ingredients)
+    {
+        List<string> duplicates = IngredientNames.FindDuplicates(ingredients.Select(i => i.Name));
+
+        foreach (string name in duplicates)
+        {
+            ModelState.AddModelError("Ingredients", $"'{name}' is listed More than once; combine them into one line.");
+        }
+
+        return duplicates.Count > 0;
     }
 }

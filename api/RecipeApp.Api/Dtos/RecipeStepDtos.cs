@@ -1,8 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace RecipeApp.Api.Dtos;
 
 //Client Sends
 public record RecipeStepLineRequest(
-    string Text);
+    [Required, MaxLength(1000)]string Text);
 
 //API Sends Back
 public record RecipeStepLineDto(
