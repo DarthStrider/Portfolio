@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RecipeApp.Api.Data;
+using RecipeApp.Api.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -10,10 +11,12 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 //Register the DB
-string? connecttionString = builder.Configuration.GetConnectionString("Default")
+string connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("Connection string 'Default' not found");
 
-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connecttionString));
+builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+
+builder.Services.AddScoped<IRecipeService, RecipeService>();
 
 WebApplication app = builder.Build();
 
