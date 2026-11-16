@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RecipeApp.Api.Dtos;
 using RecipeApp.Api.Services;
+using System.Text.Json;
 
 namespace RecipeApp.Api.Data;
 
@@ -19,30 +20,15 @@ public static class SeedData
         }
     }
 
-    private static List<CreateRecipeRequest> SampleRecipes() =>
-        [
-            new CreateRecipeRequest(
-            Title: "Spaghetti Aglio e Olio",
-            Description: "Classic Italian garlic and olive oil pasta, ready in 20 minutes.",
-            Servings: 2,
-            PrepTime: 5,
-            CookTime: 15,
-            SourceUrl: null,
-            Ingredients:
-            [
-                new("spaghetti", 200, "g", null),
-                new("olive oil", 0.33m, "cup", null),
-                new("garlic", 6, "clove", "thinly sliced"),
-                new("red pepper flakes", 0.5m, "tsp", null),
-                new("parsley", 2, "tbsp", "chopped"),
-                new("salt", null, null, "to taste")
-            ],
-            Steps:
-            [
-                new("Cook the spaghetti in salted boiling water until al dente; reserve 1/2 cup pasta water."),
-                new("Gently fry the garlic in olive oil over low heat until golden."),
-                new("Add red pepper flakes, then toss in the drained pasta with a splash of pasta water."),
-                new("Finish with parsley and season with salt.")
-            ]),
-        ];
+    private static List<CreateRecipeRequest> SampleRecipes()
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, "Data", "seed-recipes.json");
+        string json = File.ReadAllText(path);
+
+        //Web defaults = camelcase property names, same as the Api Uses
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+
+        return JsonSerializer.Deserialize<List<CreateRecipeRequest>>(json, options)
+            ?? throw new InvalidOperationException("Seed file is empty or invalid");
+    }
 }
