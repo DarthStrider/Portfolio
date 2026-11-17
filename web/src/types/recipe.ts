@@ -13,10 +13,26 @@ export interface RecipeIngredientLine {
     note: string | null;
 }
 
+export interface RecipeStepLineRequest {
+    test: string;
+}
+
 //Matches RecipeLineDto
 export interface RecipeStep {
     stepNumber: number;
     text: string;
+}
+
+//Matches CreateRecipeRequest and UpdateRecipeRequest
+export interface RecipeRequest {
+    title: string;
+    description: string | null;
+    servings: number;
+    prepTime: number | null;
+    cookTime: number | null;
+    sourceUrl: string | null;
+    ingredients: RecipeIngredientLine[];
+    steps: RecipeStepLineRequest[];
 }
 
 //Matches RecipeDto
