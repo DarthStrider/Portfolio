@@ -12,7 +12,7 @@ using RecipeApp.Api.Data;
 namespace RecipeApp.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261116171111_Initial")]
+    [Migration("20261117020035_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -29,113 +29,139 @@ namespace RecipeApp.Api.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_ingredients");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_ingredients_name");
 
-                    b.ToTable("Ingredients");
+                    b.ToTable("ingredients", (string)null);
                 });
 
             modelBuilder.Entity("RecipeApp.Api.Models.Recipe", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int?>("CookTime")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("cook_time");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
 
                     b.Property<int?>("PrepTime")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("prep_time");
 
                     b.Property<int>("Servings")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("servings");
 
                     b.Property<string>("SourceUrl")
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("source_url");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_recipes");
 
-                    b.ToTable("Recipes");
+                    b.ToTable("recipes", (string)null);
                 });
 
             modelBuilder.Entity("RecipeApp.Api.Models.RecipeIngredient", b =>
                 {
                     b.Property<int>("RecipeId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("recipe_id");
 
                     b.Property<int>("IngredientId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("ingredient_id");
 
                     b.Property<string>("Note")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
 
                     b.Property<decimal?>("Quantity")
                         .HasPrecision(10, 3)
-                        .HasColumnType("numeric(10,3)");
+                        .HasColumnType("numeric(10,3)")
+                        .HasColumnName("quantity");
 
                     b.Property<string>("Unit")
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("unit");
 
-                    b.HasKey("RecipeId", "IngredientId");
+                    b.HasKey("RecipeId", "IngredientId")
+                        .HasName("pk_recipe_ingredients");
 
-                    b.HasIndex("IngredientId");
+                    b.HasIndex("IngredientId")
+                        .HasDatabaseName("ix_recipe_ingredients_ingredient_id");
 
-                    b.ToTable("RecipeIngredients");
+                    b.ToTable("recipe_ingredients", (string)null);
                 });
 
             modelBuilder.Entity("RecipeApp.Api.Models.RecipeStep", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("RecipeId")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("recipe_id");
 
                     b.Property<int>("StepNumber")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("step_number");
 
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_recipe_steps");
 
                     b.HasIndex("RecipeId", "StepNumber")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_recipe_steps_recipe_id_step_number");
 
-                    b.ToTable("RecipeSteps");
+                    b.ToTable("recipe_steps", (string)null);
                 });
 
             modelBuilder.Entity("RecipeApp.Api.Models.RecipeIngredient", b =>
@@ -144,13 +170,15 @@ namespace RecipeApp.Api.Migrations
                         .WithMany("RecipeIngredients")
                         .HasForeignKey("IngredientId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_recipe_ingredients_ingredients_ingredient_id");
 
                     b.HasOne("RecipeApp.Api.Models.Recipe", "Recipe")
                         .WithMany("Ingredients")
                         .HasForeignKey("RecipeId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_recipe_ingredients_recipes_recipe_id");
 
                     b.Navigation("Ingredient");
 
@@ -163,7 +191,8 @@ namespace RecipeApp.Api.Migrations
                         .WithMany("Steps")
                         .HasForeignKey("RecipeId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_recipe_steps_recipes_recipe_id");
 
                     b.Navigation("Recipe");
                 });
