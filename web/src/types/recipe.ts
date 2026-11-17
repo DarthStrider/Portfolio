@@ -14,7 +14,7 @@ export interface RecipeIngredientLine {
 }
 
 export interface RecipeStepLineRequest {
-    test: string;
+    text: string;
 }
 
 //Matches RecipeLineDto
