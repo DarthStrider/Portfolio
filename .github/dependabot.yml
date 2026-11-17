@@ -8,3 +8,11 @@ updates:
     directory: "/api/RecipeApp.Api"
     schedule:
       interval: "daily"
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "daily"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
