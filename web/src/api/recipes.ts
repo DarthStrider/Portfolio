@@ -18,3 +18,7 @@ export function createRecipe(request: RecipeRequest): Promise<Recipe> {
 export function updateRecipe(id: number, request: RecipeRequest): Promise<void> {
     return apiSend('PUT', `/api/recipes/${id}`, request);
 }
+
+export function deleteRecipe(id: number): Promise<void> {
+    return apiSend('DELETE', `/api/recipes/${id}`);
+}

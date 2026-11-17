@@ -1,10 +1,12 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router'
-import { getRecipe } from '../api/recipes'
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useParams, useNavigate } from 'react-router'
+import { deleteRecipe, getRecipe } from '../api/recipes'
 import { ApiError } from '../api/client'
 import { formatDuration } from '../utils/formatDuration'
 import { formatIngredient } from '../utils/formatIngredient'
 import { NotFound } from '../components/NotFound';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export function RecipeDetailPage() {
     //1. Read :id from URL
@@ -18,6 +20,19 @@ export function RecipeDetailPage() {
             queryFn: () => getRecipe(recipeId),
             enabled: Number.isInteger(recipeId), //don't call the API for /recipes/abs
         });
+
+    const navigate = useNavigate();
+    const queryClient = useQueryClient();
+    const [confirmOpen, setConfirmOpen] = useState(false);
+
+    const deleteMutation = useMutation({
+        mutationFn: () => deleteRecipe(recipeId),
+        onSuccess: () => {
+            queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
+            queryClient.invalidateQueries({ queryKey: ['recipes'] });
+            navigate('/');
+        }
+    });
 
     //3. Bad id the URL, ex. recipes/abc
     if (!Number.isInteger(recipeId)) {
@@ -44,8 +59,21 @@ export function RecipeDetailPage() {
             <div className="page-header">
                 <Link to="/" className="back-link">← Back to recipes</Link>
                 <Link to={`/recipes/${recipe.id}/edit`} className="button secondary">Edit</Link>
+                <button type="button" className="danger" onClick={() => setConfirmOpen(true)}>Delete</button>
             </div>
 
+            <ConfirmDialog
+                open={confirmOpen}
+                title={`Delete ${recipe.title}?`}
+                message="This recipe will be permanently deleted. This can't be undone."
+                confirmLabel="Delete"
+                isWorking={deleteMutation.isPending}
+                onConfirm={() => deleteMutation.mutate()}
+                onCancel={() => setConfirmOpen(false)}
+            />
+
+            {deleteMutation.isError && (
+                <p className="status error">Couldn't delete the recipe: {deleteMutation.error?.message}</p>)}
 
             <h1>{recipe.title}</h1>
             {recipe.description && <p className="description">{recipe.description}</p>}

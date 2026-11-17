@@ -262,20 +262,25 @@ button {
     }
 }
 
-.page-header{
+.page-header {
     display: flex;
-    justify-content:space-between;
+    justify-content: space-between;
     align-items: center;
     gap: 1rem;
 }
-.button{
+
+.button {
     display: inline-block;
     text-decoration: none;
     padding: 0.5rem 1rem;
     border-radius: 6px;
 }
-a.primary{color: white;}
-.form-errors{
+
+a.primary {
+    color: white;
+}
+
+.form-errors {
     background: #fdecee;
     border: 1px solid #f5c2c7;
     color: #842029;
@@ -283,8 +288,39 @@ a.primary{color: white;}
     padding: 0.75rem 1rem;
     margin-bottom: 1rem;
 }
-.form-actions{
-    display:flex;
+
+.form-actions {
+    display: flex;
     gap: 0.75rem;
     align-items: center;
+}
+
+.danger {
+    background: #b00020;
+    color: white;
+    border: none;
+}
+
+.confirm-dialog {
+    border: none;
+    border-radius: 12px;
+    padding: 1.5rem;
+    max-width: 420px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+    .confirm-dialog::backdrop {
+        background: rgba(0,0,0,0.4);
+    }
+
+    .confirm-dialog h2 {
+        margin-top: 0;
+        text-align: center;
+    }
+
+.dialog-actions {
+    display: flex;
+    justify-content: space-between;
+    //buttons on far left and right margin-top: 1.5rem;
 }
