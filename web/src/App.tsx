@@ -1,5 +1,6 @@
 import { Link, Route, Routes } from 'react-router';
 import { RecipeListPage } from './pages/RecipeListPage';
+import { RecipeDetailPage } from './pages/RecipeDetailPage';
 
 export default function App() {
     return (
@@ -11,7 +12,7 @@ export default function App() {
             <main className="container">
                 <Routes>
                     <Route path="/" element={<RecipeListPage />} />
-                    <Route path="/recipes/:id" element={<p>Recipe details coming in #10</p>} />
+                    <Route path="/recipes/:id" element={<RecipeDetailPage />} />
                 </Routes>
             </main>
         </>

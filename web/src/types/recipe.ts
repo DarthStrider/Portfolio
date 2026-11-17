@@ -24,9 +24,10 @@ export interface Recipe {
     id: number;
     title: string;
     description: string | null;
-    serving: number;
+    servings: number;
     prepTime: number | null;
     cookTime: number | null;
+    sourceUrl: string | null;
     createdAt: string;
     ingredients: RecipeIngredientLine[];
     steps: RecipeStep[];
