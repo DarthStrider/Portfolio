@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { getRecipe } from '../api/recipes'
 import { ApiError } from '../api/client'
 import { formatQuantity } from '../utils/formatQuantity'
+import { formatDuration } from '../utils/formatDuration'
 export function RecipeDetailPage() {
     //1. Read :id from URL
     const { id } = useParams();
@@ -45,9 +46,9 @@ export function RecipeDetailPage() {
 
             <ul className="recipe-meta">
                 <li> Serves: {recipe.servings}</li>
-                {recipe.prepTime != null && <li>Prep Time: {recipe.prepTime}</li>}
-                {recipe.cookTime != null && <li>Cook Time: {recipe.cookTime}</li>}
-                {(recipe.prepTime ?? 0) > 0 && (recipe.cookTime ?? 0) > 0 && <li>Total Time: {totalTime}</li>}
+                {recipe.prepTime != null && <li>Prep Time: {formatDuration(recipe.prepTime)}</li>}
+                {recipe.cookTime != null && <li>Cook Time: {formatDuration(recipe.cookTime)}</li>}
+                {(recipe.prepTime ?? 0) > 0 && (recipe.cookTime ?? 0) > 0 && <li>Total Time: {formatDuration(totalTime)}</li>}
             </ul>
 
             <div className="recipe-body">
