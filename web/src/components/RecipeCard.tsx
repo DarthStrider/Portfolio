@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import type { RecipeSummary } from '../types/recipe'
+import { formatDuration } from '../utils/formatDuration'
 
 interface RecipeCardProps{ recipe: RecipeSummary; }
 
@@ -9,7 +10,7 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
             <h2>{recipe.title}</h2>
             <p>
                 Serves {recipe.servings}
-                {recipe.totalTime ? ` .${recipe.totalTime} min` : ''}
+                {recipe.totalTime ? `. ${formatDuration(recipe.totalTime)}` : ''}
             </p>
         </Link>
     );

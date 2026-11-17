@@ -2,7 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { getRecipe } from '../api/recipes'
 import { ApiError } from '../api/client'
-import { formatQuantity } from '../utils/formatQuantity'
+import { formatDuration } from '../utils/formatDuration'
+import { formatIngredient } from '../utils/formatIngredient'
+import { NotFound } from '../components/NotFound';
+
 export function RecipeDetailPage() {
     //1. Read :id from URL
     const { id } = useParams();
@@ -38,16 +41,20 @@ export function RecipeDetailPage() {
 
     return (
         <article className="recipe-detail">
-            <Link to="/" className="back-link"> ← Back to recipes</Link>
+            <div className="page-header">
+                <Link to="/" className="back-link">← Back to recipes</Link>
+                <Link to={`/recipes/${recipe.id}/edit`} className="button secondary">Edit</Link>
+            </div>
+
 
             <h1>{recipe.title}</h1>
             {recipe.description && <p className="description">{recipe.description}</p>}
 
             <ul className="recipe-meta">
                 <li> Serves: {recipe.servings}</li>
-                {recipe.prepTime != null && <li>Prep Time: {recipe.prepTime}</li>}
-                {recipe.cookTime != null && <li>Cook Time: {recipe.cookTime}</li>}
-                {(recipe.prepTime ?? 0) > 0 && (recipe.cookTime ?? 0) > 0 && <li>Total Time: {totalTime}</li>}
+                {recipe.prepTime != null && <li>Prep Time: {formatDuration(recipe.prepTime)}</li>}
+                {recipe.cookTime != null && <li>Cook Time: {formatDuration(recipe.cookTime)}</li>}
+                {(recipe.prepTime ?? 0) > 0 && (recipe.cookTime ?? 0) > 0 && <li>Total Time: {formatDuration(totalTime)}</li>}
             </ul>
 
             <div className="recipe-body">
@@ -55,10 +62,8 @@ export function RecipeDetailPage() {
                     <h2>Ingredients</h2>
                     <ul className="ingredients">
                         {recipe.ingredients.map((line) => (
-                            <li key={ line.name}>
-                                { line.quantity != null && <strong>{formatQuantity(line.quantity)} </strong> }
-                                { line.unit && <>{line.unit} </> }
-                                { line.name }
+                            <li key={line.name}>
+                                {formatIngredient(line)}
                                 {line.note && <span className="note">, {line.note}</span>}
                             </li>
                         ))}
@@ -83,15 +88,4 @@ export function RecipeDetailPage() {
 
         </article>
     );
-}
-
-//small component reused for both "bad id" and 404 from API
-function NotFound()
-{
-    return (
-        <div className="status">
-            <p>Recipe not found.</p>
-            <Link to="/">← Back to recipes</Link>
-        </div>
-    )
 }
