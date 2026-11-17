@@ -21,7 +21,20 @@ builder.Services.AddDbContext<AppDbContext>(
 
 builder.Services.AddScoped<IRecipeService, RecipeService>();
 
+// Allow the React dev server to call the API
+const string FrontendCors = "Frontend";
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(FrontendCors, policy =>
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+});
+
 WebApplication app = builder.Build();
+
+app.UseCors(FrontendCors);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -32,7 +45,7 @@ if (app.Environment.IsDevelopment())
     //Apply migrations and seed sample data (development only)
     using IServiceScope scope = app.Services.CreateScope();
     AppDbContext db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    IRecipeService recipeService =scope.ServiceProvider.GetRequiredService<IRecipeService>();
+    IRecipeService recipeService = scope.ServiceProvider.GetRequiredService<IRecipeService>();
 
     await db.Database.MigrateAsync();
     await SeedData.SeedAsync(db, recipeService);
