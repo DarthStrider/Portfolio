@@ -52,7 +52,7 @@ body { margin: 0;}
 .status.error{color:#b00020;}
 
 /* ------------------------ Recipe detail -------------------------*/
-.recipe-detail h1 {margin 0.5rem 0;}
+.recipe-detail h1 {margin: 0.5rem 0;}
 
 .back-link{
     color: #2f6f4e;
