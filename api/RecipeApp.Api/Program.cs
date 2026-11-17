@@ -15,7 +15,9 @@ builder.Services.AddOpenApi();
 string connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("Connection string 'Default' not found");
 
-builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+builder.Services.AddDbContext<AppDbContext>(
+    options => options.UseNpgsql(connectionString)
+    .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<IRecipeService, RecipeService>();
 
