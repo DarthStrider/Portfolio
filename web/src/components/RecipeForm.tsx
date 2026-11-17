@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { useFieldArray, useForm } from 'react-hook-form';
 import type { Recipe, RecipeRequest } from '../types/recipe';
 import { UNIT_GROUPS } from '../utils/units';
@@ -20,10 +21,11 @@ interface RecipeFormProps {
     initialRecipe?: Recipe;                        //given when editing
     submitLabel: string;                           //"Create recipe" / "Save changes"
     isSaving: boolean;                             //disables the button while saving
+    cancelTo: string;
     onSubmit: (request: RecipeRequest) => void;    //the page decides what to do with it
 }
 
-export function RecipeForm({ initialRecipe, submitLabel, isSaving, onSubmit }: RecipeFormProps) {
+export function RecipeForm({ initialRecipe, submitLabel, isSaving, cancelTo, onSubmit }: RecipeFormProps) {
     const {
         register,
         control,
@@ -90,8 +92,16 @@ export function RecipeForm({ initialRecipe, submitLabel, isSaving, onSubmit }: R
                             {...register(`ingredients.${index}.name`, { required: true })} />
                         <input placeholder="Note (optional)" aria-label="Note"
                             {...register(`ingredients.${index}.note`)} />
-                        <button type="button" className="icon-button" aria-label="Remove ingredient"
-                            onClick={() => ingredients.remove(index)} disabled={ingredients.fields.length === 1}>X</button>
+                        <div className="row-buttons">
+                            <button type="button" className="icon-button" aria-label="Move ingredient up"
+                                onClick={() => ingredients.move(index, index - 1)} disabled={index === 0}>↑</button>
+                            <button type="button" className="icon-button" aria-label="Move ingredient down"
+                                onClick={() => ingredients.move(index, index + 1)}
+                                disabled={index === ingredients.fields.length - 1}>↓</button>
+                            <button type="button" className="icon-button" aria-label="Remove ingredient"
+                                onClick={() => ingredients.remove(index)}
+                                disabled={ingredients.fields.length === 1}>✕</button>
+                        </div>
                     </div>
                 ))}
                 <button type="button" className="secondary"
@@ -113,15 +123,20 @@ export function RecipeForm({ initialRecipe, submitLabel, isSaving, onSubmit }: R
                             <button type="button" className="icon-button" aria-label="Move down"
                                 onClick={() => steps.move(index, index + 1)} disabled={index === steps.fields.length - 1}>↓</button>
                             <button type="button" className="icon-button" aria-label="Remove step"
-                                onClick={() => steps.remove(index)} disabled={ steps.fields.length===1}>X</button>
+                                onClick={() => steps.remove(index)} disabled={steps.fields.length === 1}>X</button>
                         </div>
-                </div>
+                    </div>
                 ))}
+                <button type="button" className="secondary" onClick={() => steps.append({ text: '' })}>
+                    + Add step
+                </button>
             </fieldset>
-
-            <button type="submit" className="primary" disabled={isSaving}>
-                {isSaving ? 'Saving...' : submitLabel}
-            </button>
+            <div className="form-actions">
+                <button type="submit" className="primary" disabled={isSaving}>
+                    {isSaving ? 'Saving...' : submitLabel}
+                </button>
+                <Link to={cancelTo} className="button secondary">Cancel</Link>
+            </div>
         </form>
     );
 }
@@ -135,7 +150,7 @@ function toFormValues(recipe?: Recipe): RecipeFormValues {
         return {
             title: '', description: '', servings: '4', prepTime: '', cookTime: '', sourceUrl: '',
             ingredients: [{ name: '', quantity: '', unit: '', note: '' }],
-            steps: [{ text: ''}]
+            steps: [{ text: '' }]
         };
     }
     return {
@@ -157,8 +172,14 @@ function toFormValues(recipe?: Recipe): RecipeFormValues {
 
 //Form values -> the request the API expects (empty text becomes null, text becomes numbers)
 function toRequest(values: RecipeFormValues): RecipeRequest {
-    const toNumber = (text: string) => (text.trim() === '' ? null: Number(text));
+    const toNumber = (text: string) => (text.trim() === '' ? null : Number(text));
     const toText = (text: string) => (text.trim() === '' ? null : text.trim());
+
+    // NEW: empty, 0 or negative quantity → null ("a pinch of salt", "salt to taste")
+    const toQuantity = (text: string) => {
+        const value = Number(text);
+        return text.trim() === '' || value <= 0 ? null : value;
+    };
 
     return {
         title: values.title.trim(),
@@ -169,7 +190,7 @@ function toRequest(values: RecipeFormValues): RecipeRequest {
         sourceUrl: toText(values.sourceUrl),
         ingredients: values.ingredients.map((i) => ({
             name: i.name.trim(),
-            quantity: toNumber(i.quantity),
+            quantity: toQuantity(i.quantity),
             unit: toText(i.unit),
             note: toText(i.note)
         })),

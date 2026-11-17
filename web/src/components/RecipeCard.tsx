@@ -10,7 +10,7 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
             <h2>{recipe.title}</h2>
             <p>
                 Serves {recipe.servings}
-                {recipe.totalTime ? ` .${formatDuration(recipe.totalTime)} : ''}
+                {recipe.totalTime ? `. ${formatDuration(recipe.totalTime)}` : ''}
             </p>
         </Link>
     );

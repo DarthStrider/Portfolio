@@ -12,9 +12,9 @@ export function getRecipe(id: number): Promise<Recipe> {
 // .... getRecipes and getRecipe stay as they are ...
 
 export function createRecipe(request: RecipeRequest): Promise<Recipe> {
-    return apiSend<Recipe>('POST', 'api/recipes', request);
+    return apiSend<Recipe>('POST', '/api/recipes', request);
 }
 
 export function updateRecipe(id: number, request: RecipeRequest): Promise<void> {
-    return apiSend('PUT', `api/recipes/${id}`, request);
+    return apiSend('PUT', `/api/recipes/${id}`, request);
 }

@@ -261,3 +261,30 @@ button {
         grid-template-columns: 1fr 1fr;
     }
 }
+
+.page-header{
+    display: flex;
+    justify-content:space-between;
+    align-items: center;
+    gap: 1rem;
+}
+.button{
+    display: inline-block;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+}
+a.primary{color: white;}
+.form-errors{
+    background: #fdecee;
+    border: 1px solid #f5c2c7;
+    color: #842029;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+.form-actions{
+    display:flex;
+    gap: 0.75rem;
+    align-items: center;
+}

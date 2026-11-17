@@ -4,5 +4,5 @@
 export const UNIT_GROUPS: { label: string, units: string[] }[] = [
     { label: 'US', units: ['tsp', 'tbsp', 'cup', 'fl oz', 'oz', 'lb'] },
     { label: 'Metric', units: ['ml', 'l', 'g', 'kg'] },
-    { label: 'Other', units: ['clove', 'can', 'pinch', 'piece', 'slice', 'bunce'] },
+    { label: 'Other', units: ['clove', 'can', 'pinch', 'piece', 'slice', 'bunch'] },
 ];
