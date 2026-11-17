@@ -58,8 +58,10 @@ export function RecipeDetailPage() {
         <article className="recipe-detail">
             <div className="page-header">
                 <Link to="/" className="back-link">← Back to recipes</Link>
-                <Link to={`/recipes/${recipe.id}/edit`} className="button secondary">Edit</Link>
-                <button type="button" className="danger" onClick={() => setConfirmOpen(true)}>Delete</button>
+                <div className="form-actions">
+                    <Link to={`/recipes/${recipe.id}/edit`} className="button secondary">Edit</Link>
+                    <button type="button" className="danger" onClick={() => setConfirmOpen(true)}>Delete</button>
+                </div>
             </div>
 
             <ConfirmDialog
