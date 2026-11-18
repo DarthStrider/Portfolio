@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using RecipeApp.Api.Data;
 using RecipeApp.Api.Dtos;
@@ -121,7 +120,8 @@ public class RecipeService(AppDbContext db) : IRecipeService
         SourceUrl: r.SourceUrl,
         CreatedAt: r.CreatedAt,
         Ingredients: r.Ingredients
-            .Select(ri => new RecipeIngredientLineDto(ri.Ingredient.Name, ri.Quantity, ri.Unit, ri.Note))
+            .OrderBy(ri => ri.Position)
+            .Select(ri => new RecipeIngredientLineDto(ri.Ingredient.Name, ri.Quantity, ri.Unit, ri.Note, ri.Section))
             .ToList(),
         Steps: r.Steps
             .OrderBy(s => s.StepNumber)
@@ -147,8 +147,9 @@ public class RecipeService(AppDbContext db) : IRecipeService
             .Where(i => names.Contains(i.Name))
             .ToDictionaryAsync(i => i.Name);
 
-        foreach (RecipeIngredientLineRequest line in ingredientLines)
+        for (int i = 0; i < ingredientLines.Count(); i++)
         {
+            RecipeIngredientLineRequest line = ingredientLines[i];
             string name = IngredientNames.Normalize(line.Name);
 
             // Reuse it if we have it; otherwise create it once and remember it
@@ -161,6 +162,8 @@ public class RecipeService(AppDbContext db) : IRecipeService
             recipe.Ingredients.Add(new RecipeIngredient
             {
                 Ingredient = ingredient,
+                Section = CleanSection(line.Section),
+                Position = i,
                 Quantity = line.Quantity,
                 Unit = line.Unit?.Trim(),
                 Note = line.Note?.Trim()
@@ -177,4 +180,9 @@ public class RecipeService(AppDbContext db) : IRecipeService
             });
         }
     }
+
+    // Trim a section name; treat empty/whitespace as "no section"
+    private static string? CleanSection(string? section) =>
+        string.IsNullOrWhiteSpace(section) ? null : section.Trim();
+
 }

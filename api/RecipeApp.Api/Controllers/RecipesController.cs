@@ -60,13 +60,14 @@ public class RecipesController(IRecipeService recipes): ControllerBase
 
     private bool HasDuplicateIngredients(List<RecipeIngredientLineRequest> ingredients)
     {
-        List<string> duplicates = IngredientNames.FindDuplicates(ingredients.Select(i => i.Name));
+        List<(string? Section, string Name)> duplicates = IngredientNames.FindDuplicatesBySection(ingredients.Select(i => (i.Section, i.Name)));
 
-        foreach (string name in duplicates)
+        foreach ((string? section, string? name) in duplicates)
         {
-            ModelState.AddModelError("Ingredients", $"'{name}' is listed More than once; combine them into one line.");
+            string where = section is null ? "" : $" in `{section}`";
+            ModelState.AddModelError("Ingredients", $"'{name}' is listed more than once{where}; combine them into one line");
         }
-
+        
         return duplicates.Count > 0;
     }
 }

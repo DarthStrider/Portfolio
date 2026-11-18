@@ -8,10 +8,10 @@ public static class IngredientNames
     /// Cleans an ingredient name so the same ingredient is always stored
     /// and searched the same way: "  Olive   OIL " -> "olive oil".
     /// </summary>
-    public static string Normalize(string  name)
+    public static string Normalize(string name)
     {
         //1. Guard: null or only spaces -? empty string (validation will be rejected later)
-        if(string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(name))
         {
             return string.Empty;
         }
@@ -37,4 +37,21 @@ public static class IngredientNames
             .Where(g => g.Count() > 1)       // keep groups with more than one
             .Select(g => g.Key)              // the name itself
             .ToList();
+
+
+    ///<summary>
+    ///Returns ingredients listed more than once within the SAME section.
+    ///Sugar in batter and sugar in iciing is fine, but twice in Batter is not.
+    /// </summary>
+
+    public static List<(string? Section, string Name)> FindDuplicatesBySection(
+        IEnumerable<(string? Section, string Name)> lines) =>
+        lines
+            .Select(l => (
+                Section: string.IsNullOrWhiteSpace(l.Section) ? null : l.Section.Trim(),
+                Name: Normalize(l.Name)))
+        .GroupBy(l => (Section: l.Section?.ToLowerInvariant(), l.Name))
+        .Where(g => g.Count() > 1)
+        .Select(g => g.First())
+        .ToList();
 }
