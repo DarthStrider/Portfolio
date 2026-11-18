@@ -37,13 +37,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         // ------------------- RecipeIngredient (link table) ----------------------
         modelBuilder.Entity<RecipeIngredient>(ri =>
         {
-            //No Id Column: the key is the pair (recipeId, IngredientId).
-            ri.HasKey(x => new { x.RecipeId, x.IngredientId });
-
             //Up to 7 digits before the decimal point, 3 after (ex. 0.333).
             ri.Property(x => x.Quantity).HasPrecision(10, 3);
             ri.Property(x => x.Unit).HasMaxLength(50);
             ri.Property(x => x.Note).HasMaxLength(200);
+            ri.Property(x => x.Section).HasMaxLength(100);
+            ri.HasIndex(x => new { x.RecipeId, x.Section, x.IngredientId })
+            .IsUnique()
+            .AreNullsDistinct(false);
 
             //Recipe -> its ingredient lines.
             // Deleting a recipe deletes its lines (cascade)
