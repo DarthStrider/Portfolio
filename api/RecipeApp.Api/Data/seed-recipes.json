@@ -6,13 +6,46 @@
     "prepTime": 5,
     "cookTime": 15,
     "sourceUrl": null,
+    "cuisineId": 1,
+    "mealIds": [ 3, 4 ],
+    "courseIds": [ 2 ],
     "ingredients": [
-      { "name": "spaghetti", "quantity": 200, "unit": "g", "note": null },
-      { "name": "olive oil", "quantity": 0.33, "unit": "cup", "note": null },
-      { "name": "garlic", "quantity": 6, "unit": "clove", "note": "thinly sliced" },
-      { "name": "red pepper flakes", "quantity": 0.5, "unit": "tsp", "note": null },
-      { "name": "parsley", "quantity": 2, "unit": "tbsp", "note": "chopped" },
-      { "name": "salt", "quantity": null, "unit": null, "note": "to taste" }
+      {
+        "name": "spaghetti",
+        "quantity": 200,
+        "unit": "g",
+        "note": null
+      },
+      {
+        "name": "olive oil",
+        "quantity": 0.33,
+        "unit": "cup",
+        "note": null
+      },
+      {
+        "name": "garlic",
+        "quantity": 6,
+        "unit": "clove",
+        "note": "thinly sliced"
+      },
+      {
+        "name": "red pepper flakes",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "note": null
+      },
+      {
+        "name": "parsley",
+        "quantity": 2,
+        "unit": "tbsp",
+        "note": "chopped"
+      },
+      {
+        "name": "salt",
+        "quantity": null,
+        "unit": null,
+        "note": "to taste"
+      }
     ],
     "steps": [
       { "text": "Cook the spaghetti in salted boiling water until al dente; reserve 1/2 cup pasta water." },
@@ -28,17 +61,70 @@
     "prepTime": 10,
     "cookTime": 15,
     "sourceUrl": null,
+    "cuisineId": 2,
+    "mealIds": [ 1, 2 ],
+    "courseIds": [ 2 ],
     "ingredients": [
-      { "name": "corn tortillas", "quantity": 4, "unit": null, "note": null },
-      { "name": "eggs", "quantity": 4, "unit": null, "note": null },
-      { "name": "tomato", "quantity": 2, "unit": null, "note": "diced" },
-      { "name": "onion", "quantity": 0.5, "unit": null, "note": "finely chopped" },
-      { "name": "garlic", "quantity": 1, "unit": "clove", "note": "minced" },
-      { "name": "jalapeño", "quantity": 1, "unit": null, "note": "seeded and minced" },
-      { "name": "black beans", "quantity": 1, "unit": "cup", "note": "drained" },
-      { "name": "olive oil", "quantity": 1, "unit": "tbsp", "note": null },
-      { "name": "cilantro", "quantity": 2, "unit": "tbsp", "note": "chopped" },
-      { "name": "salt", "quantity": null, "unit": null, "note": "to taste" }
+      {
+        "name": "corn tortillas",
+        "quantity": 4,
+        "unit": null,
+        "note": null
+      },
+      {
+        "name": "eggs",
+        "quantity": 4,
+        "unit": null,
+        "note": null
+      },
+      {
+        "name": "tomato",
+        "quantity": 2,
+        "unit": null,
+        "note": "diced"
+      },
+      {
+        "name": "onion",
+        "quantity": 0.5,
+        "unit": null,
+        "note": "finely chopped"
+      },
+      {
+        "name": "garlic",
+        "quantity": 1,
+        "unit": "clove",
+        "note": "minced"
+      },
+      {
+        "name": "jalapeño",
+        "quantity": 1,
+        "unit": null,
+        "note": "seeded and minced"
+      },
+      {
+        "name": "black beans",
+        "quantity": 1,
+        "unit": "cup",
+        "note": "drained"
+      },
+      {
+        "name": "olive oil",
+        "quantity": 1,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "cilantro",
+        "quantity": 2,
+        "unit": "tbsp",
+        "note": "chopped"
+      },
+      {
+        "name": "salt",
+        "quantity": null,
+        "unit": null,
+        "note": "to taste"
+      }
     ],
     "steps": [
       { "text": "Soften the onion, garlic and jalapeño in half the oil, then add the tomato and simmer 5 minutes to make a salsa." },
@@ -55,18 +141,76 @@
     "prepTime": 10,
     "cookTime": 30,
     "sourceUrl": null,
+    "cuisineId": 3,
+    "mealIds": [ 3, 4 ],
+    "courseIds": [ 2 ],
     "ingredients": [
-      { "name": "chickpeas", "quantity": 2, "unit": "can", "note": "drained and rinsed" },
-      { "name": "onion", "quantity": 1, "unit": null, "note": "finely chopped" },
-      { "name": "garlic", "quantity": 3, "unit": "clove", "note": "minced" },
-      { "name": "ginger", "quantity": 1, "unit": "tbsp", "note": "grated" },
-      { "name": "tomato", "quantity": 400, "unit": "g", "note": "canned, crushed" },
-      { "name": "garam masala", "quantity": 2, "unit": "tsp", "note": null },
-      { "name": "ground cumin", "quantity": 1, "unit": "tsp", "note": null },
-      { "name": "ground turmeric", "quantity": 0.5, "unit": "tsp", "note": null },
-      { "name": "olive oil", "quantity": 2, "unit": "tbsp", "note": null },
-      { "name": "cilantro", "quantity": 2, "unit": "tbsp", "note": "chopped" },
-      { "name": "salt", "quantity": null, "unit": null, "note": "to taste" }
+      {
+        "name": "chickpeas",
+        "quantity": 2,
+        "unit": "can",
+        "note": "drained and rinsed"
+      },
+      {
+        "name": "onion",
+        "quantity": 1,
+        "unit": null,
+        "note": "finely chopped"
+      },
+      {
+        "name": "garlic",
+        "quantity": 3,
+        "unit": "clove",
+        "note": "minced"
+      },
+      {
+        "name": "ginger",
+        "quantity": 1,
+        "unit": "tbsp",
+        "note": "grated"
+      },
+      {
+        "name": "tomato",
+        "quantity": 400,
+        "unit": "g",
+        "note": "canned, crushed"
+      },
+      {
+        "name": "garam masala",
+        "quantity": 2,
+        "unit": "tsp",
+        "note": null
+      },
+      {
+        "name": "ground cumin",
+        "quantity": 1,
+        "unit": "tsp",
+        "note": null
+      },
+      {
+        "name": "ground turmeric",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "note": null
+      },
+      {
+        "name": "olive oil",
+        "quantity": 2,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "cilantro",
+        "quantity": 2,
+        "unit": "tbsp",
+        "note": "chopped"
+      },
+      {
+        "name": "salt",
+        "quantity": null,
+        "unit": null,
+        "note": "to taste"
+      }
     ],
     "steps": [
       { "text": "Cook the onion in oil over medium heat until golden, about 8 minutes." },
@@ -83,12 +227,40 @@
     "prepTime": 5,
     "cookTime": 10,
     "sourceUrl": null,
+    "cuisineId": 4,
+    "mealIds": [ 3, 4 ],
+    "courseIds": [ 1,4 ],
     "ingredients": [
-      { "name": "dashi stock", "quantity": 4, "unit": "cup", "note": null },
-      { "name": "white miso paste", "quantity": 3, "unit": "tbsp", "note": null },
-      { "name": "silken tofu", "quantity": 200, "unit": "g", "note": "cubed" },
-      { "name": "dried wakame", "quantity": 1, "unit": "tbsp", "note": null },
-      { "name": "green onion", "quantity": 2, "unit": null, "note": "thinly sliced" }
+      {
+        "name": "dashi stock",
+        "quantity": 4,
+        "unit": "cup",
+        "note": null
+      },
+      {
+        "name": "white miso paste",
+        "quantity": 3,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "silken tofu",
+        "quantity": 200,
+        "unit": "g",
+        "note": "cubed"
+      },
+      {
+        "name": "dried wakame",
+        "quantity": 1,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "green onion",
+        "quantity": 2,
+        "unit": null,
+        "note": "thinly sliced"
+      }
     ],
     "steps": [
       { "text": "Soak the wakame in warm water for 5 minutes, then drain." },
@@ -105,15 +277,58 @@
     "prepTime": 10,
     "cookTime": 15,
     "sourceUrl": null,
+    "cuisineId": 8,
+    "mealIds": [ 1,2 ],
+    "courseIds": [ 2 ],
     "ingredients": [
-      { "name": "flour", "quantity": 1.5, "unit": "cup", "note": null },
-      { "name": "baking powder", "quantity": 1, "unit": "tbsp", "note": null },
-      { "name": "sugar", "quantity": 1, "unit": "tbsp", "note": null },
-      { "name": "salt", "quantity": 0.25, "unit": "tsp", "note": null },
-      { "name": "milk", "quantity": 1.25, "unit": "cup", "note": null },
-      { "name": "eggs", "quantity": 1, "unit": null, "note": null },
-      { "name": "butter", "quantity": 3, "unit": "tbsp", "note": "melted, plus more for the pan" },
-      { "name": "maple syrup", "quantity": null, "unit": null, "note": "for serving" }
+      {
+        "name": "flour",
+        "quantity": 1.5,
+        "unit": "cup",
+        "note": null
+      },
+      {
+        "name": "baking powder",
+        "quantity": 1,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "sugar",
+        "quantity": 1,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "salt",
+        "quantity": 0.25,
+        "unit": "tsp",
+        "note": null
+      },
+      {
+        "name": "milk",
+        "quantity": 1.25,
+        "unit": "cup",
+        "note": null
+      },
+      {
+        "name": "eggs",
+        "quantity": 1,
+        "unit": null,
+        "note": null
+      },
+      {
+        "name": "butter",
+        "quantity": 3,
+        "unit": "tbsp",
+        "note": "melted, plus more for the pan"
+      },
+      {
+        "name": "maple syrup",
+        "quantity": null,
+        "unit": null,
+        "note": "for serving"
+      }
     ],
     "steps": [
       { "text": "Whisk the flour, baking powder, sugar and salt in a large bowl." },
@@ -130,17 +345,70 @@
     "prepTime": 15,
     "cookTime": 0,
     "sourceUrl": null,
+    "cuisineId": 6,
+    "mealIds": [ 3, 4 ],
+    "courseIds": [ 3,5 ],
     "ingredients": [
-      { "name": "tomato", "quantity": 3, "unit": null, "note": "cut into wedges" },
-      { "name": "cucumber", "quantity": 1, "unit": null, "note": "sliced" },
-      { "name": "red onion", "quantity": 0.5, "unit": null, "note": "thinly sliced" },
-      { "name": "green bell pepper", "quantity": 1, "unit": null, "note": "sliced" },
-      { "name": "kalamata olives", "quantity": 0.5, "unit": "cup", "note": null },
-      { "name": "feta cheese", "quantity": 200, "unit": "g", "note": "in one block" },
-      { "name": "olive oil", "quantity": 3, "unit": "tbsp", "note": null },
-      { "name": "red wine vinegar", "quantity": 1, "unit": "tbsp", "note": null },
-      { "name": "dried oregano", "quantity": 1, "unit": "tsp", "note": null },
-      { "name": "salt", "quantity": null, "unit": null, "note": "to taste" }
+      {
+        "name": "tomato",
+        "quantity": 3,
+        "unit": null,
+        "note": "cut into wedges"
+      },
+      {
+        "name": "cucumber",
+        "quantity": 1,
+        "unit": null,
+        "note": "sliced"
+      },
+      {
+        "name": "red onion",
+        "quantity": 0.5,
+        "unit": null,
+        "note": "thinly sliced"
+      },
+      {
+        "name": "green bell pepper",
+        "quantity": 1,
+        "unit": null,
+        "note": "sliced"
+      },
+      {
+        "name": "kalamata olives",
+        "quantity": 0.5,
+        "unit": "cup",
+        "note": null
+      },
+      {
+        "name": "feta cheese",
+        "quantity": 200,
+        "unit": "g",
+        "note": "in one block"
+      },
+      {
+        "name": "olive oil",
+        "quantity": 3,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "red wine vinegar",
+        "quantity": 1,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "dried oregano",
+        "quantity": 1,
+        "unit": "tsp",
+        "note": null
+      },
+      {
+        "name": "salt",
+        "quantity": null,
+        "unit": null,
+        "note": "to taste"
+      }
     ],
     "steps": [
       { "text": "Combine the tomato, cucumber, red onion, pepper and olives in a large bowl." },
@@ -156,15 +424,58 @@
     "prepTime": 10,
     "cookTime": 0,
     "sourceUrl": null,
+    "cuisineId": 7,
+    "mealIds": [ 5, 4 ],
+    "courseIds": [ 1 ],
     "ingredients": [
-      { "name": "chickpeas", "quantity": 1, "unit": "can", "note": "drained, liquid reserved" },
-      { "name": "tahini", "quantity": 0.25, "unit": "cup", "note": null },
-      { "name": "lemon juice", "quantity": 3, "unit": "tbsp", "note": null },
-      { "name": "garlic", "quantity": 1, "unit": "clove", "note": null },
-      { "name": "olive oil", "quantity": 2, "unit": "tbsp", "note": "plus more for serving" },
-      { "name": "ground cumin", "quantity": 0.5, "unit": "tsp", "note": null },
-      { "name": "salt", "quantity": 0.5, "unit": "tsp", "note": null },
-      { "name": "paprika", "quantity": null, "unit": null, "note": "for garnish" }
+      {
+        "name": "chickpeas",
+        "quantity": 1,
+        "unit": "can",
+        "note": "drained, liquid reserved"
+      },
+      {
+        "name": "tahini",
+        "quantity": 0.25,
+        "unit": "cup",
+        "note": null
+      },
+      {
+        "name": "lemon juice",
+        "quantity": 3,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "garlic",
+        "quantity": 1,
+        "unit": "clove",
+        "note": null
+      },
+      {
+        "name": "olive oil",
+        "quantity": 2,
+        "unit": "tbsp",
+        "note": "plus more for serving"
+      },
+      {
+        "name": "ground cumin",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "note": null
+      },
+      {
+        "name": "salt",
+        "quantity": 0.5,
+        "unit": "tsp",
+        "note": null
+      },
+      {
+        "name": "paprika",
+        "quantity": null,
+        "unit": null,
+        "note": "for garnish"
+      }
     ],
     "steps": [
       { "text": "Blend the tahini and lemon juice for 1 minute until creamy." },
@@ -180,17 +491,70 @@
     "prepTime": 15,
     "cookTime": 10,
     "sourceUrl": null,
+    "cuisineId": 5,
+    "mealIds": [ 4 ],
+    "courseIds": [ 2 ],
     "ingredients": [
-      { "name": "chicken breast", "quantity": 500, "unit": "g", "note": "thinly sliced" },
-      { "name": "broccoli", "quantity": 2, "unit": "cup", "note": "small florets" },
-      { "name": "red bell pepper", "quantity": 1, "unit": null, "note": "sliced" },
-      { "name": "carrot", "quantity": 1, "unit": null, "note": "thinly sliced" },
-      { "name": "garlic", "quantity": 2, "unit": "clove", "note": "minced" },
-      { "name": "ginger", "quantity": 1, "unit": "tbsp", "note": "grated" },
-      { "name": "soy sauce", "quantity": 3, "unit": "tbsp", "note": null },
-      { "name": "cornstarch", "quantity": 1, "unit": "tsp", "note": "mixed with 2 tbsp water" },
-      { "name": "vegetable oil", "quantity": 2, "unit": "tbsp", "note": null },
-      { "name": "green onion", "quantity": 2, "unit": null, "note": "sliced" }
+      {
+        "name": "chicken breast",
+        "quantity": 500,
+        "unit": "g",
+        "note": "thinly sliced"
+      },
+      {
+        "name": "broccoli",
+        "quantity": 2,
+        "unit": "cup",
+        "note": "small florets"
+      },
+      {
+        "name": "red bell pepper",
+        "quantity": 1,
+        "unit": null,
+        "note": "sliced"
+      },
+      {
+        "name": "carrot",
+        "quantity": 1,
+        "unit": null,
+        "note": "thinly sliced"
+      },
+      {
+        "name": "garlic",
+        "quantity": 2,
+        "unit": "clove",
+        "note": "minced"
+      },
+      {
+        "name": "ginger",
+        "quantity": 1,
+        "unit": "tbsp",
+        "note": "grated"
+      },
+      {
+        "name": "soy sauce",
+        "quantity": 3,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "cornstarch",
+        "quantity": 1,
+        "unit": "tsp",
+        "note": "mixed with 2 tbsp water"
+      },
+      {
+        "name": "vegetable oil",
+        "quantity": 2,
+        "unit": "tbsp",
+        "note": null
+      },
+      {
+        "name": "green onion",
+        "quantity": 2,
+        "unit": null,
+        "note": "sliced"
+      }
     ],
     "steps": [
       { "text": "Stir-fry the chicken in half the oil over high heat until cooked through, then set aside." },
@@ -201,28 +565,79 @@
     ]
   },
   {
-  "title": "Vanilla Cake",
-  "description": "A simple vanilla layer cake with buttercream icing.",
-  "servings": 12,
-  "prepTime": 25,
-  "cookTime": 30,
-  "sourceUrl": null,
-  "ingredients": [
-    { "name": "flour", "quantity": 2.5, "unit": "cup", "note": null, "section": "Batter" },
-    { "name": "sugar", "quantity": 1.5, "unit": "cup", "note": null, "section": "Batter" },
-    { "name": "butter", "quantity": 0.75, "unit": "cup", "note": "softened", "section": "Batter" },
-    { "name": "eggs", "quantity": 3, "unit": null, "note": null, "section": "Batter" },
-    { "name": "milk", "quantity": 1, "unit": "cup", "note": null, "section": "Batter" },
-    { "name": "butter", "quantity": 1, "unit": "cup", "note": "softened", "section": "Icing" },
-    { "name": "icing sugar", "quantity": 3, "unit": "cup", "note": null, "section": "Icing" },
-    { "name": "vanilla extract", "quantity": 2, "unit": "tsp", "note": null, "section": "Icing" }
-  ],
-  "steps": [
-    { "text": "Preheat the oven to 350°F and grease two 8-inch cake pans." },
-    { "text": "Beat the butter and sugar until fluffy, then beat in the eggs one at a time." },
-    { "text": "Add the flour and milk in turns, mixing until just smooth." },
-    { "text": "Divide between the pans and bake for 30 minutes. Cool completely." },
-    { "text": "Beat the butter, icing sugar and vanilla until smooth, then ice the cooled cake." }
-  ]
-}
+    "title": "Vanilla Cake",
+    "description": "A simple vanilla layer cake with buttercream icing.",
+    "servings": 12,
+    "prepTime": 25,
+    "cookTime": 30,
+    "sourceUrl": null,
+    "cuisineId": 9,
+    "mealIds": [ 5 ],
+    "courseIds": [ 6 ],
+    "ingredients": [
+      {
+        "name": "flour",
+        "quantity": 2.5,
+        "unit": "cup",
+        "note": null,
+        "section": "Batter"
+      },
+      {
+        "name": "sugar",
+        "quantity": 1.5,
+        "unit": "cup",
+        "note": null,
+        "section": "Batter"
+      },
+      {
+        "name": "butter",
+        "quantity": 0.75,
+        "unit": "cup",
+        "note": "softened",
+        "section": "Batter"
+      },
+      {
+        "name": "eggs",
+        "quantity": 3,
+        "unit": null,
+        "note": null,
+        "section": "Batter"
+      },
+      {
+        "name": "milk",
+        "quantity": 1,
+        "unit": "cup",
+        "note": null,
+        "section": "Batter"
+      },
+      {
+        "name": "butter",
+        "quantity": 1,
+        "unit": "cup",
+        "note": "softened",
+        "section": "Icing"
+      },
+      {
+        "name": "icing sugar",
+        "quantity": 3,
+        "unit": "cup",
+        "note": null,
+        "section": "Icing"
+      },
+      {
+        "name": "vanilla extract",
+        "quantity": 2,
+        "unit": "tsp",
+        "note": null,
+        "section": "Icing"
+      }
+    ],
+    "steps": [
+      { "text": "Preheat the oven to 350°F and grease two 8-inch cake pans." },
+      { "text": "Beat the butter and sugar until fluffy, then beat in the eggs one at a time." },
+      { "text": "Add the flour and milk in turns, mixing until just smooth." },
+      { "text": "Divide between the pans and bake for 30 minutes. Cool completely." },
+      { "text": "Beat the butter, icing sugar and vanilla until smooth, then ice the cooled cake." }
+    ]
+  }
 ]
