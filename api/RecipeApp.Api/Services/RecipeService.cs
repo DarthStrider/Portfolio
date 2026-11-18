@@ -2,25 +2,36 @@ using Microsoft.EntityFrameworkCore;
 using RecipeApp.Api.Data;
 using RecipeApp.Api.Dtos;
 using RecipeApp.Api.Models;
+using System.Linq.Expressions;
 
 namespace RecipeApp.Api.Services;
 
 public class RecipeService(AppDbContext db) : IRecipeService
 {
-    public async Task<List<RecipeSummaryDto>> GetAllAsync()
+    public async Task<List<RecipeSummaryDto>> GetAllAsync(RecipeFilter? filter = null)
     {
-        return await db.Recipes
-            .AsNoTracking()                                   // 1. read-only query
-            .OrderByDescending(r => r.CreatedAt)              // 2. newest first
-            .Select(r => new RecipeSummaryDto(                // 3. shape into the DTO
-                r.Id,
-                r.Title,
-                r.Servings,
-                (r.PrepTime ?? 0) + (r.CookTime ?? 0),
-                r.Cuisine != null ? r.Cuisine.Name : null,
-                r.Meals.OrderBy(m => m.Id).Select(m => m.Name).ToList(),
-                r.Courses.OrderBy(c => c.Id).Select(c => c.Name).ToList()))       // 4. total time
-            .ToListAsync();                                   // 5. run it
+        IQueryable<Recipe> query = db.Recipes.AsNoTracking();
+
+        //WHERE: each filter that was sent
+        if (filter?.Cuisine is { Count: > 0 })
+        {
+            List<int> cuisines = filter.Cuisine;
+            query = query.Where(r => r.CuisineId != null && cuisines.Contains(r.CuisineId.Value));
+        }
+
+        if (filter?.Meal is { Count: > 0 })
+        {
+            List<int> meals = filter.Meal;
+            query = query.Where(r => r.Meals.Any(m => meals.Contains(m.Id)));
+        }
+
+        if (filter?.Course is { Count: > 0 })
+        {
+            List<int> courses = filter.Course;
+            query = query.Where(r => r.Courses.Any(c => courses.Contains(c.Id)));
+        }
+
+        return await ToSummariesAsync(query);
     }
 
     public async Task<RecipeDto?> GetByIdAsync(int id)
@@ -38,6 +49,7 @@ public class RecipeService(AppDbContext db) : IRecipeService
 
         return recipe is null ? null : ToDto(recipe);        // 5. not found -> null; found -> DTO
     }
+
     public async Task<RecipeDto> CreateAsync(CreateRecipeRequest request)
     {
         // 1. Build the recipe from the simple fields
@@ -119,6 +131,24 @@ public class RecipeService(AppDbContext db) : IRecipeService
     //Helpers
 
     // Converts an entity (database shape) into a DTO (API shape)
+
+
+    //Recipe -> card Summary
+    private static readonly Expression<Func<Recipe, RecipeSummaryDto>> ToSummary = r => new RecipeSummaryDto(
+        r.Id,
+        r.Title,
+        r.Servings,
+        (r.PrepTime ?? 0) + (r.CookTime ?? 0),
+        r.Cuisine != null ? r.Cuisine.Name : null,
+        r.Meals.OrderBy(m => m.Id).Select(m => m.Name).ToList(),
+        r.Courses.OrderBy(c => c.Id).Select(c => c.Name).ToList());
+
+    private static Task<List<RecipeSummaryDto>> ToSummariesAsync(IQueryable<Recipe> query) => 
+        query
+        .OrderByDescending(r => r.CreatedAt)
+        .Select(ToSummary) 
+        .ToListAsync();
+
     private static RecipeDto ToDto(Recipe r) => new(
         Id: r.Id,
         Title: r.Title,

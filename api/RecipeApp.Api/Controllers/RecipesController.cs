@@ -11,9 +11,9 @@ public class RecipesController(IRecipeService recipes, ICategoryService categori
 
     //HTTP Get for all the recipe summaries
     [HttpGet]
-    public async Task<ActionResult<List<RecipeSummaryDto>>> GetAll()
+    public async Task<ActionResult<List<RecipeSummaryDto>>> GetAll([FromQuery] RecipeFilter filter)
     {
-        return await recipes.GetAllAsync();
+        return await recipes.GetAllAsync(filter);
     }
 
     //Http Get Recipe by Id
