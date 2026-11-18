@@ -334,3 +334,29 @@ a.primary {
 .ingredient-group:first-of-type h3 {
     margin-top: 0;
 }
+.section-card{
+    display:flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border: 1px solid #e3e3e3;
+    border-radius: 8px;
+    padding: 0.75rem;
+    background: #fafaf8;
+}
+
+.section-header{
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.recipe-form .section-name{
+    font-weight: 600;
+    color: #2f6f4e;
+}
+
+.row-buttons{
+    display: flex;
+    gap: 0.25rem;
+}
