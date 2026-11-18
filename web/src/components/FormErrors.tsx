@@ -17,11 +17,11 @@ export function FormErrors({ error }: { error: Error | null }) {
 
         return (
             <div className="form-errors" role="alert">
-                <strong>Please fux tge following:</strong>
+                <strong>Please fix the following:</strong>
                 <ul>
                     {messages.length > 0
                         ? messages.map((message) => <li key={message}>{message}</li>)
-                        : <li>{problem?.title ?? 'THe recipe is not valid'}</li>}
+                        : <li>{problem?.title ?? 'The recipe is not valid'}</li>}
                 </ul>
             </div>
         );
