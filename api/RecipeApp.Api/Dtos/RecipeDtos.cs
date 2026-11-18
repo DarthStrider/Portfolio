@@ -11,7 +11,11 @@ public record CreateRecipeRequest(
     [Range(0,1440)]int? CookTime,
     [Url, MaxLength(2048)]string? SourceUrl,
     [MinLength(1)]List<RecipeIngredientLineRequest> Ingredients,
-    [MinLength(1)]List<RecipeStepLineRequest> Steps);
+    [MinLength(1)]List<RecipeStepLineRequest> Steps,
+    int? CuisineId,
+    List<int>? MealIds,
+    List<int>? CourseIds);
+    
 
 //Client sends (PUT /api/recipes/{id}); the id comes from the URL
 public record UpdateRecipeRequest(
@@ -22,7 +26,10 @@ public record UpdateRecipeRequest(
     [Range(0, 1440)] int? CookTime,
     [Url, MaxLength(2048)] string? SourceUrl,
     [MinLength(1)] List<RecipeIngredientLineRequest> Ingredients,
-    [MinLength(1)] List<RecipeStepLineRequest> Steps);
+    [MinLength(1)] List<RecipeStepLineRequest> Steps,
+    int? CuisineId,
+    List<int>? MealIds,
+    List<int>? CourseIds);
 
 
 //API Sends
@@ -36,11 +43,17 @@ public record RecipeDto(
     string? SourceUrl,
     DateTime CreatedAt,
     List<RecipeIngredientLineDto> Ingredients,
-    List<RecipeStepLineDto> Steps);
+    List<RecipeStepLineDto> Steps,
+    CategoryDto? Cuisine,
+    List<CategoryDto> Meals,
+    List<CategoryDto>Courses);
 
 //API sends back (GET list): light version for cards
 public record RecipeSummaryDto(
     int Id,
     string Title,
     int Servings,
-    int? TotalTime);
+    int? TotalTime,
+    string? Cuisine,
+    List<string> Meals,
+    List<string> Courses);

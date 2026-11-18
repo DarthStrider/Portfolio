@@ -16,17 +16,24 @@ public class RecipeService(AppDbContext db) : IRecipeService
                 r.Id,
                 r.Title,
                 r.Servings,
-                (r.PrepTime ?? 0) + (r.CookTime ?? 0)))       // 4. total time
+                (r.PrepTime ?? 0) + (r.CookTime ?? 0),
+                r.Cuisine != null ? r.Cuisine.Name : null,
+                r.Meals.OrderBy(m => m.Id).Select(m => m.Name).ToList(),
+                r.Courses.OrderBy(c => c.Id).Select(c => c.Name).ToList()))       // 4. total time
             .ToListAsync();                                   // 5. run it
     }
 
     public async Task<RecipeDto?> GetByIdAsync(int id)
     {
-        var recipe = await db.Recipes
+        Recipe? recipe = await db.Recipes
             .AsNoTracking()                                  // 1. read-only
             .Include(r => r.Ingredients)                     // 2. load the ingredient lines...
                 .ThenInclude(ri => ri.Ingredient)            //    ...and each line's Ingredient (for its Name)
             .Include(r => r.Steps)                           // 3. load the steps
+            .Include(r=> r.Cuisine)
+            .Include(r => r.Meals)
+            .Include(r => r.Courses)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(r => r.Id == id);           // 4. one recipe, or null
 
         return recipe is null ? null : ToDto(recipe);        // 5. not found -> null; found -> DTO
@@ -47,7 +54,7 @@ public class RecipeService(AppDbContext db) : IRecipeService
 
         // 2. Add ingredient lines and steps (shared with UpdateAsync)
         await ApplyLinesAsync(recipe, request.Ingredients, request.Steps);
-
+        await ApplyCategoriesAsync(recipe, request.CuisineId, request.MealIds, request.CourseIds);
         // 3. Save: one INSERT for the recipe, plus its lines, steps, and any new ingredients
         db.Recipes.Add(recipe);
         await db.SaveChangesAsync();
@@ -63,6 +70,8 @@ public class RecipeService(AppDbContext db) : IRecipeService
         Recipe? recipe = await db.Recipes
             .Include(r => r.Ingredients)
             .Include(r => r.Steps)
+            .Include(r => r.Meals)
+            .Include(r => r.Courses)
             .FirstOrDefaultAsync(r => r.Id == id);
 
         if (recipe is null)
@@ -81,7 +90,7 @@ public class RecipeService(AppDbContext db) : IRecipeService
         recipe.Ingredients.Clear();
         recipe.Steps.Clear();
         await ApplyLinesAsync(recipe, request.Ingredients, request.Steps);
-
+        await ApplyCategoriesAsync(recipe, request.CuisineId, request.MealIds, request.CourseIds);
         // No db.Recipes.Add(...): EF already knows about this recipe
         await db.SaveChangesAsync();
         return true;                                        // controller turns this into 204
@@ -126,7 +135,11 @@ public class RecipeService(AppDbContext db) : IRecipeService
         Steps: r.Steps
             .OrderBy(s => s.StepNumber)
             .Select(s => new RecipeStepLineDto(s.StepNumber, s.Text))
-            .ToList());
+            .ToList(),
+        Cuisine: r.Cuisine is null ? null : new CategoryDto(r.Cuisine.Id, r.Cuisine.Name),
+        Meals: r.Meals.OrderBy(m=>m.Id).Select(m=> new CategoryDto(m.Id, m.Name)).ToList(),
+        Courses: r.Courses.OrderBy(c=>c.Id).Select(c => new CategoryDto(c.Id, c.Name)).ToList()
+        );
 
     // Turns request lines into entities on the recipe.
     // Reuses existing Ingredient rows and numbers steps 1..n.
@@ -185,4 +198,17 @@ public class RecipeService(AppDbContext db) : IRecipeService
     private static string? CleanSection(string? section) =>
         string.IsNullOrWhiteSpace(section) ? null : section.Trim();
 
+    private async Task ApplyCategoriesAsync(Recipe recipe, int? cuisineId, List<int>? mealIds, List<int>? courseIds)
+    {
+        recipe.CuisineId = cuisineId;
+        recipe.Cuisine = cuisineId is null ? null : await db.Cuisines.FindAsync(cuisineId);
+
+        List<int> meals = (mealIds ?? []).Distinct().ToList();
+        recipe.Meals.Clear();
+        recipe.Meals.AddRange(await db.Meals.Where(m => meals.Contains(m.Id)).ToListAsync());
+
+        List<int> courses = (courseIds ?? []).Distinct().ToList();
+        recipe.Courses.Clear();
+        recipe.Courses.AddRange(await db.Courses.Where(c => courses.Contains(c.Id)).ToListAsync());
+    }
 }

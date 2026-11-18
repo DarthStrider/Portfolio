@@ -20,6 +20,7 @@ builder.Services.AddDbContext<AppDbContext>(
     .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<IRecipeService, RecipeService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
 
 // Allow the React dev server to call the API
 const string FrontendCors = "Frontend";
