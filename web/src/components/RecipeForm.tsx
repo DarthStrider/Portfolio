@@ -13,7 +13,7 @@ interface RecipeFormValues {
     prepTime: string;
     cookTime: string;
     sourceUrl: string;
-    ingredients: { name: string; quantity: string; unit: string; note: string; }[];
+    ingredients: { name: string; quantity: string; unit: string; note: string; section: string; }[];
     steps: { text: string }[];
 }
 
@@ -105,7 +105,7 @@ export function RecipeForm({ initialRecipe, submitLabel, isSaving, cancelTo, onS
                     </div>
                 ))}
                 <button type="button" className="secondary"
-                    onClick={() => ingredients.append({ name: '', quantity: '', unit: '', note: '' })}>+ Add Ingredient</button>
+                    onClick={() => ingredients.append({ name: '', quantity: '', unit: '', note: '', section: '' })}>+ Add Ingredient</button>
             </fieldset>
 
             {/* ----------------------------- Steps -------------------------------- */}
@@ -149,7 +149,7 @@ function toFormValues(recipe?: Recipe): RecipeFormValues {
     if (!recipe) {
         return {
             title: '', description: '', servings: '4', prepTime: '', cookTime: '', sourceUrl: '',
-            ingredients: [{ name: '', quantity: '', unit: '', note: '' }],
+            ingredients: [{ name: '', quantity: '', unit: '', note: '', section: '' }],
             steps: [{ text: '' }]
         };
     }
@@ -165,6 +165,7 @@ function toFormValues(recipe?: Recipe): RecipeFormValues {
             quantity: i.quantity?.toString() ?? '',
             unit: i.unit ?? '',
             note: i.note ?? '',
+            section: i.section ?? ''
         })),
         steps: recipe.steps.map((s) => ({ text: s.text }))
     };
@@ -192,7 +193,8 @@ function toRequest(values: RecipeFormValues): RecipeRequest {
             name: i.name.trim(),
             quantity: toQuantity(i.quantity),
             unit: toText(i.unit),
-            note: toText(i.note)
+            note: toText(i.note),
+            section: toText(i.section)
         })),
         steps: values.steps.map((s) => ({ text: s.text.trim() })),
     };
