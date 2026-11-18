@@ -199,5 +199,30 @@
       { "text": "Return the chicken, add the soy sauce and cornstarch mixture, and toss until glossy." },
       { "text": "Top with green onion and serve with rice." }
     ]
-  }
+  },
+  {
+  "title": "Vanilla Cake",
+  "description": "A simple vanilla layer cake with buttercream icing.",
+  "servings": 12,
+  "prepTime": 25,
+  "cookTime": 30,
+  "sourceUrl": null,
+  "ingredients": [
+    { "name": "flour", "quantity": 2.5, "unit": "cup", "note": null, "section": "Batter" },
+    { "name": "sugar", "quantity": 1.5, "unit": "cup", "note": null, "section": "Batter" },
+    { "name": "butter", "quantity": 0.75, "unit": "cup", "note": "softened", "section": "Batter" },
+    { "name": "eggs", "quantity": 3, "unit": null, "note": null, "section": "Batter" },
+    { "name": "milk", "quantity": 1, "unit": "cup", "note": null, "section": "Batter" },
+    { "name": "butter", "quantity": 1, "unit": "cup", "note": "softened", "section": "Icing" },
+    { "name": "icing sugar", "quantity": 3, "unit": "cup", "note": null, "section": "Icing" },
+    { "name": "vanilla extract", "quantity": 2, "unit": "tsp", "note": null, "section": "Icing" }
+  ],
+  "steps": [
+    { "text": "Preheat the oven to 350°F and grease two 8-inch cake pans." },
+    { "text": "Beat the butter and sugar until fluffy, then beat in the eggs one at a time." },
+    { "text": "Add the flour and milk in turns, mixing until just smooth." },
+    { "text": "Divide between the pans and bake for 30 minutes. Cool completely." },
+    { "text": "Beat the butter, icing sugar and vanilla until smooth, then ice the cooled cake." }
+  ]
+}
 ]
