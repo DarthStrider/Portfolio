@@ -96,9 +96,12 @@ namespace RecipeApp.Api.Migrations
 
             modelBuilder.Entity("RecipeApp.Api.Models.RecipeIngredient", b =>
                 {
-                    b.Property<int>("RecipeId")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
-                        .HasColumnName("recipe_id");
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("IngredientId")
                         .HasColumnType("integer")
@@ -109,21 +112,40 @@ namespace RecipeApp.Api.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("note");
 
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
                     b.Property<decimal?>("Quantity")
                         .HasPrecision(10, 3)
                         .HasColumnType("numeric(10,3)")
                         .HasColumnName("quantity");
+
+                    b.Property<int>("RecipeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("recipe_id");
+
+                    b.Property<string>("Section")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("section");
 
                     b.Property<string>("Unit")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("unit");
 
-                    b.HasKey("RecipeId", "IngredientId")
+                    b.HasKey("Id")
                         .HasName("pk_recipe_ingredients");
 
                     b.HasIndex("IngredientId")
                         .HasDatabaseName("ix_recipe_ingredients_ingredient_id");
+
+                    b.HasIndex("RecipeId", "Section", "IngredientId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_recipe_ingredients_recipe_id_section_ingredient_id");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("RecipeId", "Section", "IngredientId"), false);
 
                     b.ToTable("recipe_ingredients", (string)null);
                 });

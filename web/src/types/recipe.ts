@@ -11,6 +11,7 @@ export interface RecipeIngredientLine {
     quantity: number | null;
     unit: string | null;
     note: string | null;
+    section: string | null;
 }
 
 export interface RecipeStepLineRequest {

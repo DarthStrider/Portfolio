@@ -7,7 +7,7 @@ import { formatDuration } from '../utils/formatDuration'
 import { formatIngredient } from '../utils/formatIngredient'
 import { NotFound } from '../components/NotFound';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-
+import { groupBySection } from '../utils/groupBySection';
 export function RecipeDetailPage() {
     //1. Read :id from URL
     const { id } = useParams();
@@ -90,14 +90,19 @@ export function RecipeDetailPage() {
             <div className="recipe-body">
                 <section>
                     <h2>Ingredients</h2>
-                    <ul className="ingredients">
-                        {recipe.ingredients.map((line) => (
-                            <li key={line.name}>
-                                {formatIngredient(line)}
-                                {line.note && <span className="note">, {line.note}</span>}
-                            </li>
-                        ))}
-                    </ul>
+                    {groupBySection(recipe.ingredients).map((group, groupIndex) => (
+                        <div key={group.section ?? `group-${groupIndex}`} className="ingredient-group">
+                            {group.section && <h3>{group.section}</h3>}
+                            <ul className="ingredients">
+                                {group.lines.map((line, lineIndex) => (
+                                    <li key={`${line.name}-${lineIndex}`}>
+                                        {formatIngredient(line)}
+                                        {line.note && <span className="note">, {line.note}</span>}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
                 </section>
 
                 <section>
@@ -108,14 +113,16 @@ export function RecipeDetailPage() {
                         ))}
                     </ol>
                 </section>
-            </div>
+            </div >
 
-            {recipe.sourceUrl && (
-                <p className="source">
-                    Source: <a href={recipe.sourceUrl} target="_blank" rel="noreferrer">{ recipe.sourceUrl}</a>
-                </p>
-            )}
+            {
+                recipe.sourceUrl && (
+                    <p className="source">
+                        Source: <a href={recipe.sourceUrl} target="_blank" rel="noreferrer">{recipe.sourceUrl}</a>
+                    </p>
+                )
+            }
 
-        </article>
+        </article >
     );
 }
