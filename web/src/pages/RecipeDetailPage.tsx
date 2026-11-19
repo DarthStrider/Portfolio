@@ -8,6 +8,7 @@ import { formatIngredient } from '../utils/formatIngredient'
 import { NotFound } from '../components/NotFound';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { groupBySection } from '../utils/groupBySection';
+import { CategoryChips } from '../components/CategoryChips';
 export function RecipeDetailPage() {
     //1. Read :id from URL
     const { id } = useParams();
@@ -79,6 +80,12 @@ export function RecipeDetailPage() {
 
             <h1>{recipe.title}</h1>
             {recipe.description && <p className="description">{recipe.description}</p>}
+
+            <CategoryChips names={[
+                recipe.cuisine?.name ?? null,
+                ...recipe.meals.map((m) => m.name),
+                ...recipe.courses.map((c) => c.name),
+            ]} />
 
             <ul className="recipe-meta">
                 <li> Serves: {recipe.servings}</li>

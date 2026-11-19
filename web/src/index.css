@@ -360,3 +360,41 @@ a.primary {
     display: flex;
     gap: 0.25rem;
 }
+
+/*----- Category inputs and chips --------*/
+.checkbox-group{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+}
+
+.checkbox-group .group-label{
+    font-weight: 600;
+    min-width: 4.5rem;
+}
+
+.recipe-form label.checkbox{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: normal;
+}
+
+.chips{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+}
+
+.chip{
+    font-size: 0.8rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    background: #e8f1ec;
+    color: #2f6f4e;
+}

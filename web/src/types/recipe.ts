@@ -3,6 +3,9 @@ export interface RecipeSummary {
     title: string;
     servings: number;
     totalTime: number | null;
+    cuisine: string | null;
+    meals: string[];
+    courses: string[];
 }
 
 //Matches RecipeIngredientLineDto
@@ -34,6 +37,9 @@ export interface RecipeRequest {
     sourceUrl: string | null;
     ingredients: RecipeIngredientLine[];
     steps: RecipeStepLineRequest[];
+    cuisineId: number | null;
+    mealIds: number[];
+    courseIds: number[];
 }
 
 //Matches RecipeDto
@@ -48,4 +54,18 @@ export interface Recipe {
     createdAt: string;
     ingredients: RecipeIngredientLine[];
     steps: RecipeStep[];
+    cuisine: Category | null;
+    meals: Category[];
+    courses: Category[];
+}
+
+export interface Category {
+    id: number;
+    name: string;
+}
+
+export interface Categories {
+    cuisines: Category[];
+    meals: Category[];
+    courses: Category[];
 }
