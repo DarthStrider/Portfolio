@@ -3,7 +3,8 @@ import { useFieldArray, useForm, type Control, type FieldErrors, type UseFormReg
 import type { Recipe, RecipeRequest } from '../types/recipe';
 import { UNIT_GROUPS } from '../utils/units';
 import { groupBySection } from '../utils/groupBySection';
-
+import { useQuery } from '@tanstack/react-query';
+import { getCategories } from '../api/categories';
 
 //What the form holds while the user types.
 //Input always give back text, so numbers are string here and converted on Sumbit
@@ -27,6 +28,9 @@ interface RecipeFormValues {
     prepTime: string;
     cookTime: string;
     sourceUrl: string;
+    cuisineId: string;
+    mealIds: string[];
+    courseIds: string[];
     sections: SectionValues[];
     steps: { text: string }[];
 }
@@ -54,6 +58,8 @@ export function RecipeForm({ initialRecipe, submitLabel, isSaving, cancelTo, onS
     // Dynamic lists: each gives the rows plus add/remove/move helpers
     const sections = useFieldArray({ control, name: 'sections' });
     const steps = useFieldArray({ control, name: 'steps' });
+
+    const categories = useQuery({ queryKey: ['categories'], queryFn: getCategories, staleTime: Infinity });
 
     return (
         <form className="recipe-form" onSubmit={handleSubmit((values) => onSubmit(toRequest(values)))}>
@@ -88,6 +94,47 @@ export function RecipeForm({ initialRecipe, submitLabel, isSaving, cancelTo, onS
                 Source URL
                 <input type="url" placeholder="https://..." {...register('sourceUrl')} />
             </label>
+
+
+            {/*----------------------- Categories ------------------------------------- */}
+            <fieldset>
+                <legend>Categories</legend>
+                {categories.isPending && <p className="status">Loading categories...</p>}
+                {categories.isError && <p className="status error">Couldn't load categories.</p>}
+                {categories.data && (
+                    <>
+                        <label>
+                            Cuisine
+                            <select {...register('cuisineId')}>
+                                <option value="">-</option>
+                                {categories.data.cuisines.map((c) => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <div className="checkbox-group">
+                            <span className="group-label">Meal</span>
+                            {categories.data.meals.map((m) => (
+                                <label key={m.id} className="checkbox">
+                                    <input type="checkbox" value={m.id} {...register('mealIds')} />
+                                    {m.name}
+                                </label>
+                            ))}
+                        </div>
+
+                        <div className="checkbox-group">
+                            <span className="group-label">Course</span>
+                            {categories.data.courses.map((c) => (
+                                <label key={c.id} className="checkbox">
+                                    <input type="checkbox" value={c.id} {...register('courseIds')} />
+                                    {c.name}
+                                </label>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </fieldset>
 
             {/*----------------------- Ingredients ------------------------------------- */}
             <fieldset>
@@ -235,7 +282,9 @@ function validateSectionName(value: string, values: RecipeFormValues, index: num
 function toFormValues(recipe?: Recipe): RecipeFormValues {
     if (!recipe) {
         return {
-            title: '', description: '', servings: '4', prepTime: '', cookTime: '', sourceUrl: '', sections: [emptySection()],
+            title: '', description: '', servings: '4', prepTime: '', cookTime: '', sourceUrl: '',
+            cuisineId:'', mealIds: [], courseIds:[],
+            sections: [emptySection()],
             steps: [{ text: '' }]
         };
     }
@@ -246,6 +295,9 @@ function toFormValues(recipe?: Recipe): RecipeFormValues {
         prepTime: recipe.prepTime?.toString() ?? '',
         cookTime: recipe.cookTime?.toString() ?? '',
         sourceUrl: recipe.sourceUrl ?? '',
+        cuisineId: recipe.cuisine?.id.toString() ?? '',
+        mealIds: recipe.meals.map((m) => String(m.id)),
+        courseIds: recipe.courses.map((c) => String(c.id)),
         sections: groupBySection(recipe.ingredients).map((group) => ({
             name: group.section ?? '',
             ingredients: group.lines.map((i) => ({
@@ -287,6 +339,9 @@ function toRequest(values: RecipeFormValues): RecipeRequest {
                 section: toText(section.name),
             }))),
         steps: values.steps.map((s) => ({ text: s.text.trim() })),
+        cuisineId: values.cuisineId === '' ? null : Number(values.cuisineId),
+        mealIds: values.mealIds.map(Number),
+        courseIds: values.courseIds.map(Number),
     };
 
 }

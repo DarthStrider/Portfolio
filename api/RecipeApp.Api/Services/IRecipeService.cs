@@ -4,7 +4,7 @@ namespace RecipeApp.Api.Services;
 
 public interface IRecipeService
 {
-    Task<List<RecipeSummaryDto>> GetAllAsync();
+    Task<List<RecipeSummaryDto>> GetAllAsync(RecipeFilter? filter = null);
     Task<RecipeDto?> GetByIdAsync(int id); //null = not found
     Task<RecipeDto> CreateAsync(CreateRecipeRequest request);
     Task<bool> UpdateAsync(int id, UpdateRecipeRequest request); //false = not found

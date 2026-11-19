@@ -6,14 +6,14 @@ namespace RecipeApp.Api.Controllers;
 
 [ApiController]
 [Route("api/recipes")]
-public class RecipesController(IRecipeService recipes): ControllerBase
+public class RecipesController(IRecipeService recipes, ICategoryService categories): ControllerBase
 {
 
     //HTTP Get for all the recipe summaries
     [HttpGet]
-    public async Task<ActionResult<List<RecipeSummaryDto>>> GetAll()
+    public async Task<ActionResult<List<RecipeSummaryDto>>> GetAll([FromQuery] RecipeFilter filter)
     {
-        return await recipes.GetAllAsync();
+        return await recipes.GetAllAsync(filter);
     }
 
     //Http Get Recipe by Id
@@ -28,7 +28,10 @@ public class RecipesController(IRecipeService recipes): ControllerBase
     [HttpPost]
     public async Task<ActionResult<RecipeDto>> Create(CreateRecipeRequest request)
     {
-        if(HasDuplicateIngredients(request.Ingredients))
+        HasDuplicateIngredients(request.Ingredients);
+        await AddCategoryErrorsAsync(request.CuisineId, request.MealIds, request.CourseIds);
+
+        if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
@@ -41,7 +44,10 @@ public class RecipesController(IRecipeService recipes): ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, UpdateRecipeRequest request)
     {
-        if (HasDuplicateIngredients(request.Ingredients))
+        HasDuplicateIngredients(request.Ingredients);
+        await AddCategoryErrorsAsync(request.CuisineId, request.MealIds, request.CourseIds);
+
+        if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
@@ -64,10 +70,18 @@ public class RecipesController(IRecipeService recipes): ControllerBase
 
         foreach ((string? section, string? name) in duplicates)
         {
-            string where = section is null ? "" : $" in `{section}`";
+            string where = section is null ? "" : $" in '{section}'";
             ModelState.AddModelError("Ingredients", $"'{name}' is listed more than once{where}; combine them into one line");
         }
         
         return duplicates.Count > 0;
+    }
+
+    private async Task AddCategoryErrorsAsync(int? cuisineId, List<int>? mealIds, List<int>? courseIds)
+    {
+        foreach (string problem in await categories.FindProblemAsync(cuisineId, mealIds, courseIds))
+        {
+            ModelState.AddModelError("Categories", problem);
+        }
     }
 }

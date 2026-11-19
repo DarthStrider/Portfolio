@@ -22,6 +22,142 @@ namespace RecipeApp.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("RecipeApp.Api.Models.Course", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 1000L, null, null, null, null, null);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_courses");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_courses_name");
+
+                    b.ToTable("courses", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Appetizer"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Main"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Side"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Soup"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Salad"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Dessert"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Name = "Drink"
+                        });
+                });
+
+            modelBuilder.Entity("RecipeApp.Api.Models.Cuisine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 1000L, null, null, null, null, null);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cuisines");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cuisines_name");
+
+                    b.ToTable("cuisines", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Italian"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Mexican"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Indian"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Japanese"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Chinese"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Greek"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Name = "Middle Eastern"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Name = "Canadian"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Name = "American"
+                        });
+                });
+
             modelBuilder.Entity("RecipeApp.Api.Models.Ingredient", b =>
                 {
                     b.Property<int>("Id")
@@ -47,6 +183,59 @@ namespace RecipeApp.Api.Migrations
                     b.ToTable("ingredients", (string)null);
                 });
 
+            modelBuilder.Entity("RecipeApp.Api.Models.Meal", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<int>("Id"), 1000L, null, null, null, null, null);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_meals");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_meals_name");
+
+                    b.ToTable("meals", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Breakfast"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Brunch"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Lunch"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Dinner"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Snack"
+                        });
+                });
+
             modelBuilder.Entity("RecipeApp.Api.Models.Recipe", b =>
                 {
                     b.Property<int>("Id")
@@ -63,6 +252,10 @@ namespace RecipeApp.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<int?>("CuisineId")
+                        .HasColumnType("integer")
+                        .HasColumnName("cuisine_id");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
@@ -90,6 +283,9 @@ namespace RecipeApp.Api.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_recipes");
+
+                    b.HasIndex("CuisineId")
+                        .HasDatabaseName("ix_recipes_cuisine_id");
 
                     b.ToTable("recipes", (string)null);
                 });
@@ -183,6 +379,55 @@ namespace RecipeApp.Api.Migrations
                     b.ToTable("recipe_steps", (string)null);
                 });
 
+            modelBuilder.Entity("recipe_courses", b =>
+                {
+                    b.Property<int>("RecipeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("recipe_id");
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("course_id");
+
+                    b.HasKey("RecipeId", "CourseId")
+                        .HasName("pk_recipe_courses");
+
+                    b.HasIndex("CourseId")
+                        .HasDatabaseName("ix_recipe_courses_course_id");
+
+                    b.ToTable("recipe_courses", (string)null);
+                });
+
+            modelBuilder.Entity("recipe_meals", b =>
+                {
+                    b.Property<int>("RecipeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("recipe_id");
+
+                    b.Property<int>("MealId")
+                        .HasColumnType("integer")
+                        .HasColumnName("meal_id");
+
+                    b.HasKey("RecipeId", "MealId")
+                        .HasName("pk_recipe_meals");
+
+                    b.HasIndex("MealId")
+                        .HasDatabaseName("ix_recipe_meals_meal_id");
+
+                    b.ToTable("recipe_meals", (string)null);
+                });
+
+            modelBuilder.Entity("RecipeApp.Api.Models.Recipe", b =>
+                {
+                    b.HasOne("RecipeApp.Api.Models.Cuisine", "Cuisine")
+                        .WithMany("Recipes")
+                        .HasForeignKey("CuisineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_recipes_cuisines_cuisine_id");
+
+                    b.Navigation("Cuisine");
+                });
+
             modelBuilder.Entity("RecipeApp.Api.Models.RecipeIngredient", b =>
                 {
                     b.HasOne("RecipeApp.Api.Models.Ingredient", "Ingredient")
@@ -214,6 +459,45 @@ namespace RecipeApp.Api.Migrations
                         .HasConstraintName("fk_recipe_steps_recipes_recipe_id");
 
                     b.Navigation("Recipe");
+                });
+
+            modelBuilder.Entity("recipe_courses", b =>
+                {
+                    b.HasOne("RecipeApp.Api.Models.Course", null)
+                        .WithMany()
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_recipe_courses_courses_course_id");
+
+                    b.HasOne("RecipeApp.Api.Models.Recipe", null)
+                        .WithMany()
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_recipe_courses_recipes_recipe_id");
+                });
+
+            modelBuilder.Entity("recipe_meals", b =>
+                {
+                    b.HasOne("RecipeApp.Api.Models.Meal", null)
+                        .WithMany()
+                        .HasForeignKey("MealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_recipe_meals_meals_meal_id");
+
+                    b.HasOne("RecipeApp.Api.Models.Recipe", null)
+                        .WithMany()
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_recipe_meals_recipes_recipe_id");
+                });
+
+            modelBuilder.Entity("RecipeApp.Api.Models.Cuisine", b =>
+                {
+                    b.Navigation("Recipes");
                 });
 
             modelBuilder.Entity("RecipeApp.Api.Models.Ingredient", b =>

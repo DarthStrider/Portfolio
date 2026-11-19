@@ -1,8 +1,11 @@
 import { apiGet, apiSend } from './client';
 import type { Recipe, RecipeRequest, RecipeSummary } from '../types/recipe';
+import { toQueryString, type RecipeFilters } from '../utils/recipeFilters';
 
-export function getRecipes(): Promise<RecipeSummary[]> { 
-    return apiGet<RecipeSummary[]>('/api/recipes');
+
+export function getRecipes(filters?: RecipeFilters): Promise<RecipeSummary[]> {
+    const query = filters ? toQueryString(filters) : '';
+    return apiGet<RecipeSummary[]>(`/api/recipes${query ? `?${query}` : ''}`);
 }
 
 export function getRecipe(id: number): Promise<Recipe> {
