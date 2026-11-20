@@ -5,12 +5,13 @@ export interface RecipeFilters {
     cuisine: number[];
     meal: number[];
     course: number[];
+    search: string;
 }
 
 //URL -> filters. Ignore anything that isn't a hole mumber (?meal=abd)
 export function readFilters(params: URLSearchParams): RecipeFilters {
     const ids = (key: FilterKey) => params.getAll(key).map(Number).filter(Number.isInteger);
-    return { cuisine: ids('cuisine'), meal: ids('meal'), course: ids('course') };
+    return { cuisine: ids('cuisine'), meal: ids('meal'), course: ids('course'), search:params.get('search') ?? '' };
 }
 
 //Filters -> ""cuisine=3&meal=4&meal=5"
@@ -21,6 +22,11 @@ export function toQueryString(filters: RecipeFilters): string {
             params.append(key, String(id));
         }
     }
+
+    if (filters.search.trim() !== '') {
+        params.set('search', filters.search.trim());
+    }
+
     return params.toString();
 }
 

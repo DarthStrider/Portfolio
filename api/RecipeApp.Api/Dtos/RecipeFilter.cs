@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace RecipeApp.Api.Dtos;
 
 //Client sends (GET /api/recipes?cuising=#&meal=#&course=&)
@@ -5,4 +7,5 @@ namespace RecipeApp.Api.Dtos;
 public record RecipeFilter(
     List<int>? Cuisine,
     List<int>? Meal,
-    List<int>? Course);
+    List<int>? Course,
+    [MaxLength(100)] string? Search);

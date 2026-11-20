@@ -31,6 +31,16 @@ public class RecipeService(AppDbContext db) : IRecipeService
             query = query.Where(r => r.Courses.Any(c => courses.Contains(c.Id)));
         }
 
+        //Search title, description or any ingredient contains the text (case-insensitive)
+        if(!string.IsNullOrWhiteSpace(filter?.Search))
+        {
+            string pattern = $"%{EscapeLike(IngredientNames.Normalize(filter.Search))}%";
+            query = query.Where(r =>
+            EF.Functions.ILike(r.Title, pattern) ||
+            (r.Description != null && EF.Functions.ILike(r.Description, pattern)) ||
+            r.Ingredients.Any(ri => EF.Functions.ILike(ri.Ingredient.Name, pattern)));
+        }
+
         return await ToSummariesAsync(query);
     }
 
@@ -241,4 +251,7 @@ public class RecipeService(AppDbContext db) : IRecipeService
         recipe.Courses.Clear();
         recipe.Courses.AddRange(await db.Courses.Where(c => courses.Contains(c.Id)).ToListAsync());
     }
+
+    private static string EscapeLike(string text) =>
+        text.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }
