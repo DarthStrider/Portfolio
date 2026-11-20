@@ -2,18 +2,24 @@ import { Link } from 'react-router';
 import type { RecipeSummary } from '../types/recipe';
 import { formatDuration } from '../utils/formatDuration';
 import { CategoryChips } from './CategoryChips';
+import { FavouriteButton } from './FavouriteButton';
 
 interface RecipeCardProps{ recipe: RecipeSummary; }
 
 export function RecipeCard({ recipe }: RecipeCardProps) {
     return (
-        <Link to={`/recipes/${recipe.id}`} className="recipe-card">
-            <h2>{recipe.title}</h2>
+        <article className="recipe-card">
+            <div className="card-top">
+                <h2>
+                    <Link to={`/recipes/${recipe.id}`} className="card-link">{ recipe.title}</Link>
+                </h2>
+                <FavouriteButton recipeId={recipe.id} isFavourite={recipe.isFavourite} />
+            </div>
             <p>
-                Serves {recipe.servings}
+                Servies {recipe.servings}
                 {recipe.totalTime ? ` · ${formatDuration(recipe.totalTime)}` : ''}
             </p>
-            <CategoryChips names={[recipe.cuisine, ...recipe.meals, ...recipe.courses]} />
-        </Link>
+            <CategoryChips names={ [recipe.cuisine, ...recipe.meals, ...recipe.courses]} />
+        </article>
     );
 }

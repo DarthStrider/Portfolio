@@ -64,6 +64,20 @@ public class RecipesController(IRecipeService recipes, ICategoryService categori
         return deleted ? NoContent() : NotFound();
     }
 
+    [HttpPut("{id:int}/favourite")]
+    public async Task<IActionResult> AddFavourite(int id)
+    {
+        bool found = await recipes.SetFavouriteAsync(id, true);
+        return found ? NoContent() : NotFound();
+    }
+
+    [HttpDelete("{id:int}/favourite")]
+    public async Task<IActionResult> RemoveFavourite(int id)
+    {
+        bool found = await recipes.SetFavouriteAsync(id, false);
+        return found? NoContent() : NotFound();
+    }
+
     private bool HasDuplicateIngredients(List<RecipeIngredientLineRequest> ingredients)
     {
         List<(string? Section, string Name)> duplicates = IngredientNames.FindDuplicatesBySection(ingredients.Select(i => (i.Section, i.Name)));
