@@ -9,6 +9,8 @@ import { NotFound } from '../components/NotFound';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { groupBySection } from '../utils/groupBySection';
 import { CategoryChips } from '../components/CategoryChips';
+import { listPath } from '../utils/listReturn';
+
 export function RecipeDetailPage() {
     //1. Read :id from URL
     const { id } = useParams();
@@ -31,7 +33,7 @@ export function RecipeDetailPage() {
         onSuccess: () => {
             queryClient.removeQueries({ queryKey: ['recipe', recipeId] });
             queryClient.invalidateQueries({ queryKey: ['recipes'] });
-            navigate('/');
+            navigate(listPath());
         }
     });
 
@@ -58,7 +60,7 @@ export function RecipeDetailPage() {
     return (
         <article className="recipe-detail">
             <div className="page-header">
-                <Link to="/" className="back-link">← Back to recipes</Link>
+                <Link to={ listPath()} className="back-link">← Back to recipes</Link>
                 <div className="form-actions">
                     <Link to={`/recipes/${recipe.id}/edit`} className="button secondary">Edit</Link>
                     <button type="button" className="danger" onClick={() => setConfirmOpen(true)}>Delete</button>

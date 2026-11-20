@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { createRecipe } from '../api/recipes';
 import { RecipeForm } from '../components/RecipeForm';
 import { FormErrors } from '../components/FormErrors';
+import { listPath } from '../utils/listReturn';
 
 export function NewRecipePage() {
     const navigate = useNavigate();
@@ -27,7 +28,7 @@ export function NewRecipePage() {
                 submitLabel="Create recipe"
                 isSaving={mutation.isPending}
                 onSubmit={(request) => mutation.mutate(request)}
-                cancelTo="/"
+                cancelTo={listPath()}
             />
         </section>
     );

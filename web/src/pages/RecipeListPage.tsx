@@ -1,12 +1,13 @@
-import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { getRecipes } from '../api/recipes'
 import { getCategories } from '../api/categories';
 import { RecipeCard } from '../components/RecipeCard';
 import { FilterPanel } from '../components/FilterPanel';
 import { countFilters, FILTER_KEYS, readFilters, toggleFilter, type FilterKey } from '../utils/recipeFilters';
-
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { rememberListSearch } from '../utils/listReturn';
 
 export function RecipeListPage() {
     //1. Filters come from URL
@@ -14,6 +15,21 @@ export function RecipeListPage() {
     const filters = readFilters(searchParams);
     const activeCount = countFilters(filters);
     const [filtersOpen, setFiltersOpen] = useState(false);
+    const [searchText, setSearchText] = useState(filters.search);
+    const debouncedSearch = useDebouncedValue(searchText);
+
+    useEffect(() => {
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            const text = debouncedSearch.trim();
+            if (text) next.set('search', text);
+            else next.delete('search');
+            return next;
+        }, { replace: true });
+    }, [debouncedSearch, setSearchParams]);
+
+    const location = useLocation();
+    useEffect(() => { rememberListSearch(location.search); }, [location.search]);
 
     //2. Recipes for these filters.
     const { data: recipes, isPending, isError, error } = useQuery({
@@ -27,7 +43,10 @@ export function RecipeListPage() {
 
     //replace: true -> ticking boxes does not fill the back history with every step
     const toggle = (key: FilterKey, id: number) => setSearchParams((prev) => toggleFilter(prev, key, id), { replace: true });
-    const clearAll = () => setSearchParams({}, { replace: true });
+    const clearAll = () => {
+        setSearchText('');
+        setSearchParams({}, { replace: true });
+    };
 
     // Look up a chip's name from its id (e.g. meal 4 -> "Dinner")
     const nameOf = (key: FilterKey, id: number): string => {
@@ -44,7 +63,7 @@ export function RecipeListPage() {
     }
 
     //No recipes at all
-    if (recipes.length === 0 && activeCount === 0) {
+    if (recipes.length === 0 && activeCount === 0 && filters.search === '') {
         return (
             <div className="status">
                 <p> No Recipes yet.</p>
@@ -64,6 +83,18 @@ export function RecipeListPage() {
                 </div>
             </div>
 
+            <div className="search-box">
+                <input
+                    type="search" placeholder="Search recipes or ingredients..."
+                    aria-label="Search recipes"
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)} />
+                {searchText && (
+                    <button type="button" className="icon-button" aria-label="Clear search"
+                        onClick={() => setSearchText('')}>✕</button>
+                )}
+            </div>
+
             {/* Active filters: one chip each, × removes it */}
             {activeCount > 0 && (
                 <div className="active-filters">
@@ -80,8 +111,11 @@ export function RecipeListPage() {
 
             {recipes.length === 0 ? (
                 <div className="status">
-                    <p>No recipes match these filters.</p>
-                    <button type="button" className="secondary" onClick={clearAll}>Clear filters</button>
+                    <p>
+                        {filters.search
+                            ? `No recipes match "${filters.search}"${activeCount > 0 ? ' with these filters' : ''}.`
+                            : 'No recipes match these filters.'}
+                    </p>                    <button type="button" className="secondary" onClick={clearAll}>Clear filters</button>
                 </div>
             ) : (
                 <div className="recipe-grid">

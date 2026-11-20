@@ -506,3 +506,26 @@ a.primary {
     text-decoration: underline;
     cursor: pointer;
 }
+
+/*---- Search ------*/
+.search-box{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+    max-width: 480px;
+}
+
+.search-box input{
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font: inherit;
+}
+
+    /* Hide the browser's own clear button; we have our own */
+    .search-box input[type="search"]::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+        appearance: none;
+    }
