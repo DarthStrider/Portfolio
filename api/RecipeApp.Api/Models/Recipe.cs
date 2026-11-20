@@ -16,4 +16,5 @@ public class Recipe
     public Cuisine? Cuisine { get; set; }
     public List<Course> Courses { get; set;  } = [];
     public List<Meal> Meals { get; set; } = [];
+    public bool IsFavourite { get; set; }
 }

@@ -41,6 +41,11 @@ public class RecipeService(AppDbContext db) : IRecipeService
             r.Ingredients.Any(ri => EF.Functions.ILike(ri.Ingredient.Name, pattern)));
         }
 
+        if(filter?.Favourites == true)
+        {
+            query = query.Where(r => r.IsFavourite);
+        }
+
         return await ToSummariesAsync(query);
     }
 
@@ -137,6 +142,14 @@ public class RecipeService(AppDbContext db) : IRecipeService
         return true;
     }
 
+    public async Task<bool> SetFavouriteAsync(int id, bool isFavourite)
+    {
+        int updated = await db.Recipes
+            .Where(r => r.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.IsFavourite, isFavourite));
+
+        return updated > 0;
+    }
 
     //Helpers
 
@@ -151,7 +164,8 @@ public class RecipeService(AppDbContext db) : IRecipeService
         (r.PrepTime ?? 0) + (r.CookTime ?? 0),
         r.Cuisine != null ? r.Cuisine.Name : null,
         r.Meals.OrderBy(m => m.Id).Select(m => m.Name).ToList(),
-        r.Courses.OrderBy(c => c.Id).Select(c => c.Name).ToList());
+        r.Courses.OrderBy(c => c.Id).Select(c => c.Name).ToList(),
+        r.IsFavourite);
 
     private static Task<List<RecipeSummaryDto>> ToSummariesAsync(IQueryable<Recipe> query) => 
         query
@@ -178,7 +192,8 @@ public class RecipeService(AppDbContext db) : IRecipeService
             .ToList(),
         Cuisine: r.Cuisine is null ? null : new CategoryDto(r.Cuisine.Id, r.Cuisine.Name),
         Meals: r.Meals.OrderBy(m=>m.Id).Select(m=> new CategoryDto(m.Id, m.Name)).ToList(),
-        Courses: r.Courses.OrderBy(c=>c.Id).Select(c => new CategoryDto(c.Id, c.Name)).ToList()
+        Courses: r.Courses.OrderBy(c=>c.Id).Select(c => new CategoryDto(c.Id, c.Name)).ToList(),
+        IsFavourite: r.IsFavourite
         );
 
     // Turns request lines into entities on the recipe.

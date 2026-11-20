@@ -46,7 +46,8 @@ public record RecipeDto(
     List<RecipeStepLineDto> Steps,
     CategoryDto? Cuisine,
     List<CategoryDto> Meals,
-    List<CategoryDto>Courses);
+    List<CategoryDto> Courses,
+    bool IsFavourite);
 
 //API sends back (GET list): light version for cards
 public record RecipeSummaryDto(
@@ -56,4 +57,5 @@ public record RecipeSummaryDto(
     int? TotalTime,
     string? Cuisine,
     List<string> Meals,
-    List<string> Courses);
+    List<string> Courses,
+    bool IsFavourite);

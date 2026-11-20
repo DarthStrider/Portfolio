@@ -9,4 +9,5 @@ public interface IRecipeService
     Task<RecipeDto> CreateAsync(CreateRecipeRequest request);
     Task<bool> UpdateAsync(int id, UpdateRecipeRequest request); //false = not found
     Task<bool> DeleteAsync(int id);  //false = not found
+    Task<bool> SetFavouriteAsync(int id, bool isFavourite); //false = not found
 }
