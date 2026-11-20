@@ -48,6 +48,13 @@ export function RecipeListPage() {
         setSearchParams({}, { replace: true });
     };
 
+    const toggleFavourites = () => setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (next.get('favourites') == 'true') next.delete('favourites');
+        else next.set('favourites', 'true')
+        return next;
+    }, {replace: true})
+
     // Look up a chip's name from its id (e.g. meal 4 -> "Dinner")
     const nameOf = (key: FilterKey, id: number): string => {
         const lists = { cuisine: categories.data?.cuisines, meal: categories.data?.meals, course: categories.data?.courses };
@@ -63,10 +70,10 @@ export function RecipeListPage() {
     }
 
     //No recipes at all
-    if (recipes.length === 0 && activeCount === 0 && filters.search === '') {
+    if (recipes.length === 0 && activeCount === 0 && filters.search === '' && !filters.favourites) {
         return (
             <div className="status">
-                <p> No Recipes yet.</p>
+                <p>No recipes yet.</p>
                 <Link to="/recipes/new" className="button primary"> + Add your first recipe</Link>
             </div>
         );
@@ -76,6 +83,9 @@ export function RecipeListPage() {
             <div className="page-header">
                 <h1>Recipes</h1>
                 <div className="header-actions">
+                    <button type="button" className={filters.favourites ? 'primary' : 'secondary'}
+                        aria-pressed={filters.favourites} onClick={toggleFavourites}>
+                        ♥ Favourites </button>
                     <button type="button" className="secondary" onClick={() => setFiltersOpen(true)}>
                         Filters{activeCount > 0 && ` (${activeCount})`}
                     </button>
@@ -112,10 +122,15 @@ export function RecipeListPage() {
             {recipes.length === 0 ? (
                 <div className="status">
                     <p>
-                        {filters.search
-                            ? `No recipes match "${filters.search}"${activeCount > 0 ? ' with these filters' : ''}.`
-                            : 'No recipes match these filters.'}
-                    </p>                    <button type="button" className="secondary" onClick={clearAll}>Clear filters</button>
+                        <p>
+                            {filters.search
+                                ? `No recipes match "${filters.search}"${activeCount > 0 || filters.favourites ? ' with these filters' : ''}.`
+                                : filters.favourites && activeCount === 0
+                                    ? 'No favourites yet. Tap ♡ on a recipe to add it.'
+                                    : 'No recipes match these filters.'}
+                        </p>
+                    </p>
+                    <button type="button" className="secondary" onClick={clearAll}>Clear filters</button>
                 </div>
             ) : (
                 <div className="recipe-grid">

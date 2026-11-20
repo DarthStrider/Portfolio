@@ -6,6 +6,7 @@ export interface RecipeSummary {
     cuisine: string | null;
     meals: string[];
     courses: string[];
+    isFavourite: boolean;
 }
 
 //Matches RecipeIngredientLineDto
@@ -57,6 +58,7 @@ export interface Recipe {
     cuisine: Category | null;
     meals: Category[];
     courses: Category[];
+    isFavourite: boolean;
 }
 
 export interface Category {

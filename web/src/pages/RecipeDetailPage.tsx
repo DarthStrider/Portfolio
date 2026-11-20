@@ -10,6 +10,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { groupBySection } from '../utils/groupBySection';
 import { CategoryChips } from '../components/CategoryChips';
 import { listPath } from '../utils/listReturn';
+import { FavouriteButton } from '../components/FavouriteButton';
 
 export function RecipeDetailPage() {
     //1. Read :id from URL
@@ -80,7 +81,11 @@ export function RecipeDetailPage() {
             {deleteMutation.isError && (
                 <p className="status error">Couldn't delete the recipe: {deleteMutation.error?.message}</p>)}
 
-            <h1>{recipe.title}</h1>
+            <div className="title-row">
+                <h1>{recipe.title}</h1>
+                <FavouriteButton recipeId={recipe.id} isFavourite={recipe.isFavourite} />
+            </div>
+
             {recipe.description && <p className="description">{recipe.description}</p>}
 
             <CategoryChips names={[
