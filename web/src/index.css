@@ -582,9 +582,14 @@ a.primary {
     }
 
     .unit-toggle button + button{
-        border-left: #2f6f4e;
+        border-left: 1px solid #2f6f4e;
+    }
+
+    .unit-toggle button.on{
+        background: #2f6f4e;
         color: white;
     }
+
     .card-link:focus {
         outline: none; /* the card's :focus-within outline is shown instead */
     }

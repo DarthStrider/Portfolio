@@ -28,7 +28,7 @@ export function convertAmount(quantity: number, unit: string, system: UnitSystem
 
     // 3. From the base to the target, rounded the way cooks measure
     const value = base / UNITS[target].toBase;
-    return { quantity: system === 'metric' ? roundMetric(value) : roundUs(value, target), unit: target };
+    return { quantity: system === 'metric' ? roundMetric(value, target) : roundUs(value, target), unit: target };
 }
 
 function pickTarget(base: number, kind: 'volume' | 'weight', system: 'metric' | 'us') {
@@ -46,10 +46,10 @@ function pickTarget(base: number, kind: 'volume' | 'weight', system: 'metric' | 
     return base >= UNITS.lb.toBase ? 'lb' : 'oz';
 }
 
-function roundMetric(value: number): number {
-    if (value >= 100) return Math.round(value / 5) * 5;
-    if (value >= 10) return Math.round(value);
-    return Math.round(value * 100) / 100;
+function roundMetric(value: number, unit: string): number {
+    if (unit === 'l' || unit === 'kg') return Math.round(value * 100) / 100;
+    if (value >= 10) return Math.round(value/5) * 5;
+    return Math.round(value * 2) / 2;
 }
 
 function roundUs(value: number, unit: string): number {
