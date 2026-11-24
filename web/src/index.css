@@ -33,6 +33,7 @@ body {
 }
 
 .recipe-card {
+    position: relative;
     display: block;
     background: white;
     border-radius: 10px;
@@ -43,17 +44,22 @@ body {
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
+.recipe-card:focus-within {
+    outline: 2px solid #2f6f4e;
+    outline-offset: 2px;
+}
+
     .recipe-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 10px rgba(0,0,0,0.12);
     }
 
-    .recipe-card h2 {
-        font-size: 1.1rem;
-        margin: 0 0 0.5rem
-    }
+.recipe-card h2 {
+    font-size: 1.1rem;
+    margin: 0 0 0.5rem
+}
 
-.recipe card p {
+.recipe-card p {
     margin: 0;
     color: #666;
 }
@@ -334,8 +340,9 @@ a.primary {
 .ingredient-group:first-of-type h3 {
     margin-top: 0;
 }
-.section-card{
-    display:flex;
+
+.section-card {
+    display: flex;
     flex-direction: column;
     gap: 0.5rem;
     border: 1px solid #e3e3e3;
@@ -344,37 +351,37 @@ a.primary {
     background: #fafaf8;
 }
 
-.section-header{
+.section-header {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 0.5rem;
     align-items: center;
 }
 
-.recipe-form .section-name{
+.recipe-form .section-name {
     font-weight: 600;
     color: #2f6f4e;
 }
 
-.row-buttons{
+.row-buttons {
     display: flex;
     gap: 0.25rem;
 }
 
 /*----- Category inputs and chips --------*/
-.checkbox-group{
+.checkbox-group {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem 1rem;
 }
 
-.checkbox-group .group-label{
-    font-weight: 600;
-    min-width: 4.5rem;
-}
+    .checkbox-group .group-label {
+        font-weight: 600;
+        min-width: 4.5rem;
+    }
 
-.recipe-form label.checkbox{
+.recipe-form label.checkbox {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -382,7 +389,7 @@ a.primary {
     font-weight: normal;
 }
 
-.chips{
+.chips {
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
@@ -391,7 +398,7 @@ a.primary {
     margin: 0.5rem 0;
 }
 
-.chip{
+.chip {
     font-size: 0.8rem;
     padding: 0.15rem 0.6rem;
     border-radius: 999px;
@@ -400,13 +407,13 @@ a.primary {
 }
 
 /*-------- Filter Panel ---------------------------*/
-.header-actions{
+.header-actions {
     display: flex;
     gap: 0.5rem;
     align-items: center;
 }
 
-.filter-drawer{
+.filter-drawer {
     margin: 0;
     inset: 0 auto 0 0;
     height: 100%;
@@ -418,28 +425,27 @@ a.primary {
     box-sizing: border-box;
 }
 
-.filter-drawer[open]
-{
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
+    .filter-drawer[open] {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
 
-.filter-drawer::backdrop {
-    background: rgba(0, 0, 0, 0.35);
-}
+    .filter-drawer::backdrop {
+        background: rgba(0, 0, 0, 0.35);
+    }
 
-.drawer-header{
+.drawer-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.drawer-header h2{
-    margin: 0;
-}
+    .drawer-header h2 {
+        margin: 0;
+    }
 
-.drawer-body{
+.drawer-body {
     flex: 1;
     overflow-y: auto;
     display: flex;
@@ -447,7 +453,7 @@ a.primary {
     gap: 1rem;
 }
 
-.filter-group{
+.filter-group {
     border: none;
     padding: 0;
     margin: 0;
@@ -456,24 +462,24 @@ a.primary {
     gap: 0.35rem;
 }
 
-.filter-group legend{
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-}
+    .filter-group legend {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
 
-.filter-drawer label.checkbox{
+.filter-drawer label.checkbox {
     display: flex;
     align-items: center;
     gap: 0.4rem;
 }
 
-.drawer-footer{
+.drawer-footer {
     display: flex;
     justify-content: space-between;
     gap: 0.5rem;
 }
 
-.active-filters{
+.active-filters {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -481,24 +487,24 @@ a.primary {
     margin: 0.75rem 0 1rem;
 }
 
-.chip.removable{
+.chip.removable {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
     font-size: 0.85rem;
 }
 
-.chip.removable button{
-    background: none;
-    border: none;
-    padding: 0 0.1rem;
-    color: inherit;
-    cursor: pointer;
-    font-size: 1rem;
-    line-height: 1;
-}
+    .chip.removable button {
+        background: none;
+        border: none;
+        padding: 0 0.1rem;
+        color: inherit;
+        cursor: pointer;
+        font-size: 1rem;
+        line-height: 1;
+    }
 
-.link-button{
+.link-button {
     background: none;
     border: none;
     padding: 0;
@@ -508,7 +514,7 @@ a.primary {
 }
 
 /*---- Search ------*/
-.search-box{
+.search-box {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -516,18 +522,38 @@ a.primary {
     max-width: 480px;
 }
 
-.search-box input{
-    flex: 1;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    font: inherit;
+    .search-box input {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font: inherit;
+    }
+
+        /* Hide the browser's own clear button; we have our own */
+        .search-box input[type="search"]::-webkit-search-cancel-button {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+/*---- Card layout with a heart ------*/
+.card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
 }
 
-    /* Hide the browser's own clear button; we have our own */
-    .search-box input[type="search"]::-webkit-search-cancel-button {
-        -webkit-appearance: none;
-        appearance: none;
+.card-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+    /* Stretched link: an invisible layer over the whole card, so clicking anywhere opens the recipe */
+    .card-link::after {
+        content: '';
+        position: absolute;
+        inset: 0;
     }
 
     /* ---------------------------- Unit toggle ----------------------*/
@@ -559,3 +585,33 @@ a.primary {
         border-left: #2f6f4e;
         color: white;
     }
+    .card-link:focus {
+        outline: none; /* the card's :focus-within outline is shown instead */
+    }
+
+/*---- Favourite heart ------*/
+.favourite-button {
+    position: relative; /* sits above the stretched link, so it gets its own clicks */
+    z-index: 1;
+    background: none;
+    border: none;
+    padding: 0.1rem 0.25rem;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: #999;
+    cursor: pointer;
+}
+
+    .favourite-button.on {
+        color: #d6336c;
+    }
+
+    .favourite-button:hover {
+        transform: scale(1.15);
+    }
+
+.title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}

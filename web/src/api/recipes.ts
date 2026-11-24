@@ -25,3 +25,11 @@ export function updateRecipe(id: number, request: RecipeRequest): Promise<void> 
 export function deleteRecipe(id: number): Promise<void> {
     return apiSend('DELETE', `/api/recipes/${id}`);
 }
+
+export function addFavourite(id: number): Promise<void> {
+    return apiSend('PUT', `/api/recipes/${id}/favourite`);
+}
+
+export function removeFavourite(id: number): Promise<void> {
+    return apiSend('DELETE', `/api/recipes/${id}/favourite`);
+}

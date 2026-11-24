@@ -8,4 +8,5 @@ public record RecipeFilter(
     List<int>? Cuisine,
     List<int>? Meal,
     List<int>? Course,
-    [MaxLength(100)] string? Search);
+    [MaxLength(100)] string? Search,
+    bool? Favourites);

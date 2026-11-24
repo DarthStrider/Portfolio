@@ -262,6 +262,10 @@ namespace RecipeApp.Api.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("description");
 
+                    b.Property<bool>("IsFavourite")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_favourite");
+
                     b.Property<int?>("PrepTime")
                         .HasColumnType("integer")
                         .HasColumnName("prep_time");

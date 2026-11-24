@@ -18,6 +18,11 @@ public static class SeedData
         {
             await recipes.CreateAsync(request);
         }
+
+        string[] favourites = ["Chana Masala", "Maple Pancakes", "Vanilla Cake"];
+        await dbContext.Recipes
+            .Where(r => favourites.Contains(r.Title))
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.IsFavourite, true));
     }
 
     private static List<CreateRecipeRequest> SampleRecipes()
