@@ -16,6 +16,8 @@ export interface RecipeIngredientLine {
     unit: string | null;
     note: string | null;
     section: string | null;
+    gramsPerCup?: number | null;
+    preferWeight?: boolean;
 }
 
 export interface RecipeStepLineRequest {

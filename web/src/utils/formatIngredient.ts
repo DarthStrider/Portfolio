@@ -8,7 +8,11 @@ import type { RecipeIngredientLine } from '../types/recipe';
  */
 export function formatIngredient(line: RecipeIngredientLine, system: UnitSystem = 'original'): string {
     if (line.quantity != null) {
-        const { quantity, unit } = line.unit ? convertAmount(line.quantity, line.unit, system) : { quantity: line.quantity, unit: null };
+        const density = line.gramsPerCup != null ?
+            { gramsPerCup: line.gramsPerCup, preferWeight: line.preferWeight ?? false } : null;
+        const { quantity, unit } = line.unit
+            ? convertAmount(line.quantity, line.unit, system, density)
+            : { quantity: line.quantity, unit: null };
         const amount = formatQuantity(quantity);
 
         const shownUnit = unit && quantity > 1 && amount !== '1' ? pluralizeUnit(unit) : unit;

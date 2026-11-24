@@ -5,6 +5,10 @@ export interface Amount {
     unit: string
 }
 
+export interface Density {
+    gramsPerCup: number;
+    preferWeight: boolean;
+}
 /**
  * Converts an amount for display. Original mode, count units, unknown units
  * and amounts already in the chosen system come back unchanged.
@@ -13,7 +17,7 @@ export interface Amount {
  *   1200 g   -> metric -> unchanged (already metric)
  *   6 clove  -> any    -> unchanged
  */
-export function convertAmount(quantity: number, unit: string, system: UnitSystem): Amount {
+export function convertAmount(quantity: number, unit: string, system: UnitSystem, density?: Density| null): Amount {
     const unchanged = { quantity, unit };
     if (system === 'original') return unchanged;
 
@@ -23,12 +27,24 @@ export function convertAmount(quantity: number, unit: string, system: UnitSystem
     // 1. To the base unit (ml or g)
     const base = quantity * info.toBase;
 
-    // 2. Pick the target unit that reads best for that amount
-    const target = pickTarget(base, info.kind, system);
+    if (density) {
+        if (system === 'metric' && info.kind === 'volume' && density.preferWeight) {
+            const grams = (base / UNITS.cup.toBase) * density.gramsPerCup;
+            return toTarget(grams, 'weight', system);
+        }
+        if (system === 'us' && info.kind === 'weight') {
+            const ml = (base / density.gramsPerCup) * UNITS.cup.toBase;
+            return toTarget(ml, 'volume', system);
+        }
+    }
 
-    // 3. From the base to the target, rounded the way cooks measure
+    return toTarget(base, info.kind, system);
+}
+
+function toTarget(base: number, kind: 'volume' | 'weight', system: 'metric' | 'us'): Amount {
+    const target = pickTarget(base, kind, system);
     const value = base / UNITS[target].toBase;
-    return { quantity: system === 'metric' ? roundMetric(value, target) : roundUs(value, target), unit: target };
+    return { quantity: system === 'metric' ? roundMetric(value, target) : roundUs(value, target), unit: target }
 }
 
 function pickTarget(base: number, kind: 'volume' | 'weight', system: 'metric' | 'us') {
