@@ -81,6 +81,16 @@ web/               React front end (coming soon)
 - Every change goes through a pull request; `main` is protected and requires the CI build to pass
 - Dependabot keeps NuGet packages and GitHub Actions up to date
 
+## Dependency updates
+
+Dependabot checks for updates weekly (npm, NuGet, GitHub Actions and Docker images).
+
+- **Minor and patch** updates are grouped into one PR per ecosystem and **merge automatically** once the required checks (API build, Web build) pass.
+- **Major** updates get their own PR, labelled `major update`, and wait for a manual review.
+- A PR with failing checks is never merged.
+
+To stop a PR from auto-merging, click **Disable auto-merge** on the PR.
+
 ## License
 
 [MIT](LICENSE)

@@ -1,21 +1,43 @@
 version: 2
 updates:
+  # GitHub Actions used by the workflows
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    labels: ["dependencies", "area: devops"]
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # API NuGet packages
   - package-ecosystem: "nuget"
     directory: "/api/RecipeApp.Api"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    labels: ["dependencies", ".NET"]
+    groups:
+      nuget-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # API Docker base images (sdk:10.0, aspnet:10.0)
+  - package-ecosystem: "docker"
+    directory: "/api/RecipeApp.Api"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "area: devops"]
+
+  # Web npm packages
   - package-ecosystem: "npm"
     directory: "/web"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    labels: ["dependencies", "javascript"]
     groups:
-      npm-dependencies:
-        patterns:
-          - "*"
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+    # TypeScript 7 isn't supported by typescript-eslint yet (it needs < 6.1).
+    # Skip TypeScript major versions until it is; minor and patch updates still come through.
     ignore:
       - dependency-name: "typescript"
-        update-types: [version-update:semver-major]
+        update-types: ["version-update:semver-major"]
