@@ -1,6 +1,6 @@
 import { formatQuantity } from './formatQuantity';
 import { convertAmount } from './convertUnits';
-import type { UnitSystem } from './units';
+import { pluralizeUnit, type UnitSystem } from './units';
 import type { RecipeIngredientLine } from '../types/recipe';
 
 /**
@@ -10,7 +10,9 @@ export function formatIngredient(line: RecipeIngredientLine, system: UnitSystem 
     if (line.quantity != null) {
         const { quantity, unit } = line.unit ? convertAmount(line.quantity, line.unit, system) : { quantity: line.quantity, unit: null };
         const amount = formatQuantity(quantity);
-        return unit ? `${amount} ${unit} ${line.name}` : `${amount} ${line.name}`;
+
+        const shownUnit = unit && quantity > 1 && amount !== '1' ? pluralizeUnit(unit) : unit;
+        return shownUnit ? `${amount} ${shownUnit} ${line.name}` : `${amount} ${line.name}`;
     }
 
     // No quantity: "a pinch of salt", or just "salt"
