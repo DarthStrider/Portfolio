@@ -556,6 +556,40 @@ a.primary {
         inset: 0;
     }
 
+    /* ---------------------------- Unit toggle ----------------------*/
+    .ingredient-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .unit-toggle{
+        display: inline-flex;
+        border: 1px solid #2f6f4e;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .unit-toggle button{
+        background: white;
+        color: #2f6f4e;
+        border: none;
+        border-radius: 0;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .unit-toggle button + button{
+        border-left: 1px solid #2f6f4e;
+    }
+
+    .unit-toggle button.on{
+        background: #2f6f4e;
+        color: white;
+    }
+
     .card-link:focus {
         outline: none; /* the card's :focus-within outline is shown instead */
     }
