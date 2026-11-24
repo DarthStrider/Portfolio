@@ -183,6 +183,174 @@ namespace RecipeApp.Api.Migrations
                     b.ToTable("ingredients", (string)null);
                 });
 
+            modelBuilder.Entity("RecipeApp.Api.Models.IngredientDensity", b =>
+                {
+                    b.Property<string>("Name")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<decimal>("GramsPerCup")
+                        .HasPrecision(6, 1)
+                        .HasColumnType("numeric(6,1)")
+                        .HasColumnName("grams_per_cup");
+
+                    b.Property<bool>("PreferWeight")
+                        .HasColumnType("boolean")
+                        .HasColumnName("prefer_weight");
+
+                    b.HasKey("Name")
+                        .HasName("pk_ingredient_densities");
+
+                    b.ToTable("ingredient_densities", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Name = "flour",
+                            GramsPerCup = 125m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "all-purpose flour",
+                            GramsPerCup = 125m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "bread flour",
+                            GramsPerCup = 130m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "whole wheat flour",
+                            GramsPerCup = 120m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "cocoa powder",
+                            GramsPerCup = 85m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "sugar",
+                            GramsPerCup = 200m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "brown sugar",
+                            GramsPerCup = 220m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "icing sugar",
+                            GramsPerCup = 120m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "butter",
+                            GramsPerCup = 227m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "milk",
+                            GramsPerCup = 245m,
+                            PreferWeight = false
+                        },
+                        new
+                        {
+                            Name = "heavy cream",
+                            GramsPerCup = 240m,
+                            PreferWeight = false
+                        },
+                        new
+                        {
+                            Name = "yogurt",
+                            GramsPerCup = 245m,
+                            PreferWeight = false
+                        },
+                        new
+                        {
+                            Name = "grated parmesan",
+                            GramsPerCup = 100m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "water",
+                            GramsPerCup = 237m,
+                            PreferWeight = false
+                        },
+                        new
+                        {
+                            Name = "olive oil",
+                            GramsPerCup = 216m,
+                            PreferWeight = false
+                        },
+                        new
+                        {
+                            Name = "vegetable oil",
+                            GramsPerCup = 218m,
+                            PreferWeight = false
+                        },
+                        new
+                        {
+                            Name = "maple syrup",
+                            GramsPerCup = 315m,
+                            PreferWeight = false
+                        },
+                        new
+                        {
+                            Name = "honey",
+                            GramsPerCup = 340m,
+                            PreferWeight = false
+                        },
+                        new
+                        {
+                            Name = "rice",
+                            GramsPerCup = 185m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "rolled oats",
+                            GramsPerCup = 90m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "chickpeas",
+                            GramsPerCup = 164m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "chocolate chips",
+                            GramsPerCup = 170m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "peanut butter",
+                            GramsPerCup = 258m,
+                            PreferWeight = true
+                        },
+                        new
+                        {
+                            Name = "tahini",
+                            GramsPerCup = 240m,
+                            PreferWeight = true
+                        });
+                });
+
             modelBuilder.Entity("RecipeApp.Api.Models.Meal", b =>
                 {
                     b.Property<int>("Id")

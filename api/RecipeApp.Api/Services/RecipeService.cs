@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RecipeApp.Api.Data;
 using RecipeApp.Api.Dtos;
+using RecipeApp.Api.Migrations;
 using RecipeApp.Api.Models;
 using System.Linq.Expressions;
 
@@ -32,7 +33,7 @@ public class RecipeService(AppDbContext db) : IRecipeService
         }
 
         //Search title, description or any ingredient contains the text (case-insensitive)
-        if(!string.IsNullOrWhiteSpace(filter?.Search))
+        if (!string.IsNullOrWhiteSpace(filter?.Search))
         {
             string pattern = $"%{EscapeLike(IngredientNames.Normalize(filter.Search))}%";
             query = query.Where(r =>
@@ -41,7 +42,7 @@ public class RecipeService(AppDbContext db) : IRecipeService
             r.Ingredients.Any(ri => EF.Functions.ILike(ri.Ingredient.Name, pattern)));
         }
 
-        if(filter?.Favourites == true)
+        if (filter?.Favourites == true)
         {
             query = query.Where(r => r.IsFavourite);
         }
@@ -56,13 +57,13 @@ public class RecipeService(AppDbContext db) : IRecipeService
             .Include(r => r.Ingredients)                     // 2. load the ingredient lines...
                 .ThenInclude(ri => ri.Ingredient)            //    ...and each line's Ingredient (for its Name)
             .Include(r => r.Steps)                           // 3. load the steps
-            .Include(r=> r.Cuisine)
+            .Include(r => r.Cuisine)
             .Include(r => r.Meals)
             .Include(r => r.Courses)
             .AsSplitQuery()
             .FirstOrDefaultAsync(r => r.Id == id);           // 4. one recipe, or null
-
-        return recipe is null ? null : ToDto(recipe);        // 5. not found -> null; found -> DTO
+        if (recipe is null) return null;
+        return ToDto(recipe, await LoadDensitiesAsync(recipe));       // 5. not found -> null; found -> DTO
     }
 
     public async Task<RecipeDto> CreateAsync(CreateRecipeRequest request)
@@ -87,7 +88,7 @@ public class RecipeService(AppDbContext db) : IRecipeService
         await db.SaveChangesAsync();
 
         // 4. Return the saved recipe (now with its database Id)
-        return ToDto(recipe);
+        return ToDto(recipe, await LoadDensitiesAsync(recipe));
     }
 
     public async Task<bool> UpdateAsync(int id, UpdateRecipeRequest request)
@@ -167,13 +168,13 @@ public class RecipeService(AppDbContext db) : IRecipeService
         r.Courses.OrderBy(c => c.Id).Select(c => c.Name).ToList(),
         r.IsFavourite);
 
-    private static Task<List<RecipeSummaryDto>> ToSummariesAsync(IQueryable<Recipe> query) => 
+    private static Task<List<RecipeSummaryDto>> ToSummariesAsync(IQueryable<Recipe> query) =>
         query
         .OrderByDescending(r => r.CreatedAt)
-        .Select(ToSummary) 
+        .Select(ToSummary)
         .ToListAsync();
 
-    private static RecipeDto ToDto(Recipe r) => new(
+    private static RecipeDto ToDto(Recipe r, Dictionary<string, IngredientDensity> densities) => new(
         Id: r.Id,
         Title: r.Title,
         Description: r.Description,
@@ -184,7 +185,13 @@ public class RecipeService(AppDbContext db) : IRecipeService
         CreatedAt: r.CreatedAt,
         Ingredients: r.Ingredients
             .OrderBy(ri => ri.Position)
-            .Select(ri => new RecipeIngredientLineDto(ri.Ingredient.Name, ri.Quantity, ri.Unit, ri.Note, ri.Section))
+            .Select(ri =>
+            {
+                densities.TryGetValue(ri.Ingredient.Name, out IngredientDensity? density);
+                return new RecipeIngredientLineDto(
+                    ri.Ingredient.Name, ri.Quantity, ri.Unit, ri.Note, ri.Section,
+                    density?.GramsPerCup, density?.PreferWeight ?? false);
+            })
             .ToList(),
         Steps: r.Steps
             .OrderBy(s => s.StepNumber)
@@ -269,4 +276,13 @@ public class RecipeService(AppDbContext db) : IRecipeService
 
     private static string EscapeLike(string text) =>
         text.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+
+    private async Task<Dictionary<string, IngredientDensity>> LoadDensitiesAsync(Recipe recipe)
+    {
+        List<string> names = recipe.Ingredients.Select(ri => ri.Ingredient.Name).Distinct().ToList();
+        return await db.IngredientDensities
+            .AsNoTracking()
+            .Where(d => names.Contains(d.Name))
+            .ToDictionaryAsync(d => d.Name);
+    }
 }

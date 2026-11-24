@@ -16,4 +16,7 @@ public record RecipeIngredientLineDto(
     decimal? Quantity,
     string? Unit,
     string? Note,
-    string? Section);
+    string? Section,
+    decimal? GramsPerCup,
+    bool PreferWeight);
+
