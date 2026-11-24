@@ -10,6 +10,8 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { groupBySection } from '../utils/groupBySection';
 import { CategoryChips } from '../components/CategoryChips';
 import { listPath } from '../utils/listReturn';
+import { useUnitSystem } from '../hooks/useUnitSystem';
+import type { UnitSystem } from '../utils/units';
 
 export function RecipeDetailPage() {
     //1. Read :id from URL
@@ -27,6 +29,8 @@ export function RecipeDetailPage() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [unitSystem, setUnitSystem] = useUnitSystem();
+
 
     const deleteMutation = useMutation({
         mutationFn: () => deleteRecipe(recipeId),
@@ -99,13 +103,23 @@ export function RecipeDetailPage() {
             <div className="recipe-body">
                 <section>
                     <h2>Ingredients</h2>
+                    <div className="unit-toggle" role="group" aria-label="Units">
+                        {(['original', 'metric', 'us'] as UnitSystem[]).map((s) => (
+                            <button key={s} type="button"
+                                className={unitSystem === s ? 'on' : ''}
+                                aria-pressed={unitSystem === s}
+                                onClick={() => setUnitSystem(s)}>
+                                { s === 'original' ? 'Original' : s === 'metric' ? 'Metric' : 'US' }
+                            </button>
+                        ))}
+                    </div>
                     {groupBySection(recipe.ingredients).map((group, groupIndex) => (
                         <div key={group.section ?? `group-${groupIndex}`} className="ingredient-group">
                             {group.section && <h3>{group.section}</h3>}
                             <ul className="ingredients">
                                 {group.lines.map((line, lineIndex) => (
                                     <li key={`${line.name}-${lineIndex}`}>
-                                        {formatIngredient(line)}
+                                        {formatIngredient(line, unitSystem)}
                                         {line.note && <span className="note">, {line.note}</span>}
                                     </li>
                                 ))}
