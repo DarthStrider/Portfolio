@@ -53,6 +53,20 @@ export function normalizeUnit(unit: string): string {
     return ALIASES[key] ?? key;
 }
 
+const PLURALS: Record<string, string> = {
+    cup: 'cups',
+    pinch: 'pinches',
+    bunch: 'bunches',
+    clove: 'cloves',
+    can: 'cans',
+    piece: 'pieces',
+    slice: 'slices'
+}
+
+export function pluralizeUnit(unit: string): string {
+    return PLURALS[normalizeUnit(unit)] ?? unit;
+}
+
 //Units offered in the recipe form, grouped for the dropdown
 export const UNIT_GROUPS: { label: string; units: string[] }[] = [
     { label: 'US', units: ['tsp', 'tbsp', 'cup', 'fl oz', 'oz', 'lb' ]},
