@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore; // DbContext, DbSet, ModelBuilder
-using RecipeApp.Api.Models;  //Recipe, Ingredient, RecipeIngredient
+using RecipeApp.Api.Models;
+using System.Security.Cryptography.X509Certificates;  //Recipe, Ingredient, RecipeIngredient
 
 namespace RecipeApp.Api.Data;
 
@@ -13,6 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Cuisine> Cuisines => Set<Cuisine>();
     public DbSet<Meal> Meals => Set<Meal>();
     public DbSet<Course> Courses => Set<Course>();
+    public DbSet<IngredientDensity> IngredientDensities => Set<IngredientDensity>();
 
     //Rules EF can't guess
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -88,6 +90,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .OnDelete(DeleteBehavior.Restrict);
         });
 
+        //----------------------------- IngredientDensity (lookup by name) ------------------------------
+
+        modelBuilder.Entity<IngredientDensity>(density =>
+        {
+            density.HasKey(d => d.Name);
+            density.Property(d => d.Name).HasMaxLength(100);
+            density.Property(d => d.GramsPerCup).HasPrecision(6, 1);
+            density.HasData(DensitySeed.All);
+        });
+
         //------------------------- Cuisine / Meal  / Course (built in lists) ----------//
 
         modelBuilder.Entity<Cuisine>(cuisine =>
@@ -128,7 +140,5 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             //a recipe can't have two of the same step number
             step.HasIndex(s => new { s.RecipeId, s.StepNumber }).IsUnique();
         });
-
-
     }
 }
