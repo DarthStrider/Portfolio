@@ -14,7 +14,9 @@ public record CreateRecipeRequest(
     [MinLength(1)]List<RecipeStepLineRequest> Steps,
     int? CuisineId,
     List<int>? MealIds,
-    List<int>? CourseIds);
+    List<int>? CourseIds,
+    [Range(65,550)] int? OvenTemperature,
+    [RegularExpression("^[FC]$", ErrorMessage = "Oven Temperature unit must be F or C")] string? OvenTemperatureUnit); 
     
 
 //Client sends (PUT /api/recipes/{id}); the id comes from the URL
@@ -29,7 +31,9 @@ public record UpdateRecipeRequest(
     [MinLength(1)] List<RecipeStepLineRequest> Steps,
     int? CuisineId,
     List<int>? MealIds,
-    List<int>? CourseIds);
+    List<int>? CourseIds,
+    [Range(65, 550)] int? OvenTemperature,
+    [RegularExpression("^[FC]$", ErrorMessage = "Oven Temperature unit must be F or C")] string? OvenTemperatureUnit);
 
 
 //API Sends
@@ -40,6 +44,8 @@ public record RecipeDto(
     int Servings,
     int? PrepTime,
     int? CookTime,
+    int? OvenTemperature,
+    string? OvenTemperatureUnit,
     string? SourceUrl,
     DateTime CreatedAt,
     List<RecipeIngredientLineDto> Ingredients,

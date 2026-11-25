@@ -29,7 +29,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             recipe.Property(r => r.Title).HasMaxLength(200);
             recipe.Property(r => r.Description).HasMaxLength(1000);
             recipe.Property(r => r.SourceUrl).HasMaxLength(2048);
-
+            recipe.Property(r => r.OvenTemperatureUnit).HasMaxLength(1);
             //One cuisine per recipe. Restrict: a cuisine can't be delete while recipes use it.
             recipe.HasOne(r => r.Cuisine)
             .WithMany(c => c.Recipes)

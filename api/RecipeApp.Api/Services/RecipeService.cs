@@ -76,6 +76,8 @@ public class RecipeService(AppDbContext db) : IRecipeService
             Servings = request.Servings,
             PrepTime = request.PrepTime,
             CookTime = request.CookTime,
+            OvenTemperature = request.OvenTemperature,
+            OvenTemperatureUnit = request.OvenTemperatureUnit,
             SourceUrl = request.SourceUrl
             // Id and CreatedAt are set automatically
         };
@@ -111,6 +113,8 @@ public class RecipeService(AppDbContext db) : IRecipeService
         recipe.Servings = request.Servings;
         recipe.PrepTime = request.PrepTime;
         recipe.CookTime = request.CookTime;
+        recipe.OvenTemperature = request.OvenTemperature;
+        recipe.OvenTemperatureUnit = request.OvenTemperatureUnit;
         recipe.SourceUrl = request.SourceUrl;
         // Id and CreatedAt stay as they were
 
@@ -181,6 +185,8 @@ public class RecipeService(AppDbContext db) : IRecipeService
         Servings: r.Servings,
         PrepTime: r.PrepTime,
         CookTime: r.CookTime,
+        OvenTemperature: r.OvenTemperature,
+        OvenTemperatureUnit: r.OvenTemperatureUnit,
         SourceUrl: r.SourceUrl,
         CreatedAt: r.CreatedAt,
         Ingredients: r.Ingredients
@@ -228,7 +234,7 @@ public class RecipeService(AppDbContext db) : IRecipeService
             string name = IngredientNames.Normalize(line.Name);
 
             // Reuse it if we have it; otherwise create it once and remember it
-            if (!existing.TryGetValue(name, out var ingredient))
+            if (!existing.TryGetValue(name, out Ingredient? ingredient))
             {
                 ingredient = new Ingredient { Name = name };
                 existing[name] = ingredient;

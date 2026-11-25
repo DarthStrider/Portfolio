@@ -30,6 +30,7 @@ public class RecipesController(IRecipeService recipes, ICategoryService categori
     {
         HasDuplicateIngredients(request.Ingredients);
         await AddCategoryErrorsAsync(request.CuisineId, request.MealIds, request.CourseIds);
+        AddOvenTemperatureErrors(request.OvenTemperature, request.OvenTemperatureUnit);
 
         if (!ModelState.IsValid)
         {
@@ -46,6 +47,7 @@ public class RecipesController(IRecipeService recipes, ICategoryService categori
     {
         HasDuplicateIngredients(request.Ingredients);
         await AddCategoryErrorsAsync(request.CuisineId, request.MealIds, request.CourseIds);
+        AddOvenTemperatureErrors(request.OvenTemperature, request.OvenTemperatureUnit);
 
         if (!ModelState.IsValid)
         {
@@ -96,6 +98,28 @@ public class RecipesController(IRecipeService recipes, ICategoryService categori
         foreach (string problem in await categories.FindProblemAsync(cuisineId, mealIds, courseIds))
         {
             ModelState.AddModelError("Categories", problem);
+        }
+    }
+
+    private void AddOvenTemperatureErrors(int? temperature, string? unit)
+    {
+        if (temperature is null && unit is null) return;
+        if(temperature is null)
+        {
+            ModelState.AddModelError("OvenTemperature", "Enter an oven temperature, or remove the unit");
+            return;
+        }
+        if(unit is null)
+        {
+            ModelState.AddModelError("OvenTemperatureUnit", "Choose °F or °C for the oven temperature.");
+            return;
+        }
+
+        (int min, int max) = unit == "F" ? (150, 550) : (65, 290);
+        if(temperature < min || temperature > max)
+        {
+            ModelState.AddModelError("OvenTemperature", $"Oven temperature must be between {min} and {max}°{unit}.");
+
         }
     }
 }
