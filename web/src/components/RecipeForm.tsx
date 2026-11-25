@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { useFieldArray, useForm, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form';
-import type { Recipe, RecipeRequest } from '../types/recipe';
+import type { Recipe, RecipeRequest, TemperatureUnit } from '../types/recipe';
 import { UNIT_GROUPS } from '../utils/units';
 import { groupBySection } from '../utils/groupBySection';
 import { useQuery } from '@tanstack/react-query';
@@ -27,6 +27,8 @@ interface RecipeFormValues {
     servings: string;
     prepTime: string;
     cookTime: string;
+    ovenTemperature: string;
+    ovenTemperatureUnit: TemperatureUnit;
     sourceUrl: string;
     cuisineId: string;
     mealIds: string[];
@@ -77,7 +79,7 @@ export function RecipeForm({ initialRecipe, submitLabel, isSaving, cancelTo, onS
 
             <div className="form-row">
                 <label>
-                    Serviing
+                    Serving
                     <input type="number" min={1} max={100} {...register('servings', { required: 'Servings is required', min: { value: 1, message: 'At least 1' } })} />
                 </label>
                 <label>
@@ -89,7 +91,20 @@ export function RecipeForm({ initialRecipe, submitLabel, isSaving, cancelTo, onS
                     <input type="number" min={0} {...register('cookTime')} />
                 </label>
             </div>
-
+            <label>
+                Oven temperature (optional)
+                <div className="oven-input">
+                    <input type="number" min={0} placeholder="e.g. 350" aria-label="Oven temperature"
+                        {...register('ovenTemperature', {
+                            validate: (value, values) => validateOven(value, values.ovenTemperatureUnit),
+                        })} />
+                    <select aria-label="Oven temperature unit" {...register('ovenTemperatureUnit')}>
+                        <option value="F">°F</option>
+                    <option value="C">°C</option>
+                    </select>
+                </div>
+                {errors.ovenTemperature && <span className="field-error">{ errors.ovenTemperature.message}</span>}
+            </label>
             <label>
                 Source URL
                 <input type="url" placeholder="https://..." {...register('sourceUrl')} />
@@ -276,13 +291,20 @@ function validateSectionName(value: string, values: RecipeFormValues, index: num
     return isDuplicate ? 'Another section already has this name' : true;
 }
 
+function validateOven(value: string, unit: TemperatureUnit): string | true {
+    if (value.trim() === '') return true;
+    const [min, max] = unit === 'F' ? [150, 550] : [65, 290];
+    const n = Number(value);
+    return n >= min && n <= max ? true : `Oven temperature must be between ${min} and ${max}°${unit}.`;
+}
+
 //Helpers: convert between the API shape and the form shape -----
 
 //Recipe (from the API) -> form values. with no recipe, start with the one empty row each.
 function toFormValues(recipe?: Recipe): RecipeFormValues {
     if (!recipe) {
         return {
-            title: '', description: '', servings: '4', prepTime: '', cookTime: '', sourceUrl: '',
+            title: '', description: '', servings: '4', prepTime: '', cookTime: '', ovenTemperature: '', ovenTemperatureUnit: 'F', sourceUrl: '',
             cuisineId:'', mealIds: [], courseIds:[],
             sections: [emptySection()],
             steps: [{ text: '' }]
@@ -294,6 +316,8 @@ function toFormValues(recipe?: Recipe): RecipeFormValues {
         servings: String(recipe.servings),
         prepTime: recipe.prepTime?.toString() ?? '',
         cookTime: recipe.cookTime?.toString() ?? '',
+        ovenTemperature: recipe.ovenTemperature?.toString() ?? '',
+        ovenTemperatureUnit: recipe.ovenTemperatureUnit ?? 'F',
         sourceUrl: recipe.sourceUrl ?? '',
         cuisineId: recipe.cuisine?.id.toString() ?? '',
         mealIds: recipe.meals.map((m) => String(m.id)),
@@ -328,6 +352,8 @@ function toRequest(values: RecipeFormValues): RecipeRequest {
         servings: Number(values.servings),
         prepTime: toNumber(values.prepTime),
         cookTime: toNumber(values.cookTime),
+        ovenTemperature: toNumber(values.ovenTemperature),
+        ovenTemperatureUnit: values.ovenTemperature.trim() === '' ? null : values.ovenTemperatureUnit,
         sourceUrl: toText(values.sourceUrl),
         ingredients: values.sections.flatMap((section) =>
             section.ingredients.map((i) =>
