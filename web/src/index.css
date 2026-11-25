@@ -44,25 +44,25 @@ body {
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
-.recipe-card:focus-within {
-    outline: 2px solid #2f6f4e;
-    outline-offset: 2px;
-}
+    .recipe-card:focus-within {
+        outline: 2px solid #2f6f4e;
+        outline-offset: 2px;
+    }
 
     .recipe-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 10px rgba(0,0,0,0.12);
     }
 
-.recipe-card h2 {
-    font-size: 1.1rem;
-    margin: 0 0 0.5rem
-}
+    .recipe-card h2 {
+        font-size: 1.1rem;
+        margin: 0 0 0.5rem
+    }
 
-.recipe-card p {
-    margin: 0;
-    color: #666;
-}
+    .recipe-card p {
+        margin: 0;
+        color: #666;
+    }
 
 .status {
     color: #666;
@@ -556,23 +556,23 @@ a.primary {
         inset: 0;
     }
 
-    /* ---------------------------- Unit toggle ----------------------*/
-    .ingredient-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
+/* ---------------------------- Unit toggle ----------------------*/
+.ingredients-header, .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
 
-    .unit-toggle{
-        display: inline-flex;
-        border: 1px solid #2f6f4e;
-        border-radius: 999px;
-        overflow: hidden;
-    }
+.unit-toggle {
+    display: inline-flex;
+    border: 1px solid #2f6f4e;
+    border-radius: 999px;
+    overflow: hidden;
+}
 
-    .unit-toggle button{
+    .unit-toggle button {
         background: white;
         color: #2f6f4e;
         border: none;
@@ -581,18 +581,18 @@ a.primary {
         font-size: 0.85rem;
     }
 
-    .unit-toggle button + button{
-        border-left: 1px solid #2f6f4e;
-    }
+        .unit-toggle button + button {
+            border-left: 1px solid #2f6f4e;
+        }
 
-    .unit-toggle button.on{
-        background: #2f6f4e;
-        color: white;
-    }
+        .unit-toggle button.on {
+            background: #2f6f4e;
+            color: white;
+        }
 
-    .card-link:focus {
-        outline: none; /* the card's :focus-within outline is shown instead */
-    }
+.card-link:focus {
+    outline: none; /* the card's :focus-within outline is shown instead */
+}
 
 /*---- Favourite heart ------*/
 .favourite-button {
@@ -620,3 +620,15 @@ a.primary {
     align-items: center;
     gap: 0.5rem;
 }
+
+/*----------------- Oven temperature input-------------*/
+.oven-input {
+    display: flex;
+    gap: 0.5rem;
+    max-width: 220px;
+}
+
+    .oven-input input {
+        flex: 1;
+        mid-width: 0;
+    }

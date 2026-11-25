@@ -13,6 +13,8 @@ import { listPath } from '../utils/listReturn';
 import { useUnitSystem } from '../hooks/useUnitSystem';
 import type { UnitSystem } from '../utils/units';
 import { FavouriteButton } from '../components/FavouriteButton';
+import { useOvenScale } from '../hooks/useOvenScale';
+import { formatOvenTemperature, formatStepTemperatures, type OvenScale } from '../utils/temperature';
 
 export function RecipeDetailPage() {
     //1. Read :id from URL
@@ -31,7 +33,7 @@ export function RecipeDetailPage() {
     const queryClient = useQueryClient();
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [unitSystem, setUnitSystem] = useUnitSystem();
-
+    const [ovenScale, setOvenScale] = useOvenScale();
 
     const deleteMutation = useMutation({
         mutationFn: () => deleteRecipe(recipeId),
@@ -65,7 +67,7 @@ export function RecipeDetailPage() {
     return (
         <article className="recipe-detail">
             <div className="page-header">
-                <Link to={ listPath()} className="back-link">← Back to recipes</Link>
+                <Link to={listPath()} className="back-link">← Back to recipes</Link>
                 <div className="form-actions">
                     <Link to={`/recipes/${recipe.id}/edit`} className="button secondary">Edit</Link>
                     <button type="button" className="danger" onClick={() => setConfirmOpen(true)}>Delete</button>
@@ -103,20 +105,23 @@ export function RecipeDetailPage() {
                 {recipe.prepTime != null && <li>Prep Time: {formatDuration(recipe.prepTime)}</li>}
                 {recipe.cookTime != null && <li>Cook Time: {formatDuration(recipe.cookTime)}</li>}
                 {(recipe.prepTime ?? 0) > 0 && (recipe.cookTime ?? 0) > 0 && <li>Total Time: {formatDuration(totalTime)}</li>}
+                {recipe.ovenTemperature != null && recipe.ovenTemperatureUnit && (<li>Bake: {formatOvenTemperature(recipe.ovenTemperature, recipe.ovenTemperatureUnit, ovenScale)}</li>)}
             </ul>
 
             <div className="recipe-body">
                 <section>
-                    <h2>Ingredients</h2>
-                    <div className="unit-toggle" role="group" aria-label="Units">
-                        {(['original', 'metric', 'us'] as UnitSystem[]).map((s) => (
-                            <button key={s} type="button"
-                                className={unitSystem === s ? 'on' : ''}
-                                aria-pressed={unitSystem === s}
-                                onClick={() => setUnitSystem(s)}>
-                                { s === 'original' ? 'Original' : s === 'metric' ? 'Metric' : 'US' }
-                            </button>
-                        ))}
+                    <div className="ingredients-header">
+                        <h2>Ingredients</h2>
+                        <div className="unit-toggle" role="group" aria-label="Units">
+                            {(['original', 'metric', 'us'] as UnitSystem[]).map((s) => (
+                                <button key={s} type="button"
+                                    className={unitSystem === s ? 'on' : ''}
+                                    aria-pressed={unitSystem === s}
+                                    onClick={() => setUnitSystem(s)}>
+                                    {s === 'original' ? 'Original' : s === 'metric' ? 'Metric' : 'US'}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                     {groupBySection(recipe.ingredients).map((group, groupIndex) => (
                         <div key={group.section ?? `group-${groupIndex}`} className="ingredient-group">
@@ -134,10 +139,21 @@ export function RecipeDetailPage() {
                 </section>
 
                 <section>
-                    <h2>Steps</h2>
+                    <div className="panel-header">
+                        <h2>Steps</h2>
+                        <div className="unit-toggle" role="group" aria-label="Oven temperature">
+                            {(['original', 'F', 'C'] as OvenScale[]).map((s) => (
+                                <button key={s} type="button"
+                                    className={ovenScale === s ? 'on' : ''}
+                                    aria-pressed={ovenScale === s}
+                                    onClick={() => setOvenScale(s)}>
+                                    {s === 'original' ? 'As written' : `°${s}`}
+                                </button>))}
+                        </div>
+                    </div>
                     <ol className="steps">
                         {recipe.steps.map((step) => (
-                            <li key={step.stepNumber}>{step.text}</li>
+                            <li key={step.stepNumber}>{formatStepTemperatures(step.text, ovenScale)}</li>
                         ))}
                     </ol>
                 </section>

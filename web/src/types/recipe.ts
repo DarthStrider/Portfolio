@@ -1,3 +1,5 @@
+
+export type TemperatureUnit = 'F' | 'C';
 export interface RecipeSummary {
     id: number;
     title: string;
@@ -37,6 +39,8 @@ export interface RecipeRequest {
     servings: number;
     prepTime: number | null;
     cookTime: number | null;
+    ovenTemperature: number | null;
+    ovenTemperatureUnit: TemperatureUnit | null;
     sourceUrl: string | null;
     ingredients: RecipeIngredientLine[];
     steps: RecipeStepLineRequest[];
@@ -53,6 +57,8 @@ export interface Recipe {
     servings: number;
     prepTime: number | null;
     cookTime: number | null;
+    ovenTemperature: number | null;
+    ovenTemperatureUnit: TemperatureUnit | null;
     sourceUrl: string | null;
     createdAt: string;
     ingredients: RecipeIngredientLine[];

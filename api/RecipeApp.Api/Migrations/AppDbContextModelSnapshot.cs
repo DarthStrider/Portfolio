@@ -434,6 +434,15 @@ namespace RecipeApp.Api.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_favourite");
 
+                    b.Property<int?>("OvenTemperature")
+                        .HasColumnType("integer")
+                        .HasColumnName("oven_temperature");
+
+                    b.Property<string>("OvenTemperatureUnit")
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)")
+                        .HasColumnName("oven_temperature_unit");
+
                     b.Property<int?>("PrepTime")
                         .HasColumnType("integer")
                         .HasColumnName("prep_time");

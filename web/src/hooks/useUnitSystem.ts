@@ -1,27 +1,8 @@
-import { useState } from 'react';
+import { useStoredChoice } from './useStoredChoice';
 import type { UnitSystem } from '../utils/units';
 
-const KEY = 'unit-system';
-const SYSTEMS: UnitSystem[] = ['original', 'metric', 'us'];
+const SYSTEMS = ['original', 'metric', 'us'] as const;
 
-//the chosen unit system, remembered in this browser (localStorage) across visits
-export function useUnitSystem(): [UnitSystem, (system: UnitSystem) => void] {
-    const [system, setSystem] = useState<UnitSystem>(() => {
-        try {
-            const saved = localStorage.getItem(KEY);
-            return SYSTEMS.includes(saved as UnitSystem) ? (saved as UnitSystem) : 'original';
-        } catch {
-            return 'original';
-        }
-    });
-
-    const choose = (next: UnitSystem) => {
-        setSystem(next);
-        try {
-            localStorage.setItem(KEY, next);
-        } catch {//Storage blocked 
-        }
-    };
-
-    return [system, choose];
+export function useUnitSystem() {
+    return useStoredChoice<UnitSystem>('unit-system', SYSTEMS, 'original');
 }

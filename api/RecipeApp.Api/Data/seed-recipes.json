@@ -570,6 +570,8 @@
     "servings": 12,
     "prepTime": 25,
     "cookTime": 30,
+    "ovenTemperature": 350,
+    "ovenTemperatureUnit": "F",
     "sourceUrl": null,
     "cuisineId": 9,
     "mealIds": [ 5 ],

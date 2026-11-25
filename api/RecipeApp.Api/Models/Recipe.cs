@@ -8,6 +8,8 @@ public class Recipe
     public int Servings { get; set; }
     public int? PrepTime { get; set; }
     public int? CookTime { get; set; }
+    public int? OvenTemperature { get; set; }
+    public string? OvenTemperatureUnit { get; set; }
     public List<RecipeStep> Steps { get; set; } = [];
     public string? SourceUrl { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
