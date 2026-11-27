@@ -16,6 +16,7 @@ import { FavouriteButton } from '../components/FavouriteButton';
 import { useOvenScale } from '../hooks/useOvenScale';
 import { formatOvenTemperature, formatStepTemperatures, type OvenScale } from '../utils/temperature';
 import { formatQuantity } from '../utils/formatQuantity';
+import { ChefHat, Flame, Thermometer, Timer, UtensilsCrossed } from 'lucide-react';
 
 export function RecipeDetailPage() {
     //1. Read :id from URL
@@ -126,11 +127,29 @@ export function RecipeDetailPage() {
             ]} />
 
             <ul className="recipe-meta">
-                <li> Serves: {formatQuantity(servings)}</li>
-                {recipe.prepTime != null && <li>Prep Time: {formatDuration(recipe.prepTime)}</li>}
-                {recipe.cookTime != null && <li>Cook Time: {formatDuration(recipe.cookTime)}</li>}
-                {(recipe.prepTime ?? 0) > 0 && (recipe.cookTime ?? 0) > 0 && <li>Total Time: {formatDuration(totalTime)}</li>}
-                {recipe.ovenTemperature != null && recipe.ovenTemperatureUnit && (<li>Bake: {formatOvenTemperature(recipe.ovenTemperature, recipe.ovenTemperatureUnit, ovenScale)}</li>)}
+                <li className="icon-text">
+                    <UtensilsCrossed size={16} aria-hidden="true" /> Serves {formatQuantity(servings)}
+                </li>
+                {recipe.prepTime != null && (
+                    <li className="icon-text">
+                        <ChefHat size={16} aria-hidden="true" /> Prep {formatDuration(recipe.prepTime)}
+                    </li>
+                )}
+                {recipe.cookTime != null && (
+                    <li className="icon-text">
+                        <Flame size={16} aria-hidden="true" /> Cook {formatDuration(recipe.cookTime)}
+                    </li>
+                )}
+                {(recipe.prepTime ?? 0) > 0 && (recipe.cookTime ?? 0) > 0 && (
+                    <li className="icon-text">
+                        <Timer size={16} aria-hidden="true" /> Total {formatDuration(totalTime)}
+                    </li>
+                )}
+                {recipe.ovenTemperature != null && recipe.ovenTemperatureUnit && (
+                    <li className="icon-text">
+                        <Thermometer size={16} aria-hidden="true" /> Bake {formatOvenTemperature(recipe.ovenTemperature, recipe.ovenTemperatureUnit, ovenScale)}
+                    </li>
+                )}
             </ul>
 
             <div className="recipe-body">
