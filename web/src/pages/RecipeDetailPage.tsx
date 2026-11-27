@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router'
 import { deleteRecipe, getRecipe } from '../api/recipes'
@@ -36,6 +36,12 @@ export function RecipeDetailPage() {
     const [unitSystem, setUnitSystem] = useUnitSystem();
     const [ovenScale, setOvenScale] = useOvenScale();
     const [searchParams, setSearchParams] = useSearchParams();
+
+    useEffect(() => {
+        if (!recipe) return;
+        document.title = `${recipe.title} · Recipe App`;
+        return () => { document.title = 'Recipe App'; };
+    },[recipe]);
 
     const deleteMutation = useMutation({
         mutationFn: () => deleteRecipe(recipeId),
@@ -87,6 +93,7 @@ export function RecipeDetailPage() {
             <div className="page-header">
                 <Link to={listPath()} className="back-link">← Back to recipes</Link>
                 <div className="form-actions">
+                    <button type="button" className="secondary" onClick={() => window.print()}>Print</button>
                     <Link to={`/recipes/${recipe.id}/edit`} className="button secondary">Edit</Link>
                     <button type="button" className="danger" onClick={() => setConfirmOpen(true)}>Delete</button>
                 </div>
@@ -167,10 +174,13 @@ export function RecipeDetailPage() {
 
                     {factor !== 1 && (
                         <p className="scale-note">
-                            Scaled from {recipe.servings} {recipe.servings === 1 ? 'serving' : 'servings'} ·{' '}
-                            <button type="button" className="link-button" onClick={() => setServings(recipe.servings)}>
-                                Reset
-                            </button>
+                            Scaled from {recipe.servings} {recipe.servings === 1 ? 'serving' : 'servings'}
+                            <span className="no-print">
+                                {' · '}
+                                <button type="button" className="link-button" onClick={() => setServings(recipe.servings)}>
+                                    Reset
+                                </button>
+                            </span>
                         </p>)}
 
                     {groupBySection(recipe.ingredients).map((group, groupIndex) => (
@@ -222,7 +232,9 @@ export function RecipeDetailPage() {
                     </p>
                 )
             }
-
+            <footer className="print-footer">
+                Printed from Recipe App · {new Date().toLocaleDateString(undefined, { dateStyle: 'medium' })}
+            </footer>
         </article >
     );
 }
