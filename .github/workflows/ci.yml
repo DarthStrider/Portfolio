@@ -54,3 +54,51 @@ jobs:
 
       - name: Build
         run: npm run build
+  
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      # docker-compose.yml reads POSTGRES_DB/USER/PASSWORD from .env, which isn't in git (it's ignored).
+      # The example values are fine for a throwaway CI database; real secrets never go here.
+      - name: Create .env from the example
+        run: cp .env.example .env
+
+      # Builds the API image from the Dockerfile (the part "API build" never tests), then starts API + Postgres
+      - name: Build and start the app
+        run: docker compose up -d --build
+      
+      # The API needs a few seconds to start, migrate and seed. Ask /health every 2 s, for up to 60 s.
+      - name: Wait for the API to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://localhost:8080/health; then
+              echo " - API is healthy"
+              exit 0
+            fi
+            echo "Waiting for the API... ($i/30)"
+            sleep 2
+          done
+          echo "API did not become healthy in time"
+          exit 1
+
+      # A real endpoint, through the database: proves migrations ran and seeding worked
+      - name: Smoke test the API
+        run: |
+          curl --silent --fail http://localhost:8080/api/categories | grep --quiet "Italian"
+          curl --silent --fail http://localhost:8080/api/recipes | grep --quiet "Vanilla Cake"
+          echo "Smoke test passed"
+
+      # Only when something above failed: show why
+      - name: Show API logs
+        if: failure()
+        run: docker compose logs api
+
+      # Always: stop and remove the containers and the test database
+      - name: Clean up
+        if: always()
+        run: docker compose down -v

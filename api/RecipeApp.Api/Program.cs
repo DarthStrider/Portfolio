@@ -19,6 +19,7 @@ builder.Services.AddDbContext<AppDbContext>(
     options => options.UseNpgsql(connectionString)
     .UseSnakeCaseNamingConvention());
 
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 builder.Services.AddScoped<IRecipeService, RecipeService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 
@@ -59,5 +60,6 @@ else
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();
