@@ -681,3 +681,112 @@ a.primary {
     color: #6b5313;
     border-radius: 4px;
 }
+
+.print-footer {
+    display: none;
+}
+
+/*---- Printing (#73): rules here ONLY apply when printing / Save as PDF ------*/
+@media print {
+    /* Step 3: things that only make sense on screen */
+    .app-header,
+    .page-header,
+    .favourite-button,
+    .unit-toggle,
+    .servings-stepper button,
+    .scale-note .link-button,
+    .no-print {
+        display: none !important;
+    }
+
+    /* Step 4: page margins, black on white, no screen decoration */
+    @page {
+        margin: 1.5cm;
+    }
+
+    :root,
+    body {
+        background: white;
+        color: black;
+        font-size: 11pt;
+    }
+
+    .container {
+        max-width: none;
+        padding: 0;
+    }
+
+    .recipe-body section,
+    .recipe-card {
+        background: none;
+        box-shadow: none;
+        padding: 0;
+    }
+
+    h1, h2, h3,
+    .ingredient-group h3,
+    a {
+        color: black;
+    }
+
+    .recipe-body {
+        grid-template-columns: 1fr 2fr;
+        gap: 1.5rem;
+    }
+
+    .recipe-meta,
+    .chips {
+        gap: 0;
+        margin: 0.5rem 0;
+    }
+
+        .recipe-meta li,
+        .chip {
+            background: none;
+            color: black;
+            padding: 0;
+            border-radius: 0;
+            font-size: inherit;
+        }
+
+            .recipe-meta li + li::before,
+            .chip + .chip::before {
+                content: " \00B7  ";
+            }
+
+    .scale-hint {
+        background: none;
+        color: black;
+        border-left-color: #999;
+    }
+
+    .note,
+    .scale-note,
+    .description {
+        color: #444;
+    }
+
+    .ingredient-group,
+    .steps li {
+        break-inside: avoid;
+    }
+
+    h2, h3 {
+        break-after: avoid;
+    }
+
+    /* Step 5: footer and long URLs */
+    .print-footer {
+        display: block;
+        margin-top: 1.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid #999;
+        font-size: 9pt;
+        color: #666;
+    }
+
+    .source a {
+        overflow-wrap: anywhere;
+        text-decoration: none;
+    }
+}
