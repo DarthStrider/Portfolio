@@ -596,7 +596,9 @@ a.primary {
 
 /*---- Favourite heart ------*/
 .favourite-button {
-    position: relative; /* sits above the stretched link, so it gets its own clicks */
+    display: inline-flex; /* NEW: centre the heart icon inside the button */
+    align-items: center; /* NEW */
+    position: relative;
     z-index: 1;
     background: none;
     border: none;
@@ -606,6 +608,10 @@ a.primary {
     color: #999;
     cursor: pointer;
 }
+
+    .favourite-button svg {
+        transition: fill 0.15s, transform 0.15s;
+    }
 
     .favourite-button.on {
         color: #d6336c;
@@ -789,4 +795,38 @@ a.primary {
         overflow-wrap: anywhere;
         text-decoration: none;
     }
+}
+
+/*-----------Icons-----------*/
+.icon-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+    .icon-text svg {
+        flex-shrink: 0;
+    }
+
+/* Detail page pills: a touch more room between icon and text */
+.recipe-meta .icon-text {
+    gap: 0.35rem;
+}
+
+.card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
 }

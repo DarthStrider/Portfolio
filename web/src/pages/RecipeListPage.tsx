@@ -8,7 +8,7 @@ import { FilterPanel } from '../components/FilterPanel';
 import { countFilters, FILTER_KEYS, readFilters, toggleFilter, type FilterKey } from '../utils/recipeFilters';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { rememberListSearch } from '../utils/listReturn';
-
+import { Heart } from 'lucide-react';
 export function RecipeListPage() {
     //1. Filters come from URL
     const [searchParams, setSearchParams] = useSearchParams();
@@ -83,9 +83,10 @@ export function RecipeListPage() {
             <div className="page-header">
                 <h1>Recipes</h1>
                 <div className="header-actions">
-                    <button type="button" className={filters.favourites ? 'primary' : 'secondary'}
+                    <button type="button" className={`${filters.favourites ? 'primary' : 'secondary'} icon-text`}
                         aria-pressed={filters.favourites} onClick={toggleFavourites}>
-                        ♥ Favourites </button>
+                        <Heart size={16} fill="currentColor" aria-hidden="true" /> Favourites
+                    </button>
                     <button type="button" className="secondary" onClick={() => setFiltersOpen(true)}>
                         Filters{activeCount > 0 && ` (${activeCount})`}
                     </button>
