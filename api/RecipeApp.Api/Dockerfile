@@ -11,7 +11,7 @@ COPY . .
 RUN dotnet publish -c Release -o /app/publish --no-restore
 
 # ---------- Stage 2: run ----------
-FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # Kerberos library that Npgsql probes for (silences a startup warning)
