@@ -630,5 +630,54 @@ a.primary {
 
     .oven-input input {
         flex: 1;
-        mid-width: 0;
+        min-width: 0;
     }
+/*----------------------- Recipe Scaling -------------------------*/
+.scale-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin: 0.5rem 0 0.75rem;
+}
+
+.servings-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+}
+
+    .servings-stepper .icon-button {
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        line-height: 1;
+    }
+
+.servings-count {
+    min-width: 2.5rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.unit-toggle button:disabled {
+    opacity: 0.4;
+}
+
+.scale-note {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.scale-hint {
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid #e0b252;
+    background: #fdf7e9;
+    font-size: 0.85rem;
+    color: #6b5313;
+    border-radius: 4px;
+}

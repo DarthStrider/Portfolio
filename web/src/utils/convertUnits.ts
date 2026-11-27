@@ -41,6 +41,13 @@ export function convertAmount(quantity: number, unit: string, system: UnitSystem
     return toTarget(base, info.kind, system);
 }
 
+export function tidyAmount(quantity: number, unit: string): Amount {
+    const info = UNITS[normalizeUnit(unit)];
+    if (!info || info.kind === 'count' || info.system === null) return { quantity, unit };
+
+    return toTarget(quantity * info.toBase, info.kind, info.system);
+}
+
 function toTarget(base: number, kind: 'volume' | 'weight', system: 'metric' | 'us'): Amount {
     const target = pickTarget(base, kind, system);
     const value = base / UNITS[target].toBase;
